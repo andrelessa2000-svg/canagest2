@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Fazenda {
+  id          String    @id @default(cuid())
+  nome        String
+  cidade      String?
+  uf          String?
+  areaTotalHa Float
+  criadaEm    DateTime  @default(now())
+  atualizadaEm DateTime @updatedAt
+  talhoes     Talhao[]
+
+  @@index([nome])
+}
+
+model Talhao {
+  id         String   @id @default(cuid())
+  fazendaId  String
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  nome       String
+  variedade  String?
+  areaHa     Float
+  dataPlantio DateTime?
+  criadoEm   DateTime @default(now())
+  colheitas  Colheita[]
+
+  @@unique([fazendaId, nome])
+  @@index([fazendaId])
+}
+
+model Colheita {
+  id         String   @id @default(cuid())
+  talhaoId   String
+  talhao     Talhao   @relation(fields: [talhaoId], references: [id], onDelete: Cascade)
+  data       DateTime @default(now())
+  tipo       String
+  toneladas  Float
+  observacao String?
+  criadaEm   DateTime @default(now())
+
+  @@index([talhaoId, data])
+  @@index([data])
+}
