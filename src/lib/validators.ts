@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseDecimal, tarefasParaHa, UNIDADES_AREA } from "./format";
+import { COMPLEMENTO_TIPOS } from "./colheita";
 
 const TIPOS = ["planta", "soca", "ressoca"] as const;
 export type TipoColheita = (typeof TIPOS)[number];
@@ -46,11 +47,50 @@ export const talhaoSchema = z
 
 export const colheitaSchema = z.object({
   talhaoId: z.string().min(1, "Selecione o talhão"),
+  usinaId: z.string().min(1, "Selecione a usina"),
   data: z.string().min(1, "Informe a data"),
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),
   toneladas: numField("Toneladas"),
+
+  valorTonelada: numeroOpcional("Valor da tonelada"),
+  complemento: numeroOpcional("Complemento/ágio"),
+  complementoTipo: z.enum(COMPLEMENTO_TIPOS).optional().default("total"),
+
+  atrPorTonelada: numeroOpcional("ATR por tonelada"),
+  precoKgAtr: numeroOpcional("Preço do kg de ATR"),
+  outrosAdicionais: numeroOpcional("Outros adicionais"),
+
+  despCorte: moedaField("Corte"),
+  despTransporte: moedaField("Transporte"),
+  despOutrasColheita: moedaField("Outras despesas de colheita"),
+  despPlantioUsina: moedaField("Plantio com a usina"),
+  despArrendamento: moedaField("Arrendamento"),
+  despAdubacao: moedaField("Adubação"),
+  despHerbicida: moedaField("Herbicida"),
+  despOutras: moedaField("Outras despesas"),
+
   observacao: optionalField(300),
 });
+
+function numeroOpcional(label: string) {
+  return z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v.trim() === "" ? null : parseDecimal(v)))
+    .refine((v) => v === null || (Number.isFinite(v) && v >= 0), {
+      message: `${label} inválido(a) ou negativo(a)`,
+    });
+}
+
+function moedaField(label: string) {
+  return z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v.trim() === "" ? 0 : parseDecimal(v)))
+    .refine((v) => Number.isFinite(v) && v >= 0, {
+      message: `${label} não pode ser negativo(a)`,
+    });
+}
 
 export type FazendaInput = z.infer<typeof fazendaSchema>;
 export type TalhaoInput = z.infer<typeof talhaoSchema>;

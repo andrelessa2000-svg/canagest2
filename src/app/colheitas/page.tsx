@@ -1,29 +1,117 @@
 import Link from "next/link";
-import { Plus, Sprout } from "lucide-react";
+import { Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { fmtDate, fmtProd, fmtTons } from "@/lib/format";
-import { tipoLabel } from "@/lib/validators";
+import {
+  fmtDate,
+  fmtMoney,
+  fmtToneladas,
+  fmtCount,
+} from "@/lib/format";
+import { tipoLabel, TIPOS_COLHEITA } from "@/lib/validators";
+import { calcularColheita } from "@/lib/colheita";
 import { excluirColheita } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { CelulaMetrica } from "@/components/stat-cells";
 
 export const dynamic = "force-dynamic";
 
-export default async function ColheitasPage() {
-  const colheitas = await prisma.colheita.findMany({
-    include: { talhao: { include: { fazenda: true } } },
-    orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
-  });
+type Filtros = {
+  fazenda?: string;
+  talhao?: string;
+  usina?: string;
+  tipo?: string;
+  de?: string;
+  ate?: string;
+};
 
-  const total = colheitas.reduce((n, c) => n + c.toneladas, 0);
+export default async function ColheitasPage({
+  searchParams,
+}: {
+  searchParams: Promise<Filtros>;
+}) {
+  const { fazenda, talhao, usina, tipo, de, ate } = await searchParams;
+
+  const where = {
+    ...(usina ? { usinaId: usina } : {}),
+    ...(tipo ? { tipo } : {}),
+    ...(fazenda || talhao
+      ? {
+          talhao: {
+            ...(fazenda ? { fazendaId: fazenda } : {}),
+            ...(talhao ? { id: talhao } : {}),
+          },
+        }
+      : {}),
+    ...(de || ate
+      ? {
+          data: {
+            ...(de ? { gte: new Date(`${de}T00:00:00`) } : {}),
+            ...(ate ? { lte: new Date(`${ate}T23:59:59`) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const [colheitas, fazendas, usinas, talhoes] = await Promise.all([
+    prisma.colheita.findMany({
+      where,
+      include: {
+        talhao: { select: { id: true, nome: true, fazenda: { select: { nome: true } } } },
+        usina: { select: { nome: true, modelo: true } },
+      },
+      orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+    }),
+    prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
+    prisma.usina.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
+    prisma.talhao.findMany({
+      select: { id: true, nome: true, fazendaId: true },
+      orderBy: { nome: "asc" },
+    }),
+  ]);
+
+  const linhas = colheitas.map((c) => ({
+    c,
+    r: calcularColheita({
+      modelo: c.usina.modelo,
+      toneladas: c.toneladas,
+      valorTonelada: c.valorTonelada,
+      complemento: c.complemento,
+      complementoTipo: c.complementoTipo,
+      atrPorTonelada: c.atrPorTonelada,
+      precoKgAtr: c.precoKgAtr,
+      outrosAdicionais: c.outrosAdicionais,
+      despCorte: c.despCorte,
+      despTransporte: c.despTransporte,
+      despOutrasColheita: c.despOutrasColheita,
+      despPlantioUsina: c.despPlantioUsina,
+      despArrendamento: c.despArrendamento,
+      despAdubacao: c.despAdubacao,
+      despHerbicida: c.despHerbicida,
+      despOutras: c.despOutras,
+    }),
+  }));
+
+  const totais = linhas.reduce(
+    (acc, { r }) => ({
+      toneladas: acc.toneladas + r.toneladas,
+      receita: acc.receita + r.valorBruto,
+      despesas: acc.despesas + r.totalDespesas,
+      lucro: acc.lucro + r.lucro,
+    }),
+    { toneladas: 0, receita: 0, despesas: 0, lucro: 0 },
+  );
+
+  const fila = fazenda ? talhoes.filter((t) => t.fazendaId === fazenda) : talhoes;
+  const temFiltro = Boolean(fazenda || talhao || usina || tipo || de || ate);
 
   return (
     <>
       <PageHeader
         rotulo="safra"
         titulo="Colheitas"
-        descricao="Todas as colheitas registradas, da mais recente para a mais antiga."
+        descricao="Produção, remuneração e resultado de cada colheita registrada."
         acao={
           <Link href="/colheitas/nova" className="btn btn-primary">
             <Plus className="size-4" /> Nova colheita
@@ -31,29 +119,103 @@ export default async function ColheitasPage() {
         }
       />
 
-      {colheitas.length === 0 ? (
+      <form
+        action="/colheitas"
+        method="get"
+        className="ledger-panel mb-5 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <label className="grid gap-1">
+          <span className="field-label">Fazenda</span>
+          <select name="fazenda" defaultValue={fazenda ?? ""} className="field-input">
+            <option value="">Todas</option>
+            {fazendas.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">Talhão</span>
+          <select name="talhao" defaultValue={talhao ?? ""} className="field-input">
+            <option value="">Todos</option>
+            {fila.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">Usina</span>
+          <select name="usina" defaultValue={usina ?? ""} className="field-input">
+            <option value="">Todas</option>
+            {usinas.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">Tipo de corte</span>
+          <select name="tipo" defaultValue={tipo ?? ""} className="field-input">
+            <option value="">Todos</option>
+            {Object.entries(TIPOS_COLHEITA).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">De</span>
+          <input type="date" name="de" defaultValue={de ?? ""} className="field-input" />
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">Até</span>
+          <input type="date" name="ate" defaultValue={ate ?? ""} className="field-input" />
+        </label>
+        <div className="flex items-end gap-2 lg:col-span-2">
+          <button type="submit" className="btn btn-secondary">
+            Filtrar
+          </button>
+          {temFiltro && (
+            <Link href="/colheitas" className="btn btn-ghost">
+              Limpar
+            </Link>
+          )}
+        </div>
+      </form>
+
+      <div className="mb-5 grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <CelulaMetrica rotulo="Toneladas" valor={fmtToneladas(totais.toneladas)} />
+        <CelulaMetrica rotulo="Receita bruta" valor={fmtMoney(totais.receita)} />
+        <CelulaMetrica rotulo="Despesas" valor={fmtMoney(totais.despesas)} />
+        <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(totais.lucro)} destaque />
+      </div>
+
+      {linhas.length === 0 ? (
         <EmptyState
           icone={Sprout}
-          titulo="Nenhuma colheita ainda"
-          descricao="Registre a primeira colheita de um talhão para começar o histórico da safra."
-          ctaTexto="Registrar colheita"
-          ctaHref="/colheitas/nova"
+          titulo={temFiltro ? "Nenhuma colheita no filtro" : "Nenhuma colheita ainda"}
+          descricao={
+            temFiltro
+              ? "Ajuste os filtros para encontrar os registros de colheita."
+              : "Registre a primeira colheita de um talhão para começar o histórico da safra."
+          }
+          ctaTexto={temFiltro ? undefined : "Registrar colheita"}
+          ctaHref={temFiltro ? undefined : "/colheitas/nova"}
         />
       ) : (
         <div className="grid gap-3">
           <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
-            {colheitas.map((c) => (
-              <li
-                key={c.id}
-                className="-mx-2 flex items-center justify-between gap-3 px-2 py-3"
-              >
-                <Link
-                  href={`/talhoes/${c.talhaoId}`}
-                  className="grid min-w-0 gap-0.5"
-                >
+            {linhas.map(({ c, r }) => (
+              <li key={c.id} className="-mx-2 flex items-center gap-2 px-2 py-3">
+                <Link href={`/colheitas/${c.id}`} className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
-                    Talhão {c.talhao.nome}
-                    <span className="font-normal text-ink-2"> · {c.talhao.fazenda.nome}</span>
+                    {c.talhao.fazenda.nome}
+                    <span className="font-normal text-ink-2"> · Talhão {c.talhao.nome}</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(c.data)}</span>
@@ -62,27 +224,41 @@ export default async function ColheitasPage() {
                       {tipoLabel(c.tipo)}
                     </span>
                     <span aria-hidden>·</span>
-                    <span>{fmtProd(c.toneladas / c.talhao.areaHa)}</span>
+                    <span>{c.usina.nome}</span>
                   </span>
                 </Link>
-                <span className="flex shrink-0 items-center gap-3">
+                <span className="hidden text-right sm:grid">
                   <span className="tnum text-sm font-semibold text-ink">
-                    {fmtTons(c.toneladas)}
+                    {fmtToneladas(c.toneladas)}
                   </span>
-                  <ConfirmDelete
-                    action={excluirColheita.bind(null, c.id)}
-                    titulo="Excluir colheita?"
-                    mensagem={`O registro de ${fmtTons(c.toneladas)} de ${fmtDate(c.data)} será apagado.`}
-                    verbo="Excluir"
-                    modo="stay"
-                  />
+                  <span
+                    className={`tnum text-xs font-semibold ${
+                      r.lucro < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(r.lucro)}
+                  </span>
                 </span>
+                <Link
+                  href={`/colheitas/${c.id}/editar`}
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-line-strong hover:bg-surface-muted hover:text-ink"
+                  aria-label="Editar colheita"
+                >
+                  <Pencil className="size-4" />
+                </Link>
+                <ConfirmDelete
+                  action={excluirColheita.bind(null, c.id)}
+                  titulo="Excluir colheita?"
+                  mensagem={`O registro de ${fmtToneladas(c.toneladas)} de ${fmtDate(c.data)} será apagado.`}
+                  verbo="Excluir"
+                  modo="stay"
+                />
               </li>
             ))}
           </ul>
           <p className="px-1 text-xs text-ink-3">
-            {colheitas.length} {colheitas.length === 1 ? "registro" : "registros"} ·{" "}
-            {fmtTons(total)} no total
+            {fmtCount(linhas.length)} {linhas.length === 1 ? "registro" : "registros"}
+            {temFiltro ? " no filtro" : ""} · {fmtToneladas(totais.toneladas)} no total
           </p>
         </div>
       )}

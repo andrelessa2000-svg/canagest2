@@ -48,11 +48,16 @@ const naoEhNovo = (u) =>
     await page.waitForURL((u) => u.pathname === "/colheitas/nova", { timeout: 15000 });
     const selecionado = await page.locator('select[name="talhaoId"] option:checked').textContent();
     if (!selecionado || !selecionado.includes(NOME_TALHAO)) falha(`Talhão não pré-selecionado: "${selecionado}"`);
+    await page.selectOption('select[name="usinaId"]', { label: "Usina Pindorama" });
     await page.fill('input[name="toneladas"]', String(TONELADAS).replace(".", ","));
+    await page.fill('input[name="valorTonelada"]', "149,67467");
+    await page.fill('input[name="complemento"]', "3.000,00");
     await page.fill('textarea[name="observacao"]', "teste e2e");
     await page.click('button[type="submit"]');
-    await page.getByText("Colheita registrada").first().waitFor({ timeout: 20000 });
-    passos.push("Colheita registrada (toast confirmado)");
+    await page.waitForURL(/\/colheitas\/[a-z0-9-]+$/, { timeout: 20000 });
+    await page.getByText(/9\.876,5/).first().waitFor({ timeout: 15000 });
+    await page.getByText(/Pindorama/).first().waitFor({ timeout: 15000 });
+    passos.push("Colheita registrada (página de detalhe aberta)");
 
     passos.push("5. Confirmar na lista de colheitas");
     await page.goto(`${BASE}/colheitas`, { waitUntil: "networkidle" });

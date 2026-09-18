@@ -8,6 +8,7 @@ import {
   fazendaSchema,
   primeiraMensagem,
   talhaoSchema,
+  type ColheitaInput,
 } from "./validators";
 
 export type ActionState = { ok: true } | { ok: false; error: string };
@@ -190,53 +191,179 @@ export async function excluirTalhao(id: string): Promise<void> {
   redirect(`/fazendas/${fazendaId}`);
 }
 
+function camposColheita(formData: FormData) {
+  return {
+    talhaoId: campo(formData, "talhaoId"),
+    usinaId: campo(formData, "usinaId"),
+    data: campo(formData, "data"),
+    tipo: campo(formData, "tipo"),
+    toneladas: campo(formData, "toneladas"),
+    valorTonelada: campo(formData, "valorTonelada"),
+    complemento: campo(formData, "complemento"),
+    complementoTipo: campo(formData, "complementoTipo") || undefined,
+    atrPorTonelada: campo(formData, "atrPorTonelada"),
+    precoKgAtr: campo(formData, "precoKgAtr"),
+    outrosAdicionais: campo(formData, "outrosAdicionais"),
+    despCorte: campo(formData, "despCorte"),
+    despTransporte: campo(formData, "despTransporte"),
+    despOutrasColheita: campo(formData, "despOutrasColheita"),
+    despPlantioUsina: campo(formData, "despPlantioUsina"),
+    despArrendamento: campo(formData, "despArrendamento"),
+    despAdubacao: campo(formData, "despAdubacao"),
+    despHerbicida: campo(formData, "despHerbicida"),
+    despOutras: campo(formData, "despOutras"),
+    observacao: campo(formData, "observacao"),
+  };
+}
+
+function validarRemuneracao(
+  modelo: string,
+  d: ColheitaInput,
+): string | null {
+  if (modelo === "coruripe") {
+    if (d.atrPorTonelada === null) {
+      return "Informe o ATR por tonelada (kg ATR/t).";
+    }
+    if (d.precoKgAtr === null && d.valorTonelada === null) {
+      return "Informe o preço do kg de ATR (ou um valor base por tonelada).";
+    }
+    return null;
+  }
+  if (d.valorTonelada === null) {
+    return "Informe o valor da tonelada.";
+  }
+  return null;
+}
+
+function dadosColheita(d: ColheitaInput) {
+  return {
+    talhaoId: d.talhaoId,
+    usinaId: d.usinaId,
+    data: new Date(`${d.data}T12:00:00`),
+    tipo: d.tipo,
+    toneladas: d.toneladas,
+    valorTonelada: d.valorTonelada,
+    complemento: d.complemento,
+    complementoTipo: d.complementoTipo,
+    atrPorTonelada: d.atrPorTonelada,
+    precoKgAtr: d.precoKgAtr,
+    outrosAdicionais: d.outrosAdicionais,
+    despCorte: d.despCorte,
+    despTransporte: d.despTransporte,
+    despOutrasColheita: d.despOutrasColheita,
+    despPlantioUsina: d.despPlantioUsina,
+    despArrendamento: d.despArrendamento,
+    despAdubacao: d.despAdubacao,
+    despHerbicida: d.despHerbicida,
+    despOutras: d.despOutras,
+    observacao: d.observacao,
+  };
+}
+
+async function validarUsina(
+  usinaId: string,
+  d: ColheitaInput,
+): Promise<string | null> {
+  const usina = await prisma.usina.findUnique({
+    where: { id: usinaId },
+    select: { modelo: true },
+  });
+  if (!usina) return "Usina não encontrada.";
+  return validarRemuneracao(usina.modelo, d);
+}
+
 export async function criarColheita(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = colheitaSchema.safeParse({
-    talhaoId: campo(formData, "talhaoId"),
-    data: campo(formData, "data"),
-    tipo: campo(formData, "tipo"),
-    toneladas: campo(formData, "toneladas"),
-    observacao: campo(formData, "observacao"),
-  });
+  const parsed = colheitaSchema.safeParse(camposColheita(formData));
 
   if (!parsed.success) {
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
 
+  const erroUsina = await validarUsina(parsed.data.usinaId, parsed.data);
+  if (erroUsina) {
+    return { ok: false, error: erroUsina };
+  }
+
+  let criada!: { id: string; talhaoId: string; fazendaId: string };
   try {
-    const colheita = await prisma.colheita.create({
-      data: {
-        talhaoId: parsed.data.talhaoId,
-        data: new Date(`${parsed.data.data}T12:00:00`),
-        tipo: parsed.data.tipo,
-        toneladas: parsed.data.toneladas,
-        observacao: parsed.data.observacao,
-      },
-      include: { talhao: true },
+    const c = await prisma.colheita.create({
+      data: dadosColheita(parsed.data),
+      include: { talhao: { select: { fazendaId: true } } },
     });
-    revalidatePath("/");
-    revalidatePath("/colheitas");
-    revalidatePath(`/talhoes/${colheita.talhaoId}`);
-    revalidatePath(`/fazendas/${colheita.talhao.fazendaId}`);
-    return { ok: true };
+    criada = {
+      id: c.id,
+      talhaoId: c.talhaoId,
+      fazendaId: c.talhao.fazendaId,
+    };
   } catch (e) {
     console.error(e);
     return falha(e);
   }
+
+  revalidatePath("/");
+  revalidatePath("/colheitas");
+  revalidatePath(`/talhoes/${criada.talhaoId}`);
+  revalidatePath(`/fazendas/${criada.fazendaId}`);
+  redirect(`/colheitas/${criada.id}`);
+}
+
+export async function atualizarColheita(
+  id: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = colheitaSchema.safeParse(camposColheita(formData));
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  const erroUsina = await validarUsina(parsed.data.usinaId, parsed.data);
+  if (erroUsina) {
+    return { ok: false, error: erroUsina };
+  }
+
+  try {
+    const c = await prisma.colheita.update({
+      where: { id },
+      data: dadosColheita(parsed.data),
+      include: { talhao: { select: { fazendaId: true } } },
+    });
+    revalidatePath("/");
+    revalidatePath("/colheitas");
+    revalidatePath(`/colheitas/${id}`);
+    revalidatePath(`/talhoes/${c.talhaoId}`);
+    revalidatePath(`/fazendas/${c.talhao.fazendaId}`);
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  redirect(`/colheitas/${id}`);
 }
 
 export async function excluirColheita(id: string): Promise<ActionState> {
   try {
-    await prisma.colheita.delete({ where: { id } });
+    await removerColheita(id);
   } catch (e) {
     console.error(e);
     return falha(e);
   }
+  return { ok: true };
+}
+
+export async function excluirColheitaRedirecionando(id: string): Promise<void> {
+  await removerColheita(id);
+  redirect("/colheitas");
+}
+
+async function removerColheita(id: string): Promise<void> {
+  await prisma.colheita.delete({ where: { id } });
   revalidatePath("/");
   revalidatePath("/colheitas");
   revalidatePath("/talhoes", "layout");
-  return { ok: true };
+  revalidatePath("/fazendas", "layout");
 }

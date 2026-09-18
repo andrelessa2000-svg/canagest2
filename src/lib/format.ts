@@ -47,6 +47,43 @@ export function fmtTons(t: number): string {
   }).format(t)} t`;
 }
 
+const nfTons2 = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function fmtToneladas(t: number): string {
+  return `${nfTons2.format(Number.isFinite(t) ? t : 0)} t`;
+}
+
+const nfMoney = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function fmtMoney(v: number): string {
+  return nfMoney.format(Number.isFinite(v) ? v : 0);
+}
+
+const nfAtrT = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 3,
+});
+
+export function fmtAtrT(v: number): string {
+  return `${nfAtrT.format(Number.isFinite(v) ? v : 0)} kg ATR/t`;
+}
+
+const nfKg = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 0,
+});
+
+export function fmtKgAtr(v: number): string {
+  return `${nfKg.format(Number.isFinite(v) ? v : 0)} kg ATR`;
+}
+
 export function fmtProd(tHa: number): string {
   return `${new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,

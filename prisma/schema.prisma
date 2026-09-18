@@ -30,16 +30,50 @@ model Talhao {
   @@index([fazendaId])
 }
 
+model Usina {
+  id        String     @id @default(cuid())
+  nome      String     @unique
+  modelo    String
+  criadaEm  DateTime   @default(now())
+  colheitas Colheita[]
+
+  @@index([nome])
+}
+
 model Colheita {
   id         String   @id @default(cuid())
   talhaoId   String
   talhao     Talhao   @relation(fields: [talhaoId], references: [id], onDelete: Cascade)
+  usinaId    String
+  usina      Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
   data       DateTime @default(now())
   tipo       String
   toneladas  Float
+
+  // Remuneração — Pindorama
+  valorTonelada  Float?
+  complemento    Float?
+  complementoTipo String?
+
+  // Remuneração — Coruripe
+  atrPorTonelada Float?
+  precoKgAtr     Float?
+  outrosAdicionais Float?
+
+  // Despesas (R$) — zero quando não houver
+  despCorte           Float @default(0)
+  despTransporte      Float @default(0)
+  despOutrasColheita  Float @default(0)
+  despPlantioUsina    Float @default(0)
+  despArrendamento    Float @default(0)
+  despAdubacao        Float @default(0)
+  despHerbicida       Float @default(0)
+  despOutras          Float @default(0)
+
   observacao String?
   criadaEm   DateTime @default(now())
 
   @@index([talhaoId, data])
+  @@index([usinaId])
   @@index([data])
 }

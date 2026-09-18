@@ -12,16 +12,21 @@ export default async function NovaColheitaPage({
 }: {
   searchParams: Promise<{ talhao?: string }>;
 }) {
-  const [{ talhao }, talhoes] = await Promise.all([
+  const [{ talhao }, talhoes, usinas] = await Promise.all([
     searchParams,
     prisma.talhao.findMany({
       select: {
         id: true,
         nome: true,
         areaHa: true,
+        fazendaId: true,
         fazenda: { select: { nome: true } },
       },
       orderBy: [{ fazenda: { nome: "asc" } }, { nome: "asc" }],
+    }),
+    prisma.usina.findMany({
+      select: { id: true, nome: true, modelo: true },
+      orderBy: { nome: "asc" },
     }),
   ]);
 
@@ -40,19 +45,27 @@ export default async function NovaColheitaPage({
       <PageHeader
         rotulo="safra"
         titulo="Nova colheita"
-        descricao="Registre o que foi colhido e anote as condições do dia."
+        descricao="Registre a produção, a remuneração e as despesas. O resultado é calculado na hora."
       />
-      <div className="mx-auto max-w-xl rounded-[10px] border border-line bg-surface p-5 sm:p-8">
-        <ColheitaForm
-          acao={criarColheita}
-          talhoes={talhoes.map((t) => ({
-            id: t.id,
-            nome: t.nome,
-            fazendaNome: t.fazenda.nome,
-            areaHa: t.areaHa,
-          }))}
-          talhaoSelecionado={talhaoPreselecionado}
-        />
+      <div className="mx-auto max-w-3xl">
+        {usinas.length === 0 ? (
+          <p className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 px-6 py-10 text-center text-sm text-ink-2">
+            Nenhuma usina cadastrada. Cadastre uma usina antes de registrar colheitas.
+          </p>
+        ) : (
+          <ColheitaForm
+            acao={criarColheita}
+            talhoes={talhoes.map((t) => ({
+              id: t.id,
+              nome: t.nome,
+              areaHa: t.areaHa,
+              fazendaId: t.fazendaId,
+              fazendaNome: t.fazenda.nome,
+            }))}
+            usinas={usinas}
+            talhaoSelecionado={talhaoPreselecionado}
+          />
+        )}
       </div>
     </>
   );
