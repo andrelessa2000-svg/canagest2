@@ -7,15 +7,18 @@ import {
   fmtCount,
   fmtDate,
   fmtHa,
+  fmtMoney,
   fmtProd,
   fmtTarefas,
+  fmtToneladas,
   fmtTons,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
+import { calcularColheita } from "@/lib/colheita";
 import { excluirTalhao } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmDelete } from "@/components/confirm-delete";
-import { CelulaMetrica, GradeMetricas } from "@/components/stat-cells";
+import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,10 @@ export default async function TalhaoPage({
     where: { id },
     include: {
       fazenda: { select: { id: true, nome: true } },
-      colheitas: { orderBy: { data: "desc" } },
+      colheitas: {
+        orderBy: { data: "desc" },
+        include: { usina: { select: { nome: true, modelo: true } } },
+      },
     },
   });
 
@@ -121,32 +127,50 @@ export default async function TalhaoPage({
         ) : (
           <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
             {talhao.colheitas.map((c) => {
-              const prod = c.toneladas / talhao.areaHa;
+              const r = calcularColheita({
+                modelo: c.usina.modelo,
+                toneladas: c.toneladas,
+                valorTonelada: c.valorTonelada,
+                complemento: c.complemento,
+                complementoTipo: c.complementoTipo,
+                atrPorTonelada: c.atrPorTonelada,
+                precoKgAtr: c.precoKgAtr,
+                outrosAdicionais: c.outrosAdicionais,
+                despCorte: c.despCorte,
+                despTransporte: c.despTransporte,
+                despOutrasColheita: c.despOutrasColheita,
+                despPlantioUsina: c.despPlantioUsina,
+                despArrendamento: c.despArrendamento,
+                despAdubacao: c.despAdubacao,
+                despHerbicida: c.despHerbicida,
+                despOutras: c.despOutras,
+              });
               return (
-                <li
+                <LinhaLink
                   key={c.id}
-                  className="-mx-2 flex items-center justify-between gap-3 px-2 py-3"
-                >
-                  <span className="grid gap-0.5">
-                    <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                  href={`/colheitas/${c.id}`}
+                  principal={
+                    <>
                       {fmtDate(c.data)}
                       <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-xs font-semibold text-ink-2">
                         {tipoLabel(c.tipo)}
                       </span>
-                    </span>
-                    {c.observacao && (
-                      <span className="text-xs text-ink-3">{c.observacao}</span>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <span className="hidden text-xs text-ink-3 sm:block">
-                      {fmtProd(prod)}
-                    </span>
-                    <span className="tnum text-sm font-semibold text-ink">
-                      {fmtTons(c.toneladas)}
-                    </span>
-                  </span>
-                </li>
+                    </>
+                  }
+                  secundario={
+                    <>
+                      <span>{c.usina.nome}</span>
+                      {c.observacao && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{c.observacao}</span>
+                        </>
+                      )}
+                    </>
+                  }
+                  destaque={fmtToneladas(c.toneladas)}
+                  nota={fmtMoney(r.lucro)}
+                />
               );
             })}
           </ul>

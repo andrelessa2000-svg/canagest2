@@ -8,6 +8,7 @@ import {
   fazendaSchema,
   primeiraMensagem,
   talhaoSchema,
+  usinaSchema,
   type ColheitaInput,
 } from "./validators";
 
@@ -189,6 +190,80 @@ export async function excluirTalhao(id: string): Promise<void> {
   revalidatePath("/fazendas");
   revalidatePath(`/fazendas/${fazendaId}`);
   redirect(`/fazendas/${fazendaId}`);
+}
+
+export async function criarUsina(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = usinaSchema.safeParse({
+    nome: campo(formData, "nome"),
+    modelo: campo(formData, "modelo"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  try {
+    await prisma.usina.create({
+      data: {
+        nome: parsed.data.nome,
+        modelo: parsed.data.modelo,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/usinas");
+  redirect("/usinas");
+}
+
+export async function atualizarUsina(
+  id: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = usinaSchema.safeParse({
+    nome: campo(formData, "nome"),
+    modelo: campo(formData, "modelo"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  try {
+    await prisma.usina.update({
+      where: { id },
+      data: {
+        nome: parsed.data.nome,
+        modelo: parsed.data.modelo,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/usinas");
+  redirect("/usinas");
+}
+
+export async function excluirUsina(id: string): Promise<ActionState> {
+  try {
+    await prisma.usina.delete({ where: { id } });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/usinas");
+  return { ok: true };
 }
 
 function camposColheita(formData: FormData) {

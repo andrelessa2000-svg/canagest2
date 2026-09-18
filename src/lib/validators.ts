@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseDecimal, tarefasParaHa, UNIDADES_AREA } from "./format";
-import { COMPLEMENTO_TIPOS } from "./colheita";
+import { COMPLEMENTO_TIPOS, MODELOS_USINA } from "./colheita";
 
 const TIPOS = ["planta", "soca", "ressoca"] as const;
 export type TipoColheita = (typeof TIPOS)[number];
@@ -44,6 +44,11 @@ export const talhaoSchema = z
     nome: d.nome,
     areaHa: d.unidade === "tarefas" ? tarefasParaHa(d.area) : d.area,
   }));
+
+export const usinaSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome da usina").max(80),
+  modelo: z.enum(MODELOS_USINA, { error: "Selecione o modelo de remuneração" }),
+});
 
 export const colheitaSchema = z.object({
   talhaoId: z.string().min(1, "Selecione o talhão"),
@@ -94,6 +99,7 @@ function moedaField(label: string) {
 
 export type FazendaInput = z.infer<typeof fazendaSchema>;
 export type TalhaoInput = z.infer<typeof talhaoSchema>;
+export type UsinaInput = z.infer<typeof usinaSchema>;
 export type ColheitaInput = z.infer<typeof colheitaSchema>;
 
 export function primeiraMensagem(res: z.ZodError): string {

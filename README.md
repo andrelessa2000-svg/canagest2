@@ -1,6 +1,6 @@
 # CanaGest
 
-Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em **talhões** e registro de **colheitas**. PWA instalável, pensado para rodar no celular e no computador.
+Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em **talhões**, cadastro de **usinas** e registro de **colheitas** com remuneração e despesas. PWA instalável, pensado para rodar no celular e no computador.
 
 | | |
 |---|---|
@@ -13,8 +13,11 @@ Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em *
 
 - Fazendas: nome. A área total é calculada automaticamente pela soma dos talhões.
 - Talhões: identificação (ex.: T-01) e área informada em hectares ou tarefas (1 ha = 3,3 tarefas), exibida nas duas unidades.
-- Colheitas: data, tipo de corte (planta/soca/ressoca), toneladas e observações.
-- Painel com resumo da safra: fazendas, talhões, área (ha e tarefas) e total colhido.
+- Usinas: cadastro com **modelo de remuneração** — **Pindorama** (valor por tonelada + complemento/ágio) ou **Coruripe** (ATR: kg ATR/t × preço do kg de ATR).
+- Colheitas: talhão, usina, data, tipo de corte (planta/soca/ressoca), toneladas, remuneração, até 8 despesas e observações.
+- Cálculo de resultado por colheita: receita bruta, despesas e lucro (por colheita e por tonelada), calculado ao vivo no formulário.
+- Lista de colheitas com filtros (fazenda, talhão, usina, tipo e período) e resumo dos totais.
+- Painel com resumo da safra: fazendas, talhões, área (ha e tarefas), total colhido e financeiro (receita, despesas, lucro e lucro/t).
 - Produtividade calculada (t/ha) por talhão e por fazenda.
 - PWA instalável com suporte offline: cache de navegação e recursos estáticos.
 
@@ -75,6 +78,8 @@ Pré-requisitos: Node.js 20+ e uma conta no [Neon](https://neon.tech).
 | `npm run icons` | Regenera os ícones PNG do PWA |
 | `npm run check:ui` | Checa layout/console (390px e 1440px) com Playwright |
 | `npm run check:e2e` | Testa o CRUD completo (fazenda → talhão → colheita → excluir) |
+| `npx tsx scripts/calc-check.ts` | Confere os cálculos de remuneração (Pindorama/Coruripe) |
+| `npx tsx scripts/seed-usinas.ts` | Garante as usinas padrão (Pindorama e Coruripe) no banco |
 
 > `check:ui` e `check:e2e` precisam de um servidor rodando (`npm run build` + `npm run start -p 3210`, ou ajuste `BASE_URL`). Usam o Edge instalado (`channel: "msedge"`).
 

@@ -4,6 +4,7 @@ const BASE = process.env.BASE_URL || "http://localhost:3210";
 const ts = Date.now().toString().slice(-6);
 const NOME_FAZENDA = `Fazenda E2E ${ts}`;
 const NOME_TALHAO = `T-E2E${ts}`;
+const NOME_USINA = `Usina E2E ${ts}`;
 const TONELADAS = 9876.5;
 
 const naoEhNovo = (u) =>
@@ -17,6 +18,32 @@ const naoEhNovo = (u) =>
   const falha = (msg) => { throw new Error(msg); };
 
   try {
+    passos.push("0. Nova usina (CRUD)");
+    await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });
+    await page.fill('input[name="nome"]', NOME_USINA);
+    await page.selectOption('select[name="modelo"]', "coruripe");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/usinas", { timeout: 20000 });
+    await page.getByText(NOME_USINA, { exact: false }).first().waitFor({ timeout: 15000 });
+    await page.getByText(/Coruripe/).first().waitFor({ timeout: 15000 });
+    passos.push("Usina criada e visível na lista");
+
+    passos.push("0b. Editar usina");
+    const linhaUsina = page.locator("li").filter({ hasText: NOME_USINA });
+    await linhaUsina.locator('a[aria-label="Editar usina"]').click();
+    await page.waitForURL(/\/usinas\/[a-z0-9-]+\/editar$/, { timeout: 15000 });
+    await page.selectOption('select[name="modelo"]', "pindorama");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/usinas", { timeout: 20000 });
+    await page.getByText(/Pindorama/).first().waitFor({ timeout: 15000 });
+    passos.push("Usina editada para Pindorama");
+
+    passos.push("0c. Excluir usina");
+    await page.locator("li").filter({ hasText: NOME_USINA }).locator('button[aria-label="Excluir"]').click();
+    await page.getByRole("dialog").getByRole("button", { name: "Excluir" }).click();
+    await page.getByText(NOME_USINA, { exact: false }).first().waitFor({ state: "detached", timeout: 15000 });
+    passos.push("Usina excluída");
+
     passos.push("1. Nova fazenda");
     await page.goto(`${BASE}/fazendas/nova`, { waitUntil: "networkidle" });
     await page.fill('input[name="nome"]', NOME_FAZENDA);
