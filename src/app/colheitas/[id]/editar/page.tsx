@@ -21,25 +21,29 @@ export default async function EditarColheitaPage({
 }) {
   const { id } = await params;
 
-  const [colheita, talhoes, usinas] = await Promise.all([
+  const [colheita, fazendasRaw, usinas, talhoes] = await Promise.all([
     prisma.colheita.findUnique({ where: { id } }),
-    prisma.talhao.findMany({
-      select: {
-        id: true,
-        nome: true,
-        areaHa: true,
-        fazendaId: true,
-        fazenda: { select: { nome: true } },
-      },
-      orderBy: [{ fazenda: { nome: "asc" } }, { nome: "asc" }],
+    prisma.fazenda.findMany({
+      select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
+      orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
       orderBy: { nome: "asc" },
     }),
+    prisma.talhao.findMany({
+      select: { id: true, nome: true, areaHa: true, fazendaId: true },
+      orderBy: { nome: "asc" },
+    }),
   ]);
 
   if (!colheita) notFound();
+
+  const fazendas = fazendasRaw.map((f) => ({
+    id: f.id,
+    nome: f.nome,
+    areaHa: f.talhoes.reduce((a, t) => a + t.areaHa, 0),
+  }));
 
   return (
     <>
@@ -57,37 +61,52 @@ export default async function EditarColheitaPage({
       <div className="mx-auto max-w-3xl">
         <ColheitaForm
           acao={atualizarColheita.bind(null, id)}
-          talhoes={talhoes.map((t) => ({
-            id: t.id,
-            nome: t.nome,
-            areaHa: t.areaHa,
-            fazendaId: t.fazendaId,
-            fazendaNome: t.fazenda.nome,
-          }))}
+          fazendas={fazendas}
           usinas={usinas}
+          talhoes={talhoes}
           modo="editar"
           cancelarHref={`/colheitas/${id}`}
           inicial={{
-            talhaoId: colheita.talhaoId,
+            fazendaId: colheita.fazendaId,
+            talhaoId: colheita.talhaoId ?? "",
             usinaId: colheita.usinaId,
             data: toDateInputValue(colheita.data),
             tipo: colheita.tipo,
             toneladas: numero(colheita.toneladas),
-            valorTonelada: numero(colheita.valorTonelada),
-            complemento: numero(colheita.complemento),
-            complementoTipo: colheita.complementoTipo ?? "total",
+            precoCana: numero(colheita.precoCana),
+            agio: numero(colheita.agio),
             atrPorTonelada: numero(colheita.atrPorTonelada),
             precoKgAtr: numero(colheita.precoKgAtr),
-            outrosAdicionais: numero(colheita.outrosAdicionais),
-            despCorte: numero(colheita.despCorte),
-            despTransporte: numero(colheita.despTransporte),
-            despOutrasColheita: numero(colheita.despOutrasColheita),
-            despPlantioUsina: numero(colheita.despPlantioUsina),
-            despArrendamento: numero(colheita.despArrendamento),
-            despAdubacao: numero(colheita.despAdubacao),
-            despHerbicida: numero(colheita.despHerbicida),
-            despOutras: numero(colheita.despOutras),
+            ctc: numero(colheita.ctc),
+            areaColhida: numero(colheita.areaColhida),
+            arrendar: colheita.arrendar,
+            tonsPorTarefa: numero(colheita.tonsPorTarefa),
+            tarefasArrendadas: numero(colheita.tarefasArrendadas),
+            adubo: colheita.adubo,
+            precoTonAdubo: numero(colheita.precoTonAdubo),
+            tarefasAdubo: numero(colheita.tarefasAdubo),
             observacao: colheita.observacao ?? "",
+            herbicidas: (
+              (colheita.herbicidas as unknown as { nome?: string; valor?: number }[]) ??
+              []
+            ).map((i) => ({
+              nome: i.nome ?? "",
+              valor: i.valor === undefined ? "" : numero(i.valor),
+            })),
+            insumos: (
+              (colheita.insumos as unknown as { nome?: string; valor?: number }[]) ??
+              []
+            ).map((i) => ({
+              nome: i.nome ?? "",
+              valor: i.valor === undefined ? "" : numero(i.valor),
+            })),
+            despesasUsina: (
+              (colheita.despesasUsina as unknown as { nome?: string; valor?: number }[]) ??
+              []
+            ).map((i) => ({
+              nome: i.nome ?? "",
+              valor: i.valor === undefined ? "" : numero(i.valor),
+            })),
           }}
         />
       </div>

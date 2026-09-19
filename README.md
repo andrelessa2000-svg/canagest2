@@ -13,10 +13,11 @@ Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em *
 
 - Fazendas: nome. A área total é calculada automaticamente pela soma dos talhões.
 - Talhões: identificação (ex.: T-01) e área informada em hectares ou tarefas (1 ha = 3,3 tarefas), exibida nas duas unidades.
-- Usinas: cadastro com **modelo de remuneração** — **Pindorama** (valor por tonelada + complemento/ágio) ou **Coruripe** (ATR: kg ATR/t × preço do kg de ATR).
-- Colheitas: talhão, usina, data, tipo de corte (planta/soca/ressoca), toneladas, remuneração, até 8 despesas e observações.
-- Cálculo de resultado por colheita: receita bruta, despesas e lucro (por colheita e por tonelada), calculado ao vivo no formulário.
-- Lista de colheitas com filtros (fazenda, talhão, usina, tipo e período) e resumo dos totais.
+- Usinas: cadastro com **modelo de remuneração** — **Pindorama** (preço da cana R$/t + ágio) ou **Coruripe** (ATR: kg ATR/t × preço do kg de ATR).
+- Colheitas por fazenda (com talhão opcional): data, tipo de corte, toneladas e **área colhida** em tarefas.
+- Despesas: **CTC** (informado pela usina), **arrendamento** calculado (t/tarefa × preço da cana × tarefas), **adubo** calculado (sacos/tarefa conforme o corte × preço da tonelada), **herbicida** (itens da calda), **outros insumos** (calcário, pó de rocha, biológico, vinhaça…) e **despesas com a usina** — todas como listas dinâmicas de itens.
+- Cálculo de resultado por colheita: receita, CTC, arrendamento, insumos, despesas e lucro (por colheita e por tonelada), calculado ao vivo no formulário.
+- Lista de colheitas com filtros (fazenda, usina, tipo e período) e resumo dos totais.
 - Painel com resumo da safra: fazendas, talhões, área (ha e tarefas), total colhido e financeiro (receita, despesas, lucro e lucro/t).
 - Produtividade calculada (t/ha) por talhão e por fazenda.
 - PWA instalável com suporte offline: cache de navegação e recursos estáticos.

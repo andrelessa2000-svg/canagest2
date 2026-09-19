@@ -13,6 +13,7 @@ model Fazenda {
   criadaEm    DateTime  @default(now())
   atualizadaEm DateTime @updatedAt
   talhoes     Talhao[]
+  colheitas   Colheita[]
 
   @@index([nome])
 }
@@ -41,39 +42,55 @@ model Usina {
 }
 
 model Colheita {
-  id         String   @id @default(cuid())
-  talhaoId   String
-  talhao     Talhao   @relation(fields: [talhaoId], references: [id], onDelete: Cascade)
-  usinaId    String
-  usina      Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
-  data       DateTime @default(now())
-  tipo       String
-  toneladas  Float
+  id        String   @id @default(cuid())
+  fazendaId String
+  fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  talhaoId  String?
+  talhao    Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  usinaId   String
+  usina     Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
+  data      DateTime @default(now())
+  tipo      String
+  toneladas Float
 
   // Remuneração — Pindorama
-  valorTonelada  Float?
-  complemento    Float?
-  complementoTipo String?
+  precoCana Float?
+  agio      Float?
 
   // Remuneração — Coruripe
   atrPorTonelada Float?
   precoKgAtr     Float?
-  outrosAdicionais Float?
 
-  // Despesas (R$) — zero quando não houver
-  despCorte           Float @default(0)
-  despTransporte      Float @default(0)
-  despOutrasColheita  Float @default(0)
-  despPlantioUsina    Float @default(0)
-  despArrendamento    Float @default(0)
-  despAdubacao        Float @default(0)
-  despHerbicida       Float @default(0)
-  despOutras          Float @default(0)
+  // CTC (valor informado pela usina)
+  ctc Float @default(0)
+
+  // Area colhida (tarefas) — base para arrendamento, adubo e herbicida
+  areaColhida Float?
+
+  // Arrendamento (calculado: t/tarefa x preco da cana x tarefas arrendadas)
+  arrendar          Boolean @default(false)
+  tonsPorTarefa     Float?
+  tarefasArrendadas Float?
+
+  // Adubo (calculado: sacos/tarefa x 50 kg x preco da tonelada x area colhida)
+  adubo         Boolean @default(false)
+  precoTonAdubo Float?
+  tarefasAdubo  Float?
+
+  // Herbicida — itens da calda [{ nome, valor }]
+  herbicidas Json?
+
+  // Outros insumos — itens dinamicos [{ nome, valor }] (calcario, po de rocha, biologico, vinhaça...)
+  insumos Json?
+
+  // Despesas com a usina — itens dinamicos [{ nome, valor }]
+  despesasUsina Json?
 
   observacao String?
   criadaEm   DateTime @default(now())
 
-  @@index([talhaoId, data])
+  @@index([fazendaId, data])
+  @@index([talhaoId])
   @@index([usinaId])
   @@index([data])
 }

@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
-import {
-  fmtDate,
-  fmtMoney,
-  fmtToneladas,
-  fmtCount,
-} from "@/lib/format";
+import { fmtDate, fmtMoney, fmtToneladas, fmtCount } from "@/lib/format";
 import { tipoLabel, TIPOS_COLHEITA } from "@/lib/validators";
 import { calcularColheita } from "@/lib/colheita";
 import { excluirColheita } from "@/lib/actions";
@@ -19,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 type Filtros = {
   fazenda?: string;
-  talhao?: string;
   usina?: string;
   tipo?: string;
   de?: string;
@@ -31,19 +25,12 @@ export default async function ColheitasPage({
 }: {
   searchParams: Promise<Filtros>;
 }) {
-  const { fazenda, talhao, usina, tipo, de, ate } = await searchParams;
+  const { fazenda, usina, tipo, de, ate } = await searchParams;
 
   const where = {
+    ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(usina ? { usinaId: usina } : {}),
     ...(tipo ? { tipo } : {}),
-    ...(fazenda || talhao
-      ? {
-          talhao: {
-            ...(fazenda ? { fazendaId: fazenda } : {}),
-            ...(talhao ? { id: talhao } : {}),
-          },
-        }
-      : {}),
     ...(de || ate
       ? {
           data: {
@@ -54,19 +41,22 @@ export default async function ColheitasPage({
       : {}),
   };
 
-  const [colheitas, fazendas, usinas, talhoes] = await Promise.all([
+  const [colheitas, fazendas, usinas] = await Promise.all([
     prisma.colheita.findMany({
       where,
       include: {
-        talhao: { select: { id: true, nome: true, fazenda: { select: { nome: true } } } },
+        fazenda: { select: { id: true, nome: true } },
+        talhao: { select: { nome: true } },
         usina: { select: { nome: true, modelo: true } },
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
-    prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
-    prisma.usina.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
-    prisma.talhao.findMany({
-      select: { id: true, nome: true, fazendaId: true },
+    prisma.fazenda.findMany({
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.usina.findMany({
+      select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
   ]);
@@ -75,43 +65,44 @@ export default async function ColheitasPage({
     c,
     r: calcularColheita({
       modelo: c.usina.modelo,
+      tipo: c.tipo,
       toneladas: c.toneladas,
-      valorTonelada: c.valorTonelada,
-      complemento: c.complemento,
-      complementoTipo: c.complementoTipo,
+      precoCana: c.precoCana,
+      agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      outrosAdicionais: c.outrosAdicionais,
-      despCorte: c.despCorte,
-      despTransporte: c.despTransporte,
-      despOutrasColheita: c.despOutrasColheita,
-      despPlantioUsina: c.despPlantioUsina,
-      despArrendamento: c.despArrendamento,
-      despAdubacao: c.despAdubacao,
-      despHerbicida: c.despHerbicida,
-      despOutras: c.despOutras,
+      ctc: c.ctc,
+      areaColhida: c.areaColhida,
+      arrendar: c.arrendar,
+      tonsPorTarefa: c.tonsPorTarefa,
+      tarefasArrendadas: c.tarefasArrendadas,
+      adubo: c.adubo,
+      precoTonAdubo: c.precoTonAdubo,
+      tarefasAdubo: c.tarefasAdubo ?? undefined,
+      herbicidas: (c.herbicidas ?? []) as { nome: string; valor: number }[],
+      insumos: (c.insumos ?? []) as { nome: string; valor: number }[],
+      despesasUsina: (c.despesasUsina ?? []) as { nome: string; valor: number }[],
     }),
   }));
 
   const totais = linhas.reduce(
     (acc, { r }) => ({
       toneladas: acc.toneladas + r.toneladas,
-      receita: acc.receita + r.valorBruto,
+      receita: acc.receita + r.receita,
       despesas: acc.despesas + r.totalDespesas,
       lucro: acc.lucro + r.lucro,
     }),
     { toneladas: 0, receita: 0, despesas: 0, lucro: 0 },
   );
 
-  const fila = fazenda ? talhoes.filter((t) => t.fazendaId === fazenda) : talhoes;
-  const temFiltro = Boolean(fazenda || talhao || usina || tipo || de || ate);
+  const temFiltro = Boolean(fazenda || usina || tipo || de || ate);
 
   return (
     <>
       <PageHeader
         rotulo="safra"
         titulo="Colheitas"
-        descricao="Produção, remuneração e resultado de cada colheita registrada."
+        descricao="Produção, remuneração e resultado de cada colheita registrada por fazenda."
         acao={
           <Link href="/colheitas/nova" className="btn btn-primary">
             <Plus className="size-4" /> Nova colheita
@@ -131,17 +122,6 @@ export default async function ColheitasPage({
             {fazendas.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1">
-          <span className="field-label">Talhão</span>
-          <select name="talhao" defaultValue={talhao ?? ""} className="field-input">
-            <option value="">Todos</option>
-            {fila.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nome}
               </option>
             ))}
           </select>
@@ -190,7 +170,7 @@ export default async function ColheitasPage({
 
       <div className="mb-5 grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
         <CelulaMetrica rotulo="Toneladas" valor={fmtToneladas(totais.toneladas)} />
-        <CelulaMetrica rotulo="Receita bruta" valor={fmtMoney(totais.receita)} />
+        <CelulaMetrica rotulo="Receita" valor={fmtMoney(totais.receita)} />
         <CelulaMetrica rotulo="Despesas" valor={fmtMoney(totais.despesas)} />
         <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(totais.lucro)} destaque />
       </div>
@@ -202,7 +182,7 @@ export default async function ColheitasPage({
           descricao={
             temFiltro
               ? "Ajuste os filtros para encontrar os registros de colheita."
-              : "Registre a primeira colheita de um talhão para começar o histórico da safra."
+              : "Registre a primeira colheita de uma fazenda para começar o histórico da safra."
           }
           ctaTexto={temFiltro ? undefined : "Registrar colheita"}
           ctaHref={temFiltro ? undefined : "/colheitas/nova"}
@@ -214,8 +194,10 @@ export default async function ColheitasPage({
               <li key={c.id} className="-mx-2 flex items-center gap-2 px-2 py-3">
                 <Link href={`/colheitas/${c.id}`} className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
-                    {c.talhao.fazenda.nome}
-                    <span className="font-normal text-ink-2"> · Talhão {c.talhao.nome}</span>
+                    {c.fazenda.nome}
+                    {c.talhao && (
+                      <span className="font-normal text-ink-2"> · Talhão {c.talhao.nome}</span>
+                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(c.data)}</span>

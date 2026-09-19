@@ -10,29 +10,36 @@ export const dynamic = "force-dynamic";
 export default async function NovaColheitaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ talhao?: string }>;
+  searchParams: Promise<{ fazenda?: string; talhao?: string }>;
 }) {
-  const [{ talhao }, talhoes, usinas] = await Promise.all([
+  const [{ fazenda, talhao }, fazendasRaw, usinas, talhoes] = await Promise.all([
     searchParams,
-    prisma.talhao.findMany({
-      select: {
-        id: true,
-        nome: true,
-        areaHa: true,
-        fazendaId: true,
-        fazenda: { select: { nome: true } },
-      },
-      orderBy: [{ fazenda: { nome: "asc" } }, { nome: "asc" }],
+    prisma.fazenda.findMany({
+      select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
+      orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
       orderBy: { nome: "asc" },
     }),
+    prisma.talhao.findMany({
+      select: { id: true, nome: true, areaHa: true, fazendaId: true },
+      orderBy: { nome: "asc" },
+    }),
   ]);
 
+  const fazendas = fazendasRaw.map((f) => ({
+    id: f.id,
+    nome: f.nome,
+    areaHa: f.talhoes.reduce((a, t) => a + t.areaHa, 0),
+  }));
+
+  const fazendaValida = fazendas.some((f) => f.id === fazenda);
   const talhaoPreselecionado = talhoes.some((t) => t.id === talhao)
     ? talhao
     : undefined;
+
+  const inicial = fazendaValida ? { fazendaId: fazenda! } : undefined;
 
   return (
     <>
@@ -45,24 +52,20 @@ export default async function NovaColheitaPage({
       <PageHeader
         rotulo="safra"
         titulo="Nova colheita"
-        descricao="Registre a produção, a remuneração e as despesas. O resultado é calculado na hora."
+        descricao="Registre a produção por fazenda, a remuneração e as despesas. O resultado é calculado na hora."
       />
       <div className="mx-auto max-w-3xl">
         {usinas.length === 0 ? (
           <p className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 px-6 py-10 text-center text-sm text-ink-2">
-            Nenhuma usina cadastrada. Cadastre uma usina antes de registrar colheitas.
+            Cadastre uma usina antes de registrar colheitas (menu Usinas).
           </p>
         ) : (
           <ColheitaForm
             acao={criarColheita}
-            talhoes={talhoes.map((t) => ({
-              id: t.id,
-              nome: t.nome,
-              areaHa: t.areaHa,
-              fazendaId: t.fazendaId,
-              fazendaNome: t.fazenda.nome,
-            }))}
+            fazendas={fazendas}
             usinas={usinas}
+            talhoes={talhoes}
+            inicial={inicial}
             talhaoSelecionado={talhaoPreselecionado}
           />
         )}

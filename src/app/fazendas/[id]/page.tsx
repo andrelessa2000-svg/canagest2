@@ -40,8 +40,8 @@ export default async function FazendaPage({
       },
     }),
     prisma.colheita.findMany({
-      where: { talhao: { fazendaId: id } },
-      include: { talhao: true },
+      where: { fazendaId: id },
+      include: { talhao: true, usina: { select: { nome: true } } },
       orderBy: { data: "desc" },
       take: 5,
     }),
@@ -177,12 +177,8 @@ export default async function FazendaPage({
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl text-ink">Últimas colheitas</h2>
           <Link
-            href={`/colheitas/nova?talhao=${fazenda.talhoes[0]?.id ?? ""}`}
-            className={`inline-flex items-center gap-1 text-sm font-medium ${
-              fazenda.talhoes.length > 0
-                ? "text-accent hover:text-accent-strong"
-                : "pointer-events-none text-ink-3"
-            }`}
+            href={`/colheitas/nova?fazenda=${fazenda.id}`}
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-strong"
           >
             Registrar <Plus className="size-4" />
           </Link>
@@ -197,17 +193,23 @@ export default async function FazendaPage({
             {colheitas.map((c) => (
               <LinhaLink
                 key={c.id}
-                href={`/talhoes/${c.talhaoId}`}
-                principal={`Talhão ${c.talhao.nome}`}
+                href={`/colheitas/${c.id}`}
+                principal={
+                  c.talhao ? `Talhão ${c.talhao.nome}` : "Fazenda inteira"
+                }
                 secundario={
                   <>
                     <span>{fmtDateShort(c.data)}</span>
                     <span aria-hidden>·</span>
                     <span>{tipoLabel(c.tipo)}</span>
+                    <span aria-hidden>·</span>
+                    <span>{c.usina.nome}</span>
                   </>
                 }
                 destaque={fmtTons(c.toneladas)}
-                nota={fmtProd(c.toneladas / c.talhao.areaHa)}
+                nota={fmtProd(
+                  c.toneladas / (c.talhao ? c.talhao.areaHa : areaPlantada || 1),
+                )}
               />
             ))}
           </ul>

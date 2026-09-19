@@ -28,7 +28,10 @@ export default async function DashboardPage() {
       }),
       prisma.colheita.findMany({
         include: {
-          talhao: { include: { fazenda: true } },
+          fazenda: {
+            select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
+          },
+          talhao: { select: { nome: true } },
           usina: { select: { nome: true } },
         },
         orderBy: { data: "desc" },
@@ -38,20 +41,22 @@ export default async function DashboardPage() {
       prisma.colheita.findMany({
         select: {
           toneladas: true,
-          valorTonelada: true,
-          complemento: true,
-          complementoTipo: true,
+          tipo: true,
+          precoCana: true,
+          agio: true,
           atrPorTonelada: true,
           precoKgAtr: true,
-          outrosAdicionais: true,
-          despCorte: true,
-          despTransporte: true,
-          despOutrasColheita: true,
-          despPlantioUsina: true,
-          despArrendamento: true,
-          despAdubacao: true,
-          despHerbicida: true,
-          despOutras: true,
+          ctc: true,
+          areaColhida: true,
+          arrendar: true,
+          tonsPorTarefa: true,
+          tarefasArrendadas: true,
+          adubo: true,
+          precoTonAdubo: true,
+          tarefasAdubo: true,
+          herbicidas: true,
+          insumos: true,
+          despesasUsina: true,
           usina: { select: { modelo: true } },
         },
       }),
@@ -68,25 +73,27 @@ export default async function DashboardPage() {
     (acc, c) => {
       const r = calcularColheita({
         modelo: c.usina.modelo,
+        tipo: c.tipo,
         toneladas: c.toneladas,
-        valorTonelada: c.valorTonelada,
-        complemento: c.complemento,
-        complementoTipo: c.complementoTipo,
+        precoCana: c.precoCana,
+        agio: c.agio,
         atrPorTonelada: c.atrPorTonelada,
         precoKgAtr: c.precoKgAtr,
-        outrosAdicionais: c.outrosAdicionais,
-        despCorte: c.despCorte,
-        despTransporte: c.despTransporte,
-        despOutrasColheita: c.despOutrasColheita,
-        despPlantioUsina: c.despPlantioUsina,
-        despArrendamento: c.despArrendamento,
-        despAdubacao: c.despAdubacao,
-        despHerbicida: c.despHerbicida,
-        despOutras: c.despOutras,
+        ctc: c.ctc,
+        areaColhida: c.areaColhida,
+        arrendar: c.arrendar,
+        tonsPorTarefa: c.tonsPorTarefa,
+        tarefasArrendadas: c.tarefasArrendadas,
+        adubo: c.adubo,
+        precoTonAdubo: c.precoTonAdubo,
+        tarefasAdubo: c.tarefasAdubo ?? undefined,
+        herbicidas: (c.herbicidas ?? []) as { nome: string; valor: number }[],
+        insumos: (c.insumos ?? []) as { nome: string; valor: number }[],
+        despesasUsina: (c.despesasUsina ?? []) as { nome: string; valor: number }[],
       });
       return {
         toneladas: acc.toneladas + r.toneladas,
-        receita: acc.receita + r.valorBruto,
+        receita: acc.receita + r.receita,
         despesas: acc.despesas + r.totalDespesas,
         lucro: acc.lucro + r.lucro,
       };
@@ -177,28 +184,39 @@ export default async function DashboardPage() {
             </p>
           ) : (
             <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
-              {colheitasRecentes.map((c) => (
-                <LinhaLink
-                  key={c.id}
-                  href={`/colheitas/${c.id}`}
-                  principal={
-                    <>
-                      {c.talhao.nome} · {c.talhao.fazenda.nome}
-                    </>
-                  }
-                  secundario={
-                    <>
-                      <span>{fmtDateShort(c.data)}</span>
-                      <span aria-hidden>·</span>
-                      <span>{tipoLabel(c.tipo)}</span>
-                      <span aria-hidden>·</span>
-                      <span>{c.usina.nome}</span>
-                    </>
-                  }
-                  destaque={fmtToneladas(c.toneladas)}
-                  nota={fmtProd(c.toneladas / c.talhao.areaHa)}
-                />
-              ))}
+              {colheitasRecentes.map((c) => {
+                const areaFazenda = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
+                return (
+                  <LinhaLink
+                    key={c.id}
+                    href={`/colheitas/${c.id}`}
+                    principal={
+                      <>
+                        {c.fazenda.nome}
+                        {c.talhao && (
+                          <span className="font-normal text-ink-2">
+                            {" "}
+                            · Talhão {c.talhao.nome}
+                          </span>
+                        )}
+                      </>
+                    }
+                    secundario={
+                      <>
+                        <span>{fmtDateShort(c.data)}</span>
+                        <span aria-hidden>·</span>
+                        <span>{tipoLabel(c.tipo)}</span>
+                        <span aria-hidden>·</span>
+                        <span>{c.usina.nome}</span>
+                      </>
+                    }
+                    destaque={fmtToneladas(c.toneladas)}
+                    nota={
+                      areaFazenda > 0 ? fmtProd(c.toneladas / areaFazenda) : undefined
+                    }
+                  />
+                );
+              })}
             </ul>
           )}
         </section>

@@ -62,47 +62,56 @@ async function main() {
         },
       });
 
+      const tarefas = Math.round(areaHa * 3.3 * 100) / 100;
       const qtdColheitas = randInt(2, 5);
       for (let cIdx = 0; cIdx < qtdColheitas; cIdx++) {
         const diasAtras = cIdx * randInt(380, 430) + randInt(0, 120);
         const produtividade = randInt(78, 112) + Math.round(Math.random() * 10) / 10;
         const toneladas = Math.round(areaHa * produtividade * 10) / 10;
         const usina = usinas[(t + cIdx) % usinas.length];
-
-        const despesas = {
-          despCorte: rand(9000),
-          despTransporte: rand(6000),
-          despOutrasColheita: rand(1500),
-          despPlantioUsina: rand(2000),
-          despArrendamento: rand(5000),
-          despAdubacao: rand(3500),
-          despHerbicida: rand(1200),
-          despOutras: rand(800),
-        };
+        const tipo = tipos[cIdx] ?? "ressoca";
 
         const remuneracao =
           usina.modelo === "coruripe"
             ? {
                 atrPorTonelada: rand(15, 3) + 115,
                 precoKgAtr: rand(0.2, 4) + 1,
-                complemento: rand(4000),
-                outrosAdicionais: rand(1200),
+                precoCana: null,
+                agio: null,
               }
             : {
-                valorTonelada: rand(20, 5) + 139,
-                complemento: rand(9000),
-                complementoTipo: cIdx % 2 === 0 ? "total" : "por_tonelada",
+                precoCana: rand(20, 2) + 150,
+                agio: cIdx % 2 === 0 ? rand(9, 2) + 5 : null,
+                atrPorTonelada: null,
+                precoKgAtr: null,
               };
 
         await prisma.colheita.create({
           data: {
+            fazendaId: fazenda.id,
             talhaoId: talhao.id,
             usinaId: usina.id,
             data: new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000),
-            tipo: tipos[cIdx] ?? "ressoca",
+            tipo,
             toneladas,
             ...remuneracao,
-            ...despesas,
+            ctc: rand(15000),
+            areaColhida: tarefas,
+            arrendar: cIdx % 4 === 0,
+            tonsPorTarefa: cIdx % 4 === 0 ? rand(6, 1) + 34 : null,
+            tarefasArrendadas: cIdx % 4 === 0 ? tarefas : null,
+            adubo: true,
+            precoTonAdubo: rand(2500, 0) + 2400,
+            tarefasAdubo: tarefas,
+            herbicidas: [
+              { nome: "Glifosato", valor: rand(900) },
+              { nome: "Diurana", valor: rand(600) },
+            ],
+            insumos: [
+              { nome: "Calcário", valor: rand(1200) },
+              { nome: "Biológico", valor: rand(400) },
+            ],
+            despesasUsina: [{ nome: "Plantio", valor: rand(3000) }],
           },
         });
       }

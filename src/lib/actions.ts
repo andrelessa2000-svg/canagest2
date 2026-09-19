@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import {
   colheitaSchema,
@@ -268,25 +269,27 @@ export async function excluirUsina(id: string): Promise<ActionState> {
 
 function camposColheita(formData: FormData) {
   return {
-    talhaoId: campo(formData, "talhaoId"),
+    fazendaId: campo(formData, "fazendaId"),
+    talhaoId: campo(formData, "talhaoId") || undefined,
     usinaId: campo(formData, "usinaId"),
     data: campo(formData, "data"),
     tipo: campo(formData, "tipo"),
     toneladas: campo(formData, "toneladas"),
-    valorTonelada: campo(formData, "valorTonelada"),
-    complemento: campo(formData, "complemento"),
-    complementoTipo: campo(formData, "complementoTipo") || undefined,
+    precoCana: campo(formData, "precoCana"),
+    agio: campo(formData, "agio"),
     atrPorTonelada: campo(formData, "atrPorTonelada"),
     precoKgAtr: campo(formData, "precoKgAtr"),
-    outrosAdicionais: campo(formData, "outrosAdicionais"),
-    despCorte: campo(formData, "despCorte"),
-    despTransporte: campo(formData, "despTransporte"),
-    despOutrasColheita: campo(formData, "despOutrasColheita"),
-    despPlantioUsina: campo(formData, "despPlantioUsina"),
-    despArrendamento: campo(formData, "despArrendamento"),
-    despAdubacao: campo(formData, "despAdubacao"),
-    despHerbicida: campo(formData, "despHerbicida"),
-    despOutras: campo(formData, "despOutras"),
+    ctc: campo(formData, "ctc"),
+    areaColhida: campo(formData, "areaColhida"),
+    arrendar: campo(formData, "arrendar"),
+    tonsPorTarefa: campo(formData, "tonsPorTarefa"),
+    tarefasArrendadas: campo(formData, "tarefasArrendadas"),
+    adubo: campo(formData, "adubo"),
+    precoTonAdubo: campo(formData, "precoTonAdubo"),
+    tarefasAdubo: campo(formData, "tarefasAdubo"),
+    herbicidas: campo(formData, "herbicidas"),
+    insumos: campo(formData, "insumos"),
+    despesasUsina: campo(formData, "despesasUsina"),
     observacao: campo(formData, "observacao"),
   };
 }
@@ -299,38 +302,40 @@ function validarRemuneracao(
     if (d.atrPorTonelada === null) {
       return "Informe o ATR por tonelada (kg ATR/t).";
     }
-    if (d.precoKgAtr === null && d.valorTonelada === null) {
-      return "Informe o preço do kg de ATR (ou um valor base por tonelada).";
+    if (d.precoKgAtr === null && d.precoCana === null) {
+      return "Informe o preço do kg de ATR (ou um preço base por tonelada).";
     }
     return null;
   }
-  if (d.valorTonelada === null) {
-    return "Informe o valor da tonelada.";
+  if (d.precoCana === null) {
+    return "Informe o preço da cana (R$/t).";
   }
   return null;
 }
 
 function dadosColheita(d: ColheitaInput) {
   return {
-    talhaoId: d.talhaoId,
+    fazendaId: d.fazendaId,
+    talhaoId: d.talhaoId || null,
     usinaId: d.usinaId,
     data: new Date(`${d.data}T12:00:00`),
     tipo: d.tipo,
     toneladas: d.toneladas,
-    valorTonelada: d.valorTonelada,
-    complemento: d.complemento,
-    complementoTipo: d.complementoTipo,
+    precoCana: d.precoCana,
+    agio: d.agio,
     atrPorTonelada: d.atrPorTonelada,
     precoKgAtr: d.precoKgAtr,
-    outrosAdicionais: d.outrosAdicionais,
-    despCorte: d.despCorte,
-    despTransporte: d.despTransporte,
-    despOutrasColheita: d.despOutrasColheita,
-    despPlantioUsina: d.despPlantioUsina,
-    despArrendamento: d.despArrendamento,
-    despAdubacao: d.despAdubacao,
-    despHerbicida: d.despHerbicida,
-    despOutras: d.despOutras,
+ctc: d.ctc,
+    areaColhida: d.areaColhida,
+    arrendar: d.arrendar,
+    tonsPorTarefa: d.tonsPorTarefa,
+    tarefasArrendadas: d.tarefasArrendadas,
+    adubo: d.adubo,
+    precoTonAdubo: d.precoTonAdubo,
+    tarefasAdubo: d.tarefasAdubo,
+    herbicidas: d.herbicidas as unknown as Prisma.InputJsonValue,
+    insumos: d.insumos as unknown as Prisma.InputJsonValue,
+    despesasUsina: d.despesasUsina as unknown as Prisma.InputJsonValue,
     observacao: d.observacao,
   };
 }
@@ -362,17 +367,12 @@ export async function criarColheita(
     return { ok: false, error: erroUsina };
   }
 
-  let criada!: { id: string; talhaoId: string; fazendaId: string };
+  let criada!: { id: string; fazendaId: string; talhaoId: string | null };
   try {
     const c = await prisma.colheita.create({
       data: dadosColheita(parsed.data),
-      include: { talhao: { select: { fazendaId: true } } },
     });
-    criada = {
-      id: c.id,
-      talhaoId: c.talhaoId,
-      fazendaId: c.talhao.fazendaId,
-    };
+    criada = { id: c.id, fazendaId: c.fazendaId, talhaoId: c.talhaoId };
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -380,8 +380,10 @@ export async function criarColheita(
 
   revalidatePath("/");
   revalidatePath("/colheitas");
-  revalidatePath(`/talhoes/${criada.talhaoId}`);
   revalidatePath(`/fazendas/${criada.fazendaId}`);
+  if (criada.talhaoId) {
+    revalidatePath(`/talhoes/${criada.talhaoId}`);
+  }
   redirect(`/colheitas/${criada.id}`);
 }
 
@@ -405,13 +407,14 @@ export async function atualizarColheita(
     const c = await prisma.colheita.update({
       where: { id },
       data: dadosColheita(parsed.data),
-      include: { talhao: { select: { fazendaId: true } } },
     });
     revalidatePath("/");
     revalidatePath("/colheitas");
     revalidatePath(`/colheitas/${id}`);
-    revalidatePath(`/talhoes/${c.talhaoId}`);
-    revalidatePath(`/fazendas/${c.talhao.fazendaId}`);
+    revalidatePath(`/fazendas/${c.fazendaId}`);
+    if (c.talhaoId) {
+      revalidatePath(`/talhoes/${c.talhaoId}`);
+    }
   } catch (e) {
     console.error(e);
     return falha(e);

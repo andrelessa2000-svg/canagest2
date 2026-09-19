@@ -6,54 +6,61 @@ export const MODELO_USINA_LABEL: Record<ModeloUsina, string> = {
   coruripe: "Coruripe",
 };
 
-export const COMPLEMENTO_TIPOS = ["por_tonelada", "total"] as const;
-export type ComplementoTipo = (typeof COMPLEMENTO_TIPOS)[number];
+export const TIPOS_CORTE = ["planta", "soca", "ressoca"] as const;
+export type TipoCorte = (typeof TIPOS_CORTE)[number];
 
-export const COMPLEMENTO_TIPO_LABEL: Record<ComplementoTipo, string> = {
-  por_tonelada: "R$ por tonelada",
-  total: "Valor total (R$)",
+export const TIPOS_CORTE_LABEL: Record<TipoCorte, string> = {
+  planta: "Cana planta",
+  soca: "Soca",
+  ressoca: "Ressoca",
 };
 
-export type DespesasColheita = {
-  despCorte: number;
-  despTransporte: number;
-  despOutrasColheita: number;
-  despPlantioUsina: number;
-  despArrendamento: number;
-  despAdubacao: number;
-  despHerbicida: number;
-  despOutras: number;
+export const SACOS_ADUBO_POR_TAREFA: Record<TipoCorte, number> = {
+  planta: 4,
+  soca: 3,
+  ressoca: 3,
 };
 
-export const DESPESAS: { campo: keyof DespesasColheita; rotulo: string }[] = [
-  { campo: "despCorte", rotulo: "Corte" },
-  { campo: "despTransporte", rotulo: "Transporte" },
-  { campo: "despOutrasColheita", rotulo: "Outras despesas de colheita" },
-  { campo: "despPlantioUsina", rotulo: "Plantio com a usina" },
-  { campo: "despArrendamento", rotulo: "Arrendamento" },
-  { campo: "despAdubacao", rotulo: "Adubação" },
-  { campo: "despHerbicida", rotulo: "Herbicida" },
-  { campo: "despOutras", rotulo: "Outras despesas" },
-];
+export type ItemDespesa = { nome: string; valor: number };
 
-export type EntradaCalculo = Partial<DespesasColheita> & {
+export type EntradaCalculo = {
   modelo: ModeloUsina | string;
+  tipo?: TipoCorte | string;
   toneladas: number;
-  valorTonelada?: number | null;
-  complemento?: number | null;
-  complementoTipo?: string | null;
+
+  precoCana?: number | null;
+  agio?: number | null;
   atrPorTonelada?: number | null;
   precoKgAtr?: number | null;
-  outrosAdicionais?: number | null;
+
+  ctc?: number;
+
+  areaColhida?: number | null;
+  arrendar?: boolean;
+  tonsPorTarefa?: number | null;
+  tarefasArrendadas?: number | null;
+
+  adubo?: boolean;
+  precoTonAdubo?: number | null;
+  sacosPorTarefa?: number;
+  tarefasAdubo?: number;
+
+  herbicidas?: ItemDespesa[];
+  insumos?: ItemDespesa[];
+  despesasUsina?: ItemDespesa[];
 };
 
 export type ResultadoColheita = {
   toneladas: number;
   atrTotal: number;
-  valorBase: number;
-  valorComplemento: number;
-  valorOutrosAdicionais: number;
-  valorBruto: number;
+  receita: number;
+  ctc: number;
+  arrendamento: number;
+  adubo: number;
+  herbicida: number;
+  insumos: number;
+  despesasUsina: number;
+  totalInsumos: number;
   totalDespesas: number;
   lucro: number;
   receitaPorTonelada: number;
@@ -65,52 +72,67 @@ function n(v: number | null | undefined): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+function soma(itens: ItemDespesa[] | undefined): number {
+  return (itens ?? []).reduce((acc, i) => acc + n(i.valor), 0);
+}
+
+export function sacosAduboTarefa(tipo: string | undefined): number {
+  return SACOS_ADUBO_POR_TAREFA[(tipo as TipoCorte) ?? "soca"] ?? 3;
+}
+
 export function calcularColheita(e: EntradaCalculo): ResultadoColheita {
   const toneladas = n(e.toneladas);
 
   let atrTotal = 0;
-  let valorBase = 0;
-  let valorComplemento = 0;
-  let valorOutrosAdicionais = 0;
+  let receita = 0;
 
   if (e.modelo === "coruripe") {
     atrTotal = toneladas * n(e.atrPorTonelada);
     const precoKgAtr = n(e.precoKgAtr);
-    valorBase =
-      precoKgAtr > 0 ? atrTotal * precoKgAtr : toneladas * n(e.valorTonelada);
-    valorComplemento = n(e.complemento);
-    valorOutrosAdicionais = n(e.outrosAdicionais);
+    receita =
+      precoKgAtr > 0 ? atrTotal * precoKgAtr : toneladas * n(e.precoCana);
   } else {
-    valorBase = toneladas * n(e.valorTonelada);
-    const complemento = n(e.complemento);
-    valorComplemento =
-      e.complementoTipo === "por_tonelada" ? toneladas * complemento : complemento;
+    receita = toneladas * (n(e.precoCana) + n(e.agio));
   }
 
-  const valorBruto = valorBase + valorComplemento + valorOutrosAdicionais;
+  const ctc = n(e.ctc);
 
-  const totalDespesas =
-    n(e.despCorte) +
-    n(e.despTransporte) +
-    n(e.despOutrasColheita) +
-    n(e.despPlantioUsina) +
-    n(e.despArrendamento) +
-    n(e.despAdubacao) +
-    n(e.despHerbicida) +
-    n(e.despOutras);
+  const areaBase = n(e.areaColhida) > 0 ? n(e.areaColhida) : n(e.tarefasAdubo);
 
-  const lucro = valorBruto - totalDespesas;
+  const arrendamento =
+    e.arrendar && n(e.tonsPorTarefa) > 0 && n(e.tarefasArrendadas) > 0
+      ? n(e.tonsPorTarefa) * n(e.precoCana) * n(e.tarefasArrendadas)
+      : 0;
+
+  const sacos = e.sacosPorTarefa ?? sacosAduboTarefa(e.tipo);
+  const tarefasAdubo = n(e.tarefasAdubo) > 0 ? n(e.tarefasAdubo) : areaBase;
+  const adubo =
+    e.adubo && n(e.precoTonAdubo) > 0 && tarefasAdubo > 0
+      ? sacos * 50 * tarefasAdubo * (n(e.precoTonAdubo) / 1000)
+      : 0;
+
+  const herbicida = soma(e.herbicidas);
+  const insumos = soma(e.insumos);
+  const totalInsumos = adubo + herbicida + insumos;
+  const despesasUsina = soma(e.despesasUsina);
+
+  const totalDespesas = ctc + arrendamento + totalInsumos + despesasUsina;
+  const lucro = receita - totalDespesas;
 
   return {
     toneladas,
     atrTotal,
-    valorBase,
-    valorComplemento,
-    valorOutrosAdicionais,
-    valorBruto,
+    receita,
+    ctc,
+    arrendamento,
+    adubo,
+    herbicida,
+    insumos,
+    despesasUsina,
+    totalInsumos,
     totalDespesas,
     lucro,
-    receitaPorTonelada: toneladas > 0 ? valorBruto / toneladas : 0,
+    receitaPorTonelada: toneladas > 0 ? receita / toneladas : 0,
     custoPorTonelada: toneladas > 0 ? totalDespesas / toneladas : 0,
     lucroPorTonelada: toneladas > 0 ? lucro / toneladas : 0,
   };

@@ -75,10 +75,10 @@ const naoEhNovo = (u) =>
     await page.waitForURL((u) => u.pathname === "/colheitas/nova", { timeout: 15000 });
     const selecionado = await page.locator('select[name="talhaoId"] option:checked').textContent();
     if (!selecionado || !selecionado.includes(NOME_TALHAO)) falha(`Talhão não pré-selecionado: "${selecionado}"`);
-    await page.selectOption('select[name="usinaId"]', { label: "Usina Pindorama" });
+    await page.selectOption('select[name="usinaId"]', { label: "Usina Pindorama (Pindorama)" });
     await page.fill('input[name="toneladas"]', String(TONELADAS).replace(".", ","));
-    await page.fill('input[name="valorTonelada"]', "149,67467");
-    await page.fill('input[name="complemento"]', "3.000,00");
+    await page.fill('input[name="precoCana"]', "164,00");
+    await page.fill('input[name="ctc"]', "12.000,00");
     await page.fill('textarea[name="observacao"]', "teste e2e");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/colheitas\/[a-z0-9-]+$/, { timeout: 20000 });
