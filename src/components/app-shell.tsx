@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Factory, Home, Sprout, Tractor } from "lucide-react";
+import { BarChart3, Factory, Home, Sprout, Tractor } from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
 import { InstallAppButton } from "./install-app-button";
@@ -13,6 +13,7 @@ const itens = [
   { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
   { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
+  { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
 ];
 
 function ativo(pathname: string, href: string): boolean {
@@ -63,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur md:hidden"
         aria-label="Navegação inferior"
       >
-        <div className="mx-auto grid max-w-5xl grid-cols-4">
+        <div className="mx-auto grid max-w-5xl grid-cols-5">
           {itens.map(({ href, rotulo, icone: Icone }) => {
             const current = ativo(pathname, href);
             return (

@@ -18,6 +18,7 @@ Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em *
 - Despesas: **CTC** (informado pela usina), **arrendamento** calculado (t/tarefa × preço da cana × tarefas), **adubo** calculado (sacos/tarefa conforme o corte × preço da tonelada), **herbicida** (itens da calda), **outros insumos** (calcário, pó de rocha, biológico, vinhaça…) e **despesas com a usina** — todas como listas dinâmicas de itens.
 - Cálculo de resultado por colheita: receita, CTC, arrendamento, insumos, despesas e lucro (por colheita e por tonelada), calculado ao vivo no formulário.
 - Lista de colheitas com filtros (fazenda, usina, tipo e período) e resumo dos totais.
+- Relatórios completos com gráficos: toneladas por safra e por fazenda, destaques (maior/menor safra, maior/menor produtividade, maior/menor lucro), composição das despesas, comparativo por fazenda e botão de imprimir/PDF.
 - Painel com resumo da safra: fazendas, talhões, área (ha e tarefas), total colhido e financeiro (receita, despesas, lucro e lucro/t).
 - Produtividade calculada (t/ha) por talhão e por fazenda.
 - PWA instalável com suporte offline: cache de navegação e recursos estáticos.
