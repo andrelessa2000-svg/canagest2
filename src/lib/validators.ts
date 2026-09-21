@@ -63,7 +63,19 @@ const itensJson = () =>
       if (!v || v.trim() === "") return [];
       try {
         const arr = JSON.parse(v);
-        return Array.isArray(arr) ? arr : [];
+        if (!Array.isArray(arr)) return [];
+        return arr
+          .filter(
+            (i) =>
+              (typeof i?.nome === "string" && i.nome.trim() !== "") ||
+              (typeof i?.valor === "string" && i.valor.trim() !== ""),
+          )
+          .map((i) => {
+            const nome = (typeof i?.nome === "string" ? i.nome : "").trim();
+            const raw = typeof i?.valor === "string" ? i.valor : String(i?.valor ?? "");
+            const parsed = parseDecimal(raw);
+            return { nome, valor: Number.isFinite(parsed) ? parsed : 0 };
+          });
       } catch {
         return [];
       }
@@ -78,7 +90,6 @@ const ligaField = () =>
 
 export const colheitaSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),
-  talhaoId: z.string().optional(),
   usinaId: z.string().min(1, "Selecione a usina"),
   data: z.string().min(1, "Informe a data"),
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),

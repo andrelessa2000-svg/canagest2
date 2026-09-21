@@ -46,7 +46,6 @@ export default async function ColheitasPage({
       where,
       include: {
         fazenda: { select: { id: true, nome: true } },
-        talhao: { select: { nome: true } },
         usina: { select: { nome: true, modelo: true } },
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
@@ -195,9 +194,6 @@ export default async function ColheitasPage({
                 <Link href={`/colheitas/${c.id}`} className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
                     {c.fazenda.nome}
-                    {c.talhao && (
-                      <span className="font-normal text-ink-2"> · Talhão {c.talhao.nome}</span>
-                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(c.data)}</span>

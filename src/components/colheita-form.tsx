@@ -18,18 +18,11 @@ import { CelulaMetrica } from "./stat-cells";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
-export type TalhaoOpcao = {
-  id: string;
-  nome: string;
-  areaHa: number;
-  fazendaId: string;
-};
 
 type Item = { nome: string; valor: string };
 
 type Campos = {
   fazendaId: string;
-  talhaoId: string;
   usinaId: string;
   data: string;
   tipo: string;
@@ -132,30 +125,21 @@ export function ColheitaForm({
   acao,
   fazendas,
   usinas,
-  talhoes = [],
   inicial,
-  talhaoSelecionado,
   modo = "criar",
   cancelarHref = "/colheitas",
 }: {
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
   fazendas: FazendaOpcao[];
   usinas: UsinaOpcao[];
-  talhoes?: TalhaoOpcao[];
   inicial?: Partial<Campos> & { herbicidas?: Item[]; insumos?: Item[]; despesasUsina?: Item[] };
-  talhaoSelecionado?: string;
   modo?: "criar" | "editar";
   cancelarHref?: string;
 }) {
   const [state, acaoForm] = useActionState(acao, undefined);
 
-  const talhaoInicial = inicial?.talhaoId ?? talhaoSelecionado ?? "";
-  const talhaoSel = talhoes.find((t) => t.id === talhaoInicial);
   const fazendaSel =
-    inicial?.fazendaId ??
-    talhaoSel?.fazendaId ??
-    (fazendas.length === 1 ? fazendas[0].id : "") ??
-    "";
+    inicial?.fazendaId ?? (fazendas.length === 1 ? fazendas[0].id : "") ?? "";
 
   const tarefasFazendaSel = areaTarefas(
     fazendas.find((f) => f.id === fazendaSel)?.areaHa ?? 0,
@@ -165,7 +149,6 @@ export function ColheitaForm({
 
   const [c, setC] = useState<Campos>(() => ({
     fazendaId: fazendaSel,
-    talhaoId: talhaoInicial,
     usinaId: inicial?.usinaId ?? usinas[0]?.id ?? "",
     data: inicial?.data ?? toDateInputValue(new Date()),
     tipo: inicial?.tipo ?? "planta",
@@ -211,7 +194,6 @@ export function ColheitaForm({
     setC((prev) => ({
       ...prev,
       fazendaId: id,
-      talhaoId: "",
       areaColhida: prev.areaColhida || area,
       tarefasArrendadas: prev.tarefasArrendadas || area,
       tarefasAdubo: prev.tarefasAdubo || area,
@@ -278,10 +260,6 @@ export function ColheitaForm({
     { r: "Outros insumos", v: resultado.insumos },
     { r: "Despesas com a usina", v: resultado.despesasUsina },
   ].filter((x) => x.v > 0);
-
-  const talhoesVisiveis = c.fazendaId
-    ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
-    : [];
 
   return (
     <form action={acaoForm} className="grid gap-6 pb-4">
@@ -359,29 +337,6 @@ export function ColheitaForm({
               ))}
             </select>
           </Campo>
-
-          {talhoesVisiveis.length > 0 && (
-            <Campo
-              label="Talhão (opcional)"
-              htmlFor="talhaoId"
-              hint="Use quando a usina reportar por talhão."
-            >
-              <select
-                id="talhaoId"
-                name="talhaoId"
-                className="field-input"
-                value={c.talhaoId}
-                onChange={(e) => set("talhaoId", e.target.value)}
-              >
-                <option value="">Fazenda inteira</option>
-                {talhoesVisiveis.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-          )}
         </div>
       </section>
 

@@ -19,13 +19,12 @@ model Fazenda {
 }
 
 model Talhao {
-  id         String   @id @default(cuid())
-  fazendaId  String
-  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
-  nome       String
-  areaHa     Float
-  criadoEm   DateTime @default(now())
-  colheitas  Colheita[]
+  id        String   @id @default(cuid())
+  fazendaId String
+  fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  nome      String
+  areaHa    Float
+  criadoEm  DateTime @default(now())
 
   @@unique([fazendaId, nome])
   @@index([fazendaId])
@@ -45,8 +44,6 @@ model Colheita {
   id        String   @id @default(cuid())
   fazendaId String
   fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
-  talhaoId  String?
-  talhao    Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
   usinaId   String
   usina     Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
   data      DateTime @default(now())
@@ -90,7 +87,6 @@ model Colheita {
   criadaEm   DateTime @default(now())
 
   @@index([fazendaId, data])
-  @@index([talhaoId])
   @@index([usinaId])
   @@index([data])
 }

@@ -270,7 +270,6 @@ export async function excluirUsina(id: string): Promise<ActionState> {
 function camposColheita(formData: FormData) {
   return {
     fazendaId: campo(formData, "fazendaId"),
-    talhaoId: campo(formData, "talhaoId") || undefined,
     usinaId: campo(formData, "usinaId"),
     data: campo(formData, "data"),
     tipo: campo(formData, "tipo"),
@@ -316,7 +315,6 @@ function validarRemuneracao(
 function dadosColheita(d: ColheitaInput) {
   return {
     fazendaId: d.fazendaId,
-    talhaoId: d.talhaoId || null,
     usinaId: d.usinaId,
     data: new Date(`${d.data}T12:00:00`),
     tipo: d.tipo,
@@ -367,12 +365,12 @@ export async function criarColheita(
     return { ok: false, error: erroUsina };
   }
 
-  let criada!: { id: string; fazendaId: string; talhaoId: string | null };
+  let criada!: { id: string; fazendaId: string };
   try {
     const c = await prisma.colheita.create({
       data: dadosColheita(parsed.data),
     });
-    criada = { id: c.id, fazendaId: c.fazendaId, talhaoId: c.talhaoId };
+    criada = { id: c.id, fazendaId: c.fazendaId };
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -381,9 +379,6 @@ export async function criarColheita(
   revalidatePath("/");
   revalidatePath("/colheitas");
   revalidatePath(`/fazendas/${criada.fazendaId}`);
-  if (criada.talhaoId) {
-    revalidatePath(`/talhoes/${criada.talhaoId}`);
-  }
   redirect(`/colheitas/${criada.id}`);
 }
 
@@ -412,9 +407,6 @@ export async function atualizarColheita(
     revalidatePath("/colheitas");
     revalidatePath(`/colheitas/${id}`);
     revalidatePath(`/fazendas/${c.fazendaId}`);
-    if (c.talhaoId) {
-      revalidatePath(`/talhoes/${c.talhaoId}`);
-    }
   } catch (e) {
     console.error(e);
     return falha(e);

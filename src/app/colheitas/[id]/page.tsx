@@ -73,7 +73,6 @@ export default async function ColheitaPage({
           talhoes: { select: { areaHa: true } },
         },
       },
-      talhao: { select: { nome: true } },
       usina: { select: { nome: true, modelo: true } },
     },
   });
@@ -160,7 +159,6 @@ export default async function ColheitaPage({
           <h2 className="font-display text-lg text-ink">Identificação</h2>
           <dl className="mt-2 divide-y divide-line">
             <Linha rotulo="Fazenda" valor={c.fazenda.nome} />
-            {c.talhao && <Linha rotulo="Talhão" valor={c.talhao.nome} />}
             <Linha rotulo="Usina" valor={`${c.usina.nome} (${modeloLabel})`} />
             <Linha rotulo="Data" valor={fmtDate(c.data)} />
             <Linha rotulo="Tipo de corte" valor={tipoLabel(c.tipo)} />

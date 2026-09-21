@@ -27,34 +27,33 @@ export default async function FazendaPage({
 }) {
   const { id } = await params;
 
-  const [fazenda, colheitas] = await Promise.all([
+  const [fazenda, colheitas, resumen] = await Promise.all([
     prisma.fazenda.findUnique({
       where: { id },
       include: {
         talhoes: {
-          include: {
-            colheitas: { orderBy: { data: "desc" }, take: 1 },
-          },
           orderBy: { nome: "asc" },
         },
       },
     }),
     prisma.colheita.findMany({
       where: { fazendaId: id },
-      include: { talhao: true, usina: { select: { nome: true } } },
+      include: { usina: { select: { nome: true } } },
       orderBy: { data: "desc" },
       take: 5,
+    }),
+    prisma.colheita.aggregate({
+      where: { fazendaId: id },
+      _sum: { toneladas: true },
+      _count: true,
     }),
   ]);
 
   if (!fazenda) notFound();
 
   const areaPlantada = fazenda.talhoes.reduce((n, t) => n + t.areaHa, 0);
-  const colhido = fazenda.talhoes.reduce(
-    (n, t) => n + t.colheitas.reduce((m, c) => m + c.toneladas, 0),
-    0,
-  );
-  const numColheitas = fazenda.talhoes.reduce((n, t) => n + t.colheitas.length, 0);
+  const colhido = resumen._sum.toneladas ?? 0;
+  const numColheitas = resumen._count;
 
   return (
     <>
@@ -134,34 +133,18 @@ export default async function FazendaPage({
         ) : (
           <>
             <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
-              {fazenda.talhoes.map((t) => {
-                const ultima = t.colheitas[0];
-                return (
-                  <LinhaLink
-                    key={t.id}
-                    href={`/talhoes/${t.id}`}
-                    principal={
-                      <span className="font-mono font-semibold tracking-wide">
-                        {t.nome}
-                      </span>
-                    }
-                    secundario={
-                      <>
-                        <span>{fmtArea(t.areaHa)}</span>
-                        {ultima && (
-                          <>
-                            <span aria-hidden>·</span>
-                            <span>
-                              Última colheita {fmtDateShort(ultima.data)} ·{" "}
-                              {fmtTons(ultima.toneladas)}
-                            </span>
-                          </>
-                        )}
-                      </>
-                    }
-                  />
-                );
-              })}
+              {fazenda.talhoes.map((t) => (
+                <LinhaLink
+                  key={t.id}
+                  href={`/talhoes/${t.id}`}
+                  principal={
+                    <span className="font-mono font-semibold tracking-wide">
+                      {t.nome}
+                    </span>
+                  }
+                  secundario={<span>{fmtArea(t.areaHa)}</span>}
+                />
+              ))}
             </ul>
             <Link
               href={`/fazendas/${fazenda.id}/talhoes/novo`}
@@ -194,21 +177,15 @@ export default async function FazendaPage({
               <LinhaLink
                 key={c.id}
                 href={`/colheitas/${c.id}`}
-                principal={
-                  c.talhao ? `Talhão ${c.talhao.nome}` : "Fazenda inteira"
-                }
+                principal={`${fmtDateShort(c.data)} · ${c.usina.nome}`}
                 secundario={
                   <>
-                    <span>{fmtDateShort(c.data)}</span>
-                    <span aria-hidden>·</span>
                     <span>{tipoLabel(c.tipo)}</span>
-                    <span aria-hidden>·</span>
-                    <span>{c.usina.nome}</span>
                   </>
                 }
                 destaque={fmtTons(c.toneladas)}
                 nota={fmtProd(
-                  c.toneladas / (c.talhao ? c.talhao.areaHa : areaPlantada || 1),
+                  areaPlantada > 0 ? c.toneladas / areaPlantada : 0,
                 )}
               />
             ))}

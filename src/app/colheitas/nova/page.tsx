@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function NovaColheitaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fazenda?: string; talhao?: string }>;
+  searchParams: Promise<{ fazenda?: string }>;
 }) {
-  const [{ fazenda, talhao }, fazendasRaw, usinas, talhoes] = await Promise.all([
+  const [{ fazenda }, fazendasRaw, usinas] = await Promise.all([
     searchParams,
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -20,10 +20,6 @@ export default async function NovaColheitaPage({
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
-      orderBy: { nome: "asc" },
-    }),
-    prisma.talhao.findMany({
-      select: { id: true, nome: true, areaHa: true, fazendaId: true },
       orderBy: { nome: "asc" },
     }),
   ]);
@@ -35,10 +31,6 @@ export default async function NovaColheitaPage({
   }));
 
   const fazendaValida = fazendas.some((f) => f.id === fazenda);
-  const talhaoPreselecionado = talhoes.some((t) => t.id === talhao)
-    ? talhao
-    : undefined;
-
   const inicial = fazendaValida ? { fazendaId: fazenda! } : undefined;
 
   return (
@@ -64,9 +56,7 @@ export default async function NovaColheitaPage({
             acao={criarColheita}
             fazendas={fazendas}
             usinas={usinas}
-            talhoes={talhoes}
             inicial={inicial}
-            talhaoSelecionado={talhaoPreselecionado}
           />
         )}
       </div>

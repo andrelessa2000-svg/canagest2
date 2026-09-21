@@ -31,7 +31,6 @@ export default async function DashboardPage() {
           fazenda: {
             select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
           },
-          talhao: { select: { nome: true } },
           usina: { select: { nome: true } },
         },
         orderBy: { data: "desc" },
@@ -190,17 +189,7 @@ export default async function DashboardPage() {
                   <LinhaLink
                     key={c.id}
                     href={`/colheitas/${c.id}`}
-                    principal={
-                      <>
-                        {c.fazenda.nome}
-                        {c.talhao && (
-                          <span className="font-normal text-ink-2">
-                            {" "}
-                            · Talhão {c.talhao.nome}
-                          </span>
-                        )}
-                      </>
-                    }
+                    principal={c.fazenda.nome}
                     secundario={
                       <>
                         <span>{fmtDateShort(c.data)}</span>

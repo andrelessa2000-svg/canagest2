@@ -54,15 +54,14 @@ async function main() {
     const qtdTalhoes = randInt(4, 7);
     for (let t = 1; t <= qtdTalhoes; t++) {
       const areaHa = randInt(18, 70) + Math.round(Math.random() * 10) / 10;
-      const talhao = await prisma.talhao.create({
+      const tarefas = Math.round(areaHa * 3.3 * 100) / 100;
+      await prisma.talhao.create({
         data: {
           fazendaId: fazenda.id,
           nome: `T-${String(t).padStart(2, "0")}`,
           areaHa,
         },
       });
-
-      const tarefas = Math.round(areaHa * 3.3 * 100) / 100;
       const qtdColheitas = randInt(2, 5);
       for (let cIdx = 0; cIdx < qtdColheitas; cIdx++) {
         const diasAtras = cIdx * randInt(380, 430) + randInt(0, 120);
@@ -89,7 +88,6 @@ async function main() {
         await prisma.colheita.create({
           data: {
             fazendaId: fazenda.id,
-            talhaoId: talhao.id,
             usinaId: usina.id,
             data: new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000),
             tipo,

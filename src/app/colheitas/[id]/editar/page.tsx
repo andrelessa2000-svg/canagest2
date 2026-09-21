@@ -21,7 +21,7 @@ export default async function EditarColheitaPage({
 }) {
   const { id } = await params;
 
-  const [colheita, fazendasRaw, usinas, talhoes] = await Promise.all([
+  const [colheita, fazendasRaw, usinas] = await Promise.all([
     prisma.colheita.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -29,10 +29,6 @@ export default async function EditarColheitaPage({
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
-      orderBy: { nome: "asc" },
-    }),
-    prisma.talhao.findMany({
-      select: { id: true, nome: true, areaHa: true, fazendaId: true },
       orderBy: { nome: "asc" },
     }),
   ]);
@@ -63,12 +59,10 @@ export default async function EditarColheitaPage({
           acao={atualizarColheita.bind(null, id)}
           fazendas={fazendas}
           usinas={usinas}
-          talhoes={talhoes}
           modo="editar"
           cancelarHref={`/colheitas/${id}`}
           inicial={{
             fazendaId: colheita.fazendaId,
-            talhaoId: colheita.talhaoId ?? "",
             usinaId: colheita.usinaId,
             data: toDateInputValue(colheita.data),
             tipo: colheita.tipo,
