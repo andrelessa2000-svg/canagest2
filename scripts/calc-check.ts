@@ -1,4 +1,5 @@
 import { calcularColheita, sacosAduboTarefa } from "@/lib/colheita";
+import { parseDecimal } from "@/lib/format";
 
 function checar(nome: string, obtido: number, esperado: number, tol = 0.01) {
   if (Math.abs(obtido - esperado) > tol) {
@@ -126,5 +127,16 @@ checar("Coruripe lucro", coruripe.lucro, 62748 * 1.0852 - 3000, 0.5);
 const zerado = calcularColheita({ modelo: "pindorama", toneladas: 0 });
 checar("Por tonelada com 0 t", zerado.receitaPorTonelada, 0);
 checar("Lucro por tonelada com 0 t", zerado.lucroPorTonelada, 0);
+
+// Parse de números com formato brasileiro
+checar("parse '2300'", parseDecimal("2300"), 2300);
+checar("parse '2.300'", parseDecimal("2.300"), 2300);
+checar("parse '2.300,5'", parseDecimal("2.300,5"), 2300.5);
+checar("parse '166.000'", parseDecimal("166.000"), 166000);
+checar("parse '1.234.567'", parseDecimal("1.234.567"), 1234567);
+checar("parse '125,496'", parseDecimal("125,496"), 125.496);
+checar("parse '2,5'", parseDecimal("2,5"), 2.5);
+checar("parse '149,67467'", parseDecimal("149,67467"), 149.67467);
+checar("parse '2.5'", parseDecimal("2.5"), 2.5);
 
 console.log("\nCálculos conferem.");

@@ -5,7 +5,6 @@ const ts = Date.now().toString().slice(-6);
 const NOME_FAZENDA = `Fazenda E2E ${ts}`;
 const NOME_TALHAO = `T-E2E${ts}`;
 const NOME_USINA = `Usina E2E ${ts}`;
-const TONELADAS = 9876.5;
 
 const naoEhNovo = (u) =>
   /\/talhoes\/[a-z0-9-]+$/.test(u.pathname) && !u.pathname.endsWith("/novo");
@@ -74,13 +73,13 @@ const naoEhNovo = (u) =>
     await page.goto(`${BASE}/colheitas/nova`, { waitUntil: "networkidle" });
     await page.selectOption('select[name="fazendaId"]', { label: NOME_FAZENDA });
     await page.selectOption('select[name="usinaId"]', { label: "Usina Pindorama (Pindorama)" });
-    await page.fill('input[name="toneladas"]', String(TONELADAS).replace(".", ","));
+    await page.fill('input[name="toneladas"]', "9.876,5");
     await page.fill('input[name="precoCana"]', "164,00");
     await page.fill('input[name="ctc"]', "12.000,00");
     const seccionDesp = page.locator("section").filter({ hasText: "Despesas com a usina" });
     await seccionDesp.getByRole("button", { name: "+ Adicionar item" }).click();
     await seccionDesp.locator('input[placeholder^="Nome"]').fill("Plantio");
-    await seccionDesp.locator('input[placeholder="Valor R$"]').fill("166000");
+    await seccionDesp.locator('input[placeholder="Valor R$"]').fill("166.000");
     await page.fill('textarea[name="observacao"]', "teste e2e");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/colheitas\/[a-z0-9-]+$/, { timeout: 20000 });

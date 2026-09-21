@@ -1,12 +1,17 @@
 export function parseDecimal(input: string): number {
   if (typeof input !== "string") return Number(input);
-  const t = input.trim().replace(/\s/g, "");
+  let t = input.trim().replace(/\s|\u00a0/g, "");
   if (!t) return NaN;
   if (t.includes(",")) {
+    // Vírgula = decimal; pontos = milhares: "2.300,5" -> 2300.5
     return Number(t.replace(/\./g, "").replace(",", "."));
   }
   if (t.includes(".")) {
-    return Number(t.replace(/,/g, ""));
+    // Puntos agrupados de a 3 = milhares: "2.300" -> 2300; senão decimal: "2.5" -> 2.5
+    if (/^\d{1,3}(\.\d{3})+$/.test(t)) {
+      return Number(t.replace(/\./g, ""));
+    }
+    return Number(t);
   }
   return Number(t);
 }
