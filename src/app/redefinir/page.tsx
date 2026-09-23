@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { RedefinirForm } from "@/components/redefinir-form";
 
@@ -15,11 +15,14 @@ export default async function RedefinirPage({
     return (
       <div className="mx-auto max-w-md">
         <PageHeader
-          rotulo="acceso"
+          rotulo="acesso"
           titulo="Link inválido"
-          descricao="Falta o token de recuperação no enlace."
+          descricao="Falta o token de recuperação no link."
         />
-        <Link href="/recuperar" className="font-semibold text-accent underline underline-offset-2">
+        <Link
+          href="/recuperar"
+          className="font-semibold text-accent underline underline-offset-2"
+        >
           Solicitar um novo link
         </Link>
       </div>
@@ -29,7 +32,7 @@ export default async function RedefinirPage({
   return (
     <div className="mx-auto max-w-md">
       <PageHeader
-        rotulo="acceso"
+        rotulo="acesso"
         titulo="Redefinir senha"
         descricao="Escolha uma nova senha para sua conta."
       />

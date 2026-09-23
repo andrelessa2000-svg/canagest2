@@ -8,7 +8,7 @@ export default async function RecuperarPage() {
   return (
     <div className="mx-auto max-w-md">
       <PageHeader
-        rotulo="acceso"
+        rotulo="acesso"
         titulo="Recuperar senha"
         descricao="Digite seu e-mail para receber um link de recuperação."
       />

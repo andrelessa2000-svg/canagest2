@@ -42,7 +42,7 @@ export function RegistroForm() {
           autoComplete="new-password"
         />
       </Campo>
-      <BotaoSubmit>Crear cuenta</BotaoSubmit>
+      <BotaoSubmit>Criar conta</BotaoSubmit>
     </form>
   );
 }

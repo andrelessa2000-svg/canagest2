@@ -345,7 +345,7 @@ export function ColheitaForm({
           <Campo
             label="Safra"
             htmlFor="safra"
-            hint="Opcional. Escreba ou escolha una safra usada antes."
+            hint="Opcional. Digite ou escolha uma safra usada antes."
           >
             <input
               id="safra"

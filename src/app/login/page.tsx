@@ -29,7 +29,7 @@ export default async function LoginPage({
   return (
     <div className="mx-auto max-w-md">
       <PageHeader
-        rotulo="acceso"
+        rotulo="acesso"
         titulo="Iniciar sessão"
         descricao="Bem-vindo de volta a CanaGest."
       />

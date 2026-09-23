@@ -83,7 +83,7 @@ export function TratoForm({
           </select>
         </Campo>
 
-        <Campo label="Safra" htmlFor="safra" hint="Opcional. Sugiere safras usadas antes.">
+        <Campo label="Safra" htmlFor="safra" hint="Opcional. Sugere safras usadas antes.">
           <input
             id="safra"
             name="safra"
