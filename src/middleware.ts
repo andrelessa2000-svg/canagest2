@@ -12,19 +12,19 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
-    const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+    const token = await getToken({
+      req,
+      secret: process.env.AUTH_SECRET,
+      secureCookie: req.nextUrl.protocol === "https:",
+    });
     if (!token) {
       const url = new URL("/login", req.url);
       if (pathname !== "/") url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url, {
-        headers: { "x-auth-debug": "token-null" },
-      });
+      return NextResponse.redirect(url);
     }
-  } catch (e) {
+  } catch {
     const url = new URL("/login", req.url);
-    return NextResponse.redirect(url, {
-      headers: { "x-auth-debug": `err:${String(e).slice(0, 120)}` },
-    });
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
