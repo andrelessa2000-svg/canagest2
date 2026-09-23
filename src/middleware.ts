@@ -16,11 +16,15 @@ export async function middleware(req: NextRequest) {
     if (!token) {
       const url = new URL("/login", req.url);
       if (pathname !== "/") url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(url, {
+        headers: { "x-auth-debug": "token-null" },
+      });
     }
-  } catch {
+  } catch (e) {
     const url = new URL("/login", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, {
+      headers: { "x-auth-debug": `err:${String(e).slice(0, 120)}` },
+    });
   }
 
   return NextResponse.next();
