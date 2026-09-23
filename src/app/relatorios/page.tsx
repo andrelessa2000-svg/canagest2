@@ -1,4 +1,5 @@
-import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, Download } from "lucide-react";
 import { prisma } from "@/lib/db";
 import {
   fmtCount,
@@ -8,6 +9,7 @@ import {
   TAREFAS_POR_HA,
 } from "@/lib/format";
 import { calcularColheita } from "@/lib/colheita";
+import { cargarCascata } from "@/lib/relatorio";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PrintButton } from "@/components/print-button";
@@ -40,7 +42,11 @@ export default async function RelatoriosPage() {
       orderBy: { data: "asc" },
     }),
     prisma.fazenda.findMany({
-      select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
+      select: {
+        id: true,
+        nome: true,
+        talhoes: { select: { nome: true, areaHa: true } },
+      },
       orderBy: { nome: "asc" },
     }),
   ]);
@@ -215,13 +221,68 @@ export default async function RelatoriosPage() {
   const maxTonsAno = Math.max(...anos.map((a) => a.tons), 1);
   const maxTonsFazenda = Math.max(...fazendaResumo.map((f) => f.tons), 1);
 
+  const porUsina = new Map<string, { nome: string; tons: number; receita: number; lucro: number }>();
+  for (const l of linhas) {
+    const u = porUsina.get(l.usinaNome) ?? { nome: l.usinaNome, tons: 0, receita: 0, lucro: 0 };
+    u.tons += l.toneladas;
+    u.receita += l.r.receita;
+    u.lucro += l.r.lucro;
+    porUsina.set(l.usinaNome, u);
+  }
+  const usinasResumo = [...porUsina.values()].sort((a, b) => b.receita - a.receita);
+
+  // Relatório em cascata
+  const cascata = await cargarCascata();
+
+  const fazendasPorSafra = new Map<string, Set<string>>();
+  for (const c of colheitas) {
+    if (!c.safra) continue;
+    if (!fazendasPorSafra.has(c.safra)) fazendasPorSafra.set(c.safra, new Set());
+    fazendasPorSafra.get(c.safra)!.add(c.fazendaId);
+  }
+  const safrasUsadas = [...fazendasPorSafra.keys()].sort();
+  const talhoesVacios = safrasUsadas
+    .map((safra) => {
+      const colhidas = fazendasPorSafra.get(safra) ?? new Set();
+      const vazios = fazendas.flatMap((f) =>
+        colhidas.has(f.id)
+          ? []
+          : f.talhoes.map((t) => ({
+              safra,
+              fazenda: f.nome,
+              talhao: t.nome,
+              areaHa: t.areaHa,
+            })),
+      );
+      return { safra, vazios };
+    })
+    .filter((g) => g.vazios.length > 0);
+
+  const costosCascata =
+    cascata.total.ctc +
+    cascata.total.arrendamento +
+    cascata.total.insumos +
+    cascata.total.despesasUsina +
+    cascata.total.tratos;
+  const custoTonelada = cascata.total.toneladas > 0 ? costosCascata / cascata.total.toneladas : 0;
+  const costoTarefa = cascata.total.tarefas > 0 ? costosCascata / cascata.total.tarefas : 0;
+
+  const linhaNum = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
   return (
     <>
       <PageHeader
         rotulo="relatório completo"
         titulo="Relatórios"
         descricao="Safra, produtividade e resultado — valores e gráficos para imprimir."
-        acao={<PrintButton />}
+        acao={
+          <>
+            <Link href="/relatorios/csv" className="btn btn-soft">
+              <Download className="size-4" /> CSV
+            </Link>
+            <PrintButton />
+          </>
+        }
       />
 
       {/* Visão geral */}
@@ -378,6 +439,157 @@ export default async function RelatoriosPage() {
               {fmtMoney(total.despesas)}
             </span>
           </div>
+        </div>
+      </section>
+
+      {/* Relatório em cascata */}
+      <section className="mt-10 grid gap-3">
+        <h2 className="font-display text-xl text-ink">Relatório em cascata</h2>
+        <p className="text-sm leading-relaxed text-ink-2">
+          Receita da colheita − CTC − arrendamento − insumos − despesas com usina ={" "}
+          <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos culturais ={" "}
+          <span className="font-semibold text-ink">lucro líquido</span>. Plantio e reforma do ano se
+          mostran separados (costo sem receita).
+        </p>
+        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                <th className="px-3 py-2 font-semibold">Fazenda</th>
+                <th className="px-3 py-2 text-right font-semibold">Ton.</th>
+                <th className="px-3 py-2 text-right font-semibold">Tarefas</th>
+                <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                <th className="px-3 py-2 text-right font-semibold">CTC</th>
+                <th className="px-3 py-2 text-right font-semibold">Arrend.</th>
+                <th className="px-3 py-2 text-right font-semibold">Insumos</th>
+                <th className="px-3 py-2 text-right font-semibold">Desp. usina</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro bruto</th>
+                <th className="px-3 py-2 text-right font-semibold">Tratos</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
+                <th className="px-3 py-2 text-right font-semibold">Plantio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cascata.filas.map((f) => (
+                <tr key={f.fazendaId} className="border-b border-line">
+                  <td className="px-3 py-2 font-medium text-ink">{f.fazendaNome}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{linhaNum(f.toneladas)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{linhaNum(f.tarefas)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.ctc)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.arrendamento)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.insumos)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.despesasUsina)}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(f.lucroBruto)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.tratos)}</td>
+                  <td
+                    className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                      f.lucroNeto < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(f.lucroNeto)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.plantio)}</td>
+                </tr>
+              ))}
+              <tr className="border-b border-line bg-surface-muted">
+                <td className="px-3 py-2 font-bold text-ink">TOTAL</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{linhaNum(cascata.total.toneladas)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{linhaNum(cascata.total.tarefas)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.receita)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.ctc)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.arrendamento)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.insumos)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.despesasUsina)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroBruto)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.tratos)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.plantio)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-3">
+          <CelulaMetrica
+            rotulo="Custo por tonelada"
+            valor={fmtMoney(custoTonelada)}
+            legenda="despesas ÷ toneladas"
+          />
+          <CelulaMetrica
+            rotulo="Custo por tarefa"
+            valor={fmtMoney(costoTarefa)}
+            legenda="despesas ÷ tarefas"
+          />
+          <CelulaMetrica
+            rotulo="Lucro líquido total"
+            valor={fmtMoney(cascata.total.lucroNeto)}
+            legenda="após tratos"
+            destaque
+          />
+        </div>
+      </section>
+
+      {/* Talhões vazios */}
+      <section className="mt-10 grid gap-3">
+        <h2 className="font-display text-xl text-ink">Talhões vazios (neutros)</h2>
+        <p className="text-sm text-ink-2">
+          Fazendas sem colheita registrada na safra — talhões deixados sem moer (normalmente para
+          renovación).
+        </p>
+        {talhoesVacios.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line-strong bg-surface/60 px-4 py-6 text-sm text-ink-2">
+            Todas as fazendas com safra têm colheita registrada, ou ainda não há safras com colheitas.
+          </p>
+        ) : (
+          talhoesVacios.map((g) => (
+            <div key={g.safra} className="rounded-[10px] border border-line bg-surface">
+              <p className="eyebrow px-4 py-2">Safra {g.safra}</p>
+              <ul className="divide-y divide-line px-4">
+                {g.vazios.map((t) => (
+                  <li key={`${g.safra}-${t.talhao}`} className="flex items-center gap-3 py-2 text-sm">
+                    <span className="font-medium text-ink">{t.talhao}</span>
+                    <span className="text-xs text-ink-3">· {t.fazenda}</span>
+                    <span className="ml-auto text-xs tabular-nums text-ink-2">
+                      {fmtCount(Math.round(t.areaHa * TAREFAS_POR_HA))} tarefas
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* Por usina */}
+      <section className="mt-10 grid gap-3">
+        <h2 className="font-display text-xl text-ink">Resultado por usina</h2>
+        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+          <table className="w-full min-w-[420px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                <th className="px-3 py-2 font-semibold">Usina</th>
+                <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usinasResumo.map((u) => (
+                <tr key={u.nome} className="border-b border-line">
+                  <td className="px-3 py-2 font-medium text-ink">{u.nome}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtToneladas(u.tons)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(u.receita)}</td>
+                  <td
+                    className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                      u.lucro < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(u.lucro)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
