@@ -7,10 +7,14 @@ import { prisma } from "./db";
 import {
   colheitaSchema,
   fazendaSchema,
+  plantioSchema,
   primeiraMensagem,
   talhaoSchema,
+  tratoSchema,
   usinaSchema,
   type ColheitaInput,
+  type PlantioInput,
+  type TratoInput,
 } from "./validators";
 
 export type ActionState = { ok: true } | { ok: false; error: string };
@@ -273,6 +277,7 @@ function camposColheita(formData: FormData) {
     usinaId: campo(formData, "usinaId"),
     data: campo(formData, "data"),
     tipo: campo(formData, "tipo"),
+    safra: campo(formData, "safra"),
     toneladas: campo(formData, "toneladas"),
     precoCana: campo(formData, "precoCana"),
     agio: campo(formData, "agio"),
@@ -318,6 +323,7 @@ function dadosColheita(d: ColheitaInput) {
     usinaId: d.usinaId,
     data: new Date(`${d.data}T12:00:00`),
     tipo: d.tipo,
+    safra: d.safra,
     toneladas: d.toneladas,
     precoCana: d.precoCana,
     agio: d.agio,
@@ -436,4 +442,166 @@ async function removerColheita(id: string): Promise<void> {
   revalidatePath("/colheitas");
   revalidatePath("/talhoes", "layout");
   revalidatePath("/fazendas", "layout");
+}
+
+function camposPlantio(formData: FormData) {
+  return {
+    fazendaId: campo(formData, "fazendaId"),
+    talhaoId: campo(formData, "talhaoId") || undefined,
+    safra: campo(formData, "safra"),
+    tipo: campo(formData, "tipo"),
+    data: campo(formData, "data"),
+    valor: campo(formData, "valor"),
+    observacao: campo(formData, "observacao"),
+  };
+}
+
+function dadosPlantio(d: PlantioInput) {
+  return {
+    fazendaId: d.fazendaId,
+    talhaoId: d.talhaoId || null,
+    safra: d.safra,
+    tipo: d.tipo,
+    data: new Date(`${d.data}T12:00:00`),
+    valor: d.valor,
+    observacao: d.observacao,
+  };
+}
+
+export async function criarPlantio(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = plantioSchema.safeParse(camposPlantio(formData));
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+  try {
+    await prisma.plantio.create({ data: dadosPlantio(parsed.data) });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/plantio");
+  revalidatePath(`/fazendas/${parsed.data.fazendaId}`);
+  redirect("/plantio");
+}
+
+export async function atualizarPlantio(
+  id: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = plantioSchema.safeParse(camposPlantio(formData));
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+  try {
+    await prisma.plantio.update({ where: { id }, data: dadosPlantio(parsed.data) });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/plantio");
+  revalidatePath(`/fazendas/${parsed.data.fazendaId}`);
+  redirect("/plantio");
+}
+
+export async function excluirPlantio(id: string): Promise<ActionState> {
+  try {
+    await prisma.plantio.delete({ where: { id } });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/plantio");
+  revalidatePath("/fazendas", "layout");
+  return { ok: true };
+}
+
+function camposTrato(formData: FormData) {
+  return {
+    fazendaId: campo(formData, "fazendaId"),
+    talhaoId: campo(formData, "talhaoId") || undefined,
+    safra: campo(formData, "safra"),
+    tipo: campo(formData, "tipo"),
+    escopo: campo(formData, "escopo"),
+    tarefas: campo(formData, "tarefas"),
+    data: campo(formData, "data"),
+    valor: campo(formData, "valor"),
+    produtos: campo(formData, "produtos"),
+    observacao: campo(formData, "observacao"),
+  };
+}
+
+function dadosTrato(d: TratoInput) {
+  return {
+    fazendaId: d.fazendaId,
+    talhaoId: d.talhaoId || null,
+    safra: d.safra,
+    tipo: d.tipo,
+    escopo: d.escopo,
+    tarefas: d.tarefas,
+    data: new Date(`${d.data}T12:00:00`),
+    valor: d.valor,
+    produtos: d.produtos as unknown as Prisma.InputJsonValue,
+    observacao: d.observacao,
+  };
+}
+
+export async function criarTrato(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = tratoSchema.safeParse(camposTrato(formData));
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+  try {
+    await prisma.trato.create({ data: dadosTrato(parsed.data) });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/tratos");
+  revalidatePath(`/fazendas/${parsed.data.fazendaId}`);
+  redirect("/tratos");
+}
+
+export async function atualizarTrato(
+  id: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = tratoSchema.safeParse(camposTrato(formData));
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+  try {
+    await prisma.trato.update({ where: { id }, data: dadosTrato(parsed.data) });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/tratos");
+  revalidatePath(`/fazendas/${parsed.data.fazendaId}`);
+  redirect("/tratos");
+}
+
+export async function excluirTrato(id: string): Promise<ActionState> {
+  try {
+    await prisma.trato.delete({ where: { id } });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/tratos");
+  revalidatePath("/fazendas", "layout");
+  return { ok: true };
 }

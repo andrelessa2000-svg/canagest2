@@ -99,7 +99,7 @@ const naoEhNovo = (u) =>
     await page.waitForURL(/\/colheitas\/[a-z0-9-]+$/, { timeout: 20000 });
     await page.getByText(/9\.876,5/).first().waitFor({ timeout: 15000 });
     await page.getByText(/Pindorama/).first().waitFor({ timeout: 15000 });
-    await page.getByText(/Plantio/).first().waitFor({ timeout: 15000 });
+    await page.locator("dt").getByText("Plantio").first().waitFor({ timeout: 15000 });
     await page.getByText(/166\.000,00/).first().waitFor({ timeout: 15000 });
     passos.push("Colheita registrada (detalhe aberto, despesa Plantio salva)");
 

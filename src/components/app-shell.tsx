@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { BarChart3, Calculator, Factory, Home, LogOut, Sprout, Tractor } from "lucide-react";
+import {
+  BarChart3,
+  Calculator,
+  Factory,
+  Home,
+  Leaf,
+  LogOut,
+  SprayCan,
+  Sprout,
+  Tractor,
+} from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
 import { InstallAppButton } from "./install-app-button";
@@ -14,6 +24,8 @@ const itens = [
   { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
   { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
+  { href: "/plantio", rotulo: "Plantio", icone: Leaf },
+  { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
   { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
   { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
 ];
@@ -106,7 +118,7 @@ export function AppShell({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur md:hidden"
         aria-label="Navegação inferior"
       >
-        <div className="mx-auto grid max-w-5xl grid-cols-6">
+        <div className="mx-auto grid max-w-5xl grid-cols-4">
           {itens.map(({ href, rotulo, icone: Icone }) => {
             const current = ativo(pathname, href);
             return (

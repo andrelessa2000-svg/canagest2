@@ -73,6 +73,8 @@ model Fazenda {
   atualizadaEm DateTime @updatedAt
   talhoes     Talhao[]
   colheitas   Colheita[]
+  plantios    Plantio[]
+  tratos      Trato[]
 
   @@index([nome])
 }
@@ -84,6 +86,8 @@ model Talhao {
   nome      String
   areaHa    Float
   criadoEm  DateTime @default(now())
+  plantios  Plantio[]
+  tratos    Trato[]
 
   @@unique([fazendaId, nome])
   @@index([fazendaId])
@@ -107,6 +111,7 @@ model Colheita {
   usina     Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
   data      DateTime @default(now())
   tipo      String
+  safra     String?
   toneladas Float
 
   // Remuneração — Pindorama
@@ -148,4 +153,41 @@ model Colheita {
   @@index([fazendaId, data])
   @@index([usinaId])
   @@index([data])
+}
+
+model Plantio {
+  id         String   @id @default(cuid())
+  fazendaId  String
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  talhaoId   String?
+  talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  safra      String?
+  tipo       String
+  data       DateTime @default(now())
+  valor      Float
+  observacao String?
+  criadaEm   DateTime @default(now())
+
+  @@index([fazendaId, data])
+  @@index([talhaoId])
+}
+
+model Trato {
+  id         String   @id @default(cuid())
+  fazendaId  String
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  talhaoId   String?
+  talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  safra      String?
+  tipo       String
+  escopo     String
+  tarefas    Float?
+  data       DateTime @default(now())
+  valor      Float
+  produtos   Json?
+  observacao String?
+  criadaEm   DateTime @default(now())
+
+  @@index([fazendaId, data])
+  @@index([talhaoId])
 }

@@ -21,7 +21,7 @@ export default async function EditarColheitaPage({
 }) {
   const { id } = await params;
 
-  const [colheita, fazendasRaw, usinas] = await Promise.all([
+  const [colheita, fazendasRaw, usinas, safrasRaw] = await Promise.all([
     prisma.colheita.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -31,9 +31,17 @@ export default async function EditarColheitaPage({
       select: { id: true, nome: true, modelo: true },
       orderBy: { nome: "asc" },
     }),
+    prisma.colheita.findMany({
+      where: { safra: { not: null } },
+      select: { safra: true },
+      distinct: ["safra"],
+      orderBy: { safra: "asc" },
+    }),
   ]);
 
   if (!colheita) notFound();
+
+  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
 
   const fazendas = fazendasRaw.map((f) => ({
     id: f.id,
@@ -59,6 +67,7 @@ export default async function EditarColheitaPage({
           acao={atualizarColheita.bind(null, id)}
           fazendas={fazendas}
           usinas={usinas}
+          safras={safras}
           modo="editar"
           cancelarHref={`/colheitas/${id}`}
           inicial={{
@@ -66,6 +75,7 @@ export default async function EditarColheitaPage({
             usinaId: colheita.usinaId,
             data: toDateInputValue(colheita.data),
             tipo: colheita.tipo,
+            safra: colheita.safra ?? "",
             toneladas: numero(colheita.toneladas),
             precoCana: numero(colheita.precoCana),
             agio: numero(colheita.agio),

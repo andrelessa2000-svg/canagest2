@@ -26,6 +26,7 @@ type Campos = {
   usinaId: string;
   data: string;
   tipo: string;
+  safra: string;
   toneladas: string;
   precoCana: string;
   agio: string;
@@ -125,6 +126,7 @@ export function ColheitaForm({
   acao,
   fazendas,
   usinas,
+  safras = [],
   inicial,
   modo = "criar",
   cancelarHref = "/colheitas",
@@ -132,6 +134,7 @@ export function ColheitaForm({
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
   fazendas: FazendaOpcao[];
   usinas: UsinaOpcao[];
+  safras?: string[];
   inicial?: Partial<Campos> & { herbicidas?: Item[]; insumos?: Item[]; despesasUsina?: Item[] };
   modo?: "criar" | "editar";
   cancelarHref?: string;
@@ -152,6 +155,7 @@ export function ColheitaForm({
     usinaId: inicial?.usinaId ?? usinas[0]?.id ?? "",
     data: inicial?.data ?? toDateInputValue(new Date()),
     tipo: inicial?.tipo ?? "planta",
+    safra: inicial?.safra ?? "",
     toneladas: inicial?.toneladas ?? "",
     precoCana: inicial?.precoCana ?? "",
     agio: inicial?.agio ?? "",
@@ -336,6 +340,28 @@ export function ColheitaForm({
                 </option>
               ))}
             </select>
+          </Campo>
+
+          <Campo
+            label="Safra"
+            htmlFor="safra"
+            hint="Opcional. Escreba ou escolha una safra usada antes."
+          >
+            <input
+              id="safra"
+              name="safra"
+              className="field-input"
+              list="safras"
+              value={c.safra}
+              onChange={(e) => set("safra", e.target.value)}
+              placeholder="Ex.: 2026/27"
+              maxLength={30}
+            />
+            <datalist id="safras">
+              {safras.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
           </Campo>
         </div>
       </section>
