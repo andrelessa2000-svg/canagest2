@@ -8,7 +8,7 @@ import { PlantioForm } from "@/components/plantio-form";
 export const dynamic = "force-dynamic";
 
 export default async function NovoPlantioPage() {
-  const [fazendas, talhoes, safrasRaw] = await Promise.all([
+  const [fazendas, talhoes, safrasRaw, plantiosMedia] = await Promise.all([
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
       orderBy: { nome: "asc" },
@@ -23,9 +23,17 @@ export default async function NovoPlantioPage() {
       distinct: ["safra"],
       orderBy: { safra: "asc" },
     }),
+    prisma.plantio.findMany({
+      where: { areaHa: { gt: 0 }, valor: { gt: 0 } },
+      select: { valor: true, areaHa: true },
+    }),
   ]);
 
   const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
+
+  const areaTotalPlantios = plantiosMedia.reduce((a, p) => a + (p.areaHa ?? 0), 0);
+  const valorTotalPlantios = plantiosMedia.reduce((a, p) => a + p.valor, 0);
+  const mediaPorHa = areaTotalPlantios > 0 ? valorTotalPlantios / areaTotalPlantios : null;
 
   return (
     <>
@@ -50,6 +58,7 @@ export default async function NovoPlantioPage() {
           }))}
           talhoes={talhoes}
           safras={safras}
+          mediaPorHa={mediaPorHa}
         />
       </div>
     </>

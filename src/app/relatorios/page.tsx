@@ -263,7 +263,10 @@ export default async function RelatoriosPage() {
     cascata.total.arrendamento +
     cascata.total.insumos +
     cascata.total.despesasUsina +
-    cascata.total.tratos;
+    cascata.total.tratos +
+    cascata.total.plantio +
+    cascata.total.projTratos +
+    cascata.total.projPlantio;
   const custoTonelada = cascata.total.toneladas > 0 ? costosCascata / cascata.total.toneladas : 0;
   const costoTarefa = cascata.total.tarefas > 0 ? costosCascata / cascata.total.tarefas : 0;
 
@@ -446,42 +449,34 @@ export default async function RelatoriosPage() {
       <section className="mt-10 grid gap-3">
         <h2 className="font-display text-xl text-ink">Relatório em cascata</h2>
         <p className="text-sm leading-relaxed text-ink-2">
-          Receita da colheita − CTC − arrendamento − insumos − despesas com usina ={" "}
-          <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos culturais ={" "}
-          <span className="font-semibold text-ink">lucro líquido</span>. Plantio e reforma do ano se
-          mostran separados (costo sem receita).
+          Receita da colheita − (CTC + arrendamento + insumos + despesas com usina) ={" "}
+          <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos reais −
+          plantio reais = <span className="font-semibold text-ink">lucro líquido</span>. Lucro líquido −
+          projeções (tratos/plantio futuros, até a próxima safra) ={" "}
+          <span className="font-semibold text-ink">lucro líquido estimado</span>.
         </p>
         <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
                 <th className="px-3 py-2 font-semibold">Fazenda</th>
-                <th className="px-3 py-2 text-right font-semibold">Ton.</th>
-                <th className="px-3 py-2 text-right font-semibold">Tarefas</th>
                 <th className="px-3 py-2 text-right font-semibold">Receita</th>
-                <th className="px-3 py-2 text-right font-semibold">CTC</th>
-                <th className="px-3 py-2 text-right font-semibold">Arrend.</th>
-                <th className="px-3 py-2 text-right font-semibold">Insumos</th>
-                <th className="px-3 py-2 text-right font-semibold">Desp. usina</th>
                 <th className="px-3 py-2 text-right font-semibold">Lucro bruto</th>
                 <th className="px-3 py-2 text-right font-semibold">Tratos</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
                 <th className="px-3 py-2 text-right font-semibold">Plantio</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
+                <th className="px-3 py-2 text-right font-semibold">Projeções</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro líquido estimado</th>
               </tr>
             </thead>
             <tbody>
               {cascata.filas.map((f) => (
                 <tr key={f.fazendaId} className="border-b border-line">
                   <td className="px-3 py-2 font-medium text-ink">{f.fazendaNome}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{linhaNum(f.toneladas)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{linhaNum(f.tarefas)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.ctc)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.arrendamento)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.insumos)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.despesasUsina)}</td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(f.lucroBruto)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.tratos)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.plantio)}</td>
                   <td
                     className={`px-3 py-2 text-right font-semibold tabular-nums ${
                       f.lucroNeto < 0 ? "text-danger-strong" : "text-accent"
@@ -489,22 +484,31 @@ export default async function RelatoriosPage() {
                   >
                     {fmtMoney(f.lucroNeto)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.plantio)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                    {fmtMoney(f.projTratos + f.projPlantio)}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right font-bold tabular-nums ${
+                      f.lucroNetoEstimado < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(f.lucroNetoEstimado)}
+                  </td>
                 </tr>
               ))}
               <tr className="border-b border-line bg-surface-muted">
                 <td className="px-3 py-2 font-bold text-ink">TOTAL</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{linhaNum(cascata.total.toneladas)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{linhaNum(cascata.total.tarefas)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.receita)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.ctc)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.arrendamento)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.insumos)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.despesasUsina)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroBruto)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.tratos)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.plantio)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">
+                  {fmtMoney(cascata.total.projTratos + cascata.total.projPlantio)}
+                </td>
+                <td className="px-3 py-2 text-right font-bold tabular-nums text-ink">
+                  {fmtMoney(cascata.total.lucroNetoEstimado)}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -521,9 +525,9 @@ export default async function RelatoriosPage() {
             legenda="despesas ÷ tarefas"
           />
           <CelulaMetrica
-            rotulo="Lucro líquido total"
-            valor={fmtMoney(cascata.total.lucroNeto)}
-            legenda="após tratos"
+            rotulo="Lucro líquido estimado"
+            valor={fmtMoney(cascata.total.lucroNetoEstimado)}
+            legenda="após costos reais e projeções"
             destaque
           />
         </div>

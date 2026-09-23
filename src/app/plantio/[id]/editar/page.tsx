@@ -20,7 +20,7 @@ export default async function EditarPlantioPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [plantio, fazendas, talhoes, safrasRaw] = await Promise.all([
+  const [plantio, fazendas, talhoes, safrasRaw, plantiosMedia] = await Promise.all([
     prisma.plantio.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -36,11 +36,18 @@ export default async function EditarPlantioPage({
       distinct: ["safra"],
       orderBy: { safra: "asc" },
     }),
+    prisma.plantio.findMany({
+      where: { areaHa: { gt: 0 }, valor: { gt: 0 } },
+      select: { valor: true, areaHa: true },
+    }),
   ]);
 
   if (!plantio) notFound();
 
   const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
+  const areaTotalPlantios = plantiosMedia.reduce((a, p) => a + (p.areaHa ?? 0), 0);
+  const valorTotalPlantios = plantiosMedia.reduce((a, p) => a + p.valor, 0);
+  const mediaPorHa = areaTotalPlantios > 0 ? valorTotalPlantios / areaTotalPlantios : null;
 
   return (
     <>
@@ -61,6 +68,7 @@ export default async function EditarPlantioPage({
           }))}
           talhoes={talhoes}
           safras={safras}
+          mediaPorHa={mediaPorHa}
           inicial={{
             fazendaId: plantio.fazendaId,
             talhaoId: plantio.talhaoId ?? "",
@@ -68,6 +76,9 @@ export default async function EditarPlantioPage({
             tipo: plantio.tipo,
             data: toDateInputValue(plantio.data),
             valor: numero(plantio.valor),
+            projecao: plantio.projecao,
+            areaHa: numero(plantio.areaHa),
+            valorPorHa: numero(plantio.valorPorHa),
             observacao: plantio.observacao ?? "",
           }}
         />

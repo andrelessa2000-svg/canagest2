@@ -21,6 +21,7 @@ type Inicial = {
   tarefas?: string;
   data?: string;
   valor?: string;
+  projecao?: boolean;
   observacao?: string;
   produtos?: Produto[];
 };
@@ -43,6 +44,7 @@ export function TratoForm({
   const [escopo, setEscopo] = useState(inicial?.escopo ?? "fazenda");
   const [talhaoId, setTalhaoId] = useState(inicial?.talhaoId ?? "");
   const [tipo, setTipo] = useState(inicial?.tipo ?? "adubacao");
+  const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
   const [produtos, setProdutos] = useState<Produto[]>(inicial?.produtos ?? []);
 
   const talhoesFazenda = fazendaId
@@ -135,6 +137,19 @@ export function TratoForm({
             ))}
           </select>
         </Campo>
+
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              name="projecao"
+              className="size-4 accent-[var(--accent)]"
+              checked={projecao}
+              onChange={(e) => setProjecao(e.target.checked)}
+            />
+            É uma projeção (trato futuro)
+          </label>
+        </div>
 
         {escopo === "talhao" || escopo === "parte" ? (
           <Campo label="Talhão" htmlFor="talhaoId">

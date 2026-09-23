@@ -15,9 +15,11 @@ export async function GET() {
     "Insumos",
     "Desp. usina",
     "Lucro bruto",
-    "Tratos",
-    "Lucro neto",
-    "Plantio",
+    "Tratos (real)",
+    "Plantio (real)",
+    "Lucro líquido",
+    "Projeções",
+    "Lucro líquido estimado",
   ].join(";");
 
   const filasCSV = [cabecera, ...filas.map(filaCascataCSV), filaCascataCSV(total)].join("\r\n");

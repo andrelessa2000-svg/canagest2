@@ -60,6 +60,11 @@ export default async function PlantioPage() {
                     <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
                       {TIPOS_PLANTIO_LABEL[p.tipo] ?? p.tipo}
                     </span>
+                    {p.projecao && (
+                      <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                        Projeção
+                      </span>
+                    )}
                     {p.safra && (
                       <>
                         <span aria-hidden>·</span>

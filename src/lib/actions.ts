@@ -452,6 +452,9 @@ function camposPlantio(formData: FormData) {
     tipo: campo(formData, "tipo"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
+    projecao: campo(formData, "projecao"),
+    areaHa: campo(formData, "areaHa"),
+    valorPorHa: campo(formData, "valorPorHa"),
     observacao: campo(formData, "observacao"),
   };
 }
@@ -464,6 +467,9 @@ function dadosPlantio(d: PlantioInput) {
     tipo: d.tipo,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
+    projecao: d.projecao,
+    areaHa: d.areaHa,
+    valorPorHa: d.valorPorHa,
     observacao: d.observacao,
   };
 }
@@ -532,6 +538,7 @@ function camposTrato(formData: FormData) {
     tarefas: campo(formData, "tarefas"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
+    projecao: campo(formData, "projecao"),
     produtos: campo(formData, "produtos"),
     observacao: campo(formData, "observacao"),
   };
@@ -547,6 +554,7 @@ function dadosTrato(d: TratoInput) {
     tarefas: d.tarefas,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
+    projecao: d.projecao,
     produtos: d.produtos as unknown as Prisma.InputJsonValue,
     observacao: d.observacao,
   };

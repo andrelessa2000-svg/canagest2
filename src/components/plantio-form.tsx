@@ -3,11 +3,16 @@
 import { useActionState, useState } from "react";
 import type { ActionState } from "@/lib/actions";
 import { TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { toDateInputValue } from "@/lib/format";
+import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string };
+
+function num(v: string): number {
+  const p = parseDecimal(v);
+  return Number.isFinite(p) ? p : 0;
+}
 
 type Inicial = {
   fazendaId?: string;
@@ -16,6 +21,9 @@ type Inicial = {
   tipo?: string;
   data?: string;
   valor?: string;
+  projecao?: boolean;
+  areaHa?: string;
+  valorPorHa?: string;
   observacao?: string;
 };
 
@@ -24,18 +32,26 @@ export function PlantioForm({
   fazendas,
   talhoes,
   safras,
+  mediaPorHa,
   inicial,
 }: {
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
   fazendas: FazendaOpcao[];
   talhoes: TalhaoOpcao[];
   safras: string[];
+  mediaPorHa?: number | null;
   inicial?: Inicial;
 }) {
   const [state, action] = useActionState(acao, undefined);
   const [fazendaId, setFazendaId] = useState(inicial?.fazendaId ?? "");
   const [talhaoId, setTalhaoId] = useState(inicial?.talhaoId ?? "");
+  const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
+  const [areaHa, setAreaHa] = useState(inicial?.areaHa ?? "");
+  const [valorPorHa, setValorPorHa] = useState(inicial?.valorPorHa ?? "");
   const [valor, setValor] = useState(inicial?.valor ?? "");
+
+  const totalProjeccion =
+    projecao && num(areaHa) > 0 && num(valorPorHa) > 0 ? num(areaHa) * num(valorPorHa) : 0;
 
   const talhoesFazenda = fazendaId
     ? talhoes.filter((t) => t.fazendaId === fazendaId)
@@ -128,32 +144,88 @@ export function PlantioForm({
           />
         </Campo>
 
-        <Campo label="Valor (R$)" htmlFor="valor" hint="Custo do plantio; não gera receita.">
+        <label className="flex items-center gap-2 text-sm font-medium text-ink">
           <input
-            id="valor"
-            name="valor"
-            className="field-input tnum"
-            inputMode="decimal"
-            required
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            placeholder="0,00"
+            type="checkbox"
+            name="projecao"
+            className="size-4 accent-[var(--accent)]"
+            checked={projecao}
+            onChange={(e) => setProjecao(e.target.checked)}
           />
-        </Campo>
-
-        <div className="sm:col-span-2">
-          <Campo label="Observações" htmlFor="observacao">
-            <textarea
-              id="observacao"
-              name="observacao"
-              className="field-input min-h-20 resize-y"
-              maxLength={300}
-              defaultValue={inicial?.observacao ?? ""}
-              placeholder="Anotações sobre o plantio…"
-            />
-          </Campo>
-        </div>
+          É uma projeção (custo futuro)
+        </label>
       </div>
+
+      {projecao && (
+        <div className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-4">
+          <p className="text-xs text-ink-3">
+            Use a média por ha dos plantios anteriores (
+            {mediaPorHa ? `${fmtMoney(mediaPorHa)}/ha` : "ainda sem média"}) ou calcule com operações
+            (trator, adubo, herbicida, mão de obra, semente) e preencha o valor total.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            <Campo label="Valor por ha (media)" htmlFor="valorPorHa">
+              <input
+                id="valorPorHa"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={valorPorHa}
+                onChange={(e) => {
+                  setValorPorHa(e.target.value);
+                  if (num(areaHa) > 0) setValor(String(num(areaHa) * num(e.target.value)));
+                }}
+                placeholder="Ex.: 12.000"
+              />
+            </Campo>
+            <Campo label="Área a plantar (ha)" htmlFor="areaHa">
+              <input
+                id="areaHa"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={areaHa}
+                onChange={(e) => {
+                  setAreaHa(e.target.value);
+                  if (num(valorPorHa) > 0) setValor(String(num(e.target.value) * num(valorPorHa)));
+                }}
+                placeholder="Ex.: 20"
+              />
+            </Campo>
+            <div className="flex items-end">
+              <p className="w-full rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-ink-2">
+                Total: <span className="tnum font-semibold text-ink">{fmtMoney(totalProjeccion)}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Campo
+        label="Valor (R$)"
+        htmlFor="valor"
+        hint={projecao ? "Custo previsto do plantio; não gera receita." : "Custo do plantio; não gera receita."}
+      >
+        <input
+          id="valor"
+          name="valor"
+          className="field-input tnum"
+          inputMode="decimal"
+          required
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          placeholder="0,00"
+        />
+      </Campo>
+
+      <Campo label="Observações" htmlFor="observacao">
+        <textarea
+          id="observacao"
+          name="observacao"
+          className="field-input min-h-20 resize-y"
+          maxLength={300}
+          defaultValue={inicial?.observacao ?? ""}
+          placeholder="Anotações sobre o plantio…"
+        />
+      </Campo>
 
       <div className="flex justify-end">
         <BotaoSubmit>{inicial ? "Salvar alterações" : "Registrar plantio"}</BotaoSubmit>

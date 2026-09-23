@@ -165,6 +165,9 @@ model Plantio {
   tipo       String
   data       DateTime @default(now())
   valor      Float
+  projecao   Boolean  @default(false)
+  areaHa     Float?
+  valorPorHa Float?
   observacao String?
   criadaEm   DateTime @default(now())
 
@@ -184,6 +187,7 @@ model Trato {
   tarefas    Float?
   data       DateTime @default(now())
   valor      Float
+  projecao   Boolean  @default(false)
   produtos   Json?
   observacao String?
   criadaEm   DateTime @default(now())
