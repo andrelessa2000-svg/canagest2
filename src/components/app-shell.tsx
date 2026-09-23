@@ -2,20 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   BarChart3,
   Calculator,
   Factory,
   Home,
   Leaf,
-  LogOut,
   SprayCan,
   Sprout,
   Tractor,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
+import { BotaoSair } from "./botao-sair";
 import { InstallAppButton } from "./install-app-button";
 import { OfflineBanner } from "./offline-banner";
 
@@ -90,14 +89,7 @@ export function AppShell({
                     )}
                     <span className="max-w-28 truncate">{usuario.nome ?? usuario.email}</span>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink-2 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
-                    aria-label="Sair"
-                  >
-                    <LogOut className="size-4" />
-                  </button>
+                  <BotaoSair compacto />
                 </>
               ) : (
                 <Link href="/login" className="btn btn-ghost">

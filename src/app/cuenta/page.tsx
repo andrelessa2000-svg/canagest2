@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { PerfilForm, SenhaForm } from "@/components/perfil-form";
+import { BotaoSair } from "@/components/botao-sair";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,10 @@ export default async function CuentaPage() {
             </p>
           )}
         </section>
+      </div>
+
+      <div className="mt-8 flex justify-end">
+        <BotaoSair />
       </div>
     </>
   );
