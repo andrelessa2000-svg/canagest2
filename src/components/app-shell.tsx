@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Factory, Home, Sprout, Tractor } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { BarChart3, Factory, Home, LogOut, Sprout, Tractor } from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
 import { InstallAppButton } from "./install-app-button";
@@ -21,7 +22,13 @@ function ativo(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  usuario,
+}: {
+  children: React.ReactNode;
+  usuario?: { nome?: string | null; email?: string | null; image?: string | null } | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -50,6 +57,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="flex items-center gap-2">
+              {usuario ? (
+                <>
+                  <Link
+                    href="/cuenta"
+                    className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-sm font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-surface-muted"
+                    aria-label="Minha conta"
+                  >
+                    {usuario.image ? (
+                      <img
+                        src={usuario.image}
+                        alt=""
+                        className="size-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
+                        {(usuario.nome ?? usuario.email ?? "?").trim().slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="max-w-28 truncate">{usuario.nome ?? usuario.email}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink-2 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
+                    aria-label="Sair"
+                  >
+                    <LogOut className="size-4" />
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="btn btn-ghost">
+                  Entrar
+                </Link>
+              )}
               <InstallAppButton />
             </div>
           </div>

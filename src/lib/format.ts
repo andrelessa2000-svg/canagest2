@@ -1,6 +1,6 @@
 export function parseDecimal(input: string): number {
   if (typeof input !== "string") return Number(input);
-  let t = input.trim().replace(/\s|\u00a0/g, "");
+  const t = input.trim().replace(/\s|\u00a0/g, "");
   if (!t) return NaN;
   if (t.includes(",")) {
     // Vírgula = decimal; pontos = milhares: "2.300,5" -> 2300.5

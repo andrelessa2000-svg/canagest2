@@ -24,6 +24,20 @@ const ROTAS = [
 const problemas = [];
 const relatorio = [];
 
+async function autenticar(page) {
+  const email = `ui-${Date.now()}-${Math.random().toString().slice(2, 8)}@teste.local`;
+  await page.goto(`${BASE}/registro`, { waitUntil: "networkidle", timeout: 30000 });
+  await page.fill('input[name="nome"]', "Usuário Teste");
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', "Teste12345");
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/login/, { timeout: 30000 });
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', "Teste12345");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => u.pathname === "/", { timeout: 30000 });
+}
+
 async function checarPagina(page, rota, viewport) {
   const errosLog = [];
   const errosPagina = [];
@@ -127,6 +141,7 @@ async function testarNavegacao(page) {
         locale: "pt-BR",
       });
       const page = await ctx.newPage();
+      await autenticar(page);
 
       for (const rota of ROTAS) {
         await checarPagina(page, rota, vp);

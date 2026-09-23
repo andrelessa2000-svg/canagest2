@@ -7,10 +7,12 @@ Gestão de fazendas de cana-de-açúcar: cadastro de **fazendas**, divisão em *
 | **Stack** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4 |
 | **Banco de dados** | PostgreSQL — Neon (nuvem), via Prisma 7 + adapter Neon |
 | **Validação** | Zod 4 |
+| **Autenticação** | NextAuth (Auth.js v5) + Prisma adapter + bcryptjs |
 | **Deploy** | Vercel (recomendado) |
 
 ## Funcionalidades
 
+- Autenticación: registro y login con e-mail/senha, login con Google (opcional, requiere credenciales), recuperación de senha y pantalla "Minha conta" (nombre, foto, trocar senha). Todas las rutas de datos están protegidas por middleware.
 - Fazendas: nome. A área total é calculada automaticamente pela soma dos talhões.
 - Talhões: identificação (ex.: T-01) e área informada em hectares ou tarefas (1 ha = 3,3 tarefas), exibida nas duas unidades.
 - Usinas: cadastro com **modelo de remuneração** — **Pindorama** (preço da cana R$/t + ágio) ou **Coruripe** (ATR: kg ATR/t × preço do kg de ATR).
@@ -57,7 +59,17 @@ Pré-requisitos: Node.js 20+ e uma conta no [Neon](https://neon.tech).
    npm run db:seed
    ```
 
-5. **Rode o app**
+5. **Configure a autenticação** — agregue no `.env`:
+
+   ```bash
+   AUTH_SECRET="<segredo largo generado>"   # node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+   AUTH_URL=""                               # local: deixe vazio; prod: https://canagest2.vercel.app
+   AUTH_TRUST_HOST=true
+   GOOGLE_CLIENT_ID=""                       # opcional
+   GOOGLE_CLIENT_SECRET=""                   # opcional
+   ```
+
+6. **Rode o app**
 
    ```bash
    npm run dev
@@ -89,7 +101,7 @@ Pré-requisitos: Node.js 20+ e uma conta no [Neon](https://neon.tech).
 
 1. Suba o projeto para um repositório Git e importe-o na [Vercel](https://vercel.com).
 2. Framework preset: **Next.js** (detectado automaticamente).
-3. Adicione as variáveis de ambiente `DATABASE_URL` e `DATABASE_URL_UNPOOLED` no projeto.
+3. Adicione as variáveis de ambiente `DATABASE_URL` e `DATABASE_URL_UNPOOLED` no projeto. Para autenticação, adicione também: `AUTH_SECRET`, `AUTH_URL` (https://canagest2.vercel.app), `AUTH_TRUST_HOST=true`, e opcionalmente `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
 4. No Neon, **libere o acesso à Vercel** (opção "Connect to Vercel") ou permita os IPs/Vercel regions na rede do banco. Isso evita erros de conexão no deploy e nas serverless functions.
 5. Deploy. O `postinstall` (`prisma generate`) roda automaticamente no build — não é preciso um banco no momento do build, pois as páginas são `force-dynamic`.
 

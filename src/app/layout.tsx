@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Lora } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { PwaRegister } from "@/components/pwa-register";
+import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,9 +48,23 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: LayoutProps<"/">) {
+  let usuario = null;
+  try {
+    const session = await auth();
+    if (session?.user?.id) {
+      usuario = {
+        nome: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+      };
+    }
+  } catch {
+    usuario = null;
+  }
+
   return (
     <html
       lang="pt-BR"
@@ -57,7 +72,7 @@ export default function RootLayout({
     >
       <body>
         <PwaRegister />
-        <AppShell>{children}</AppShell>
+        <AppShell usuario={usuario}>{children}</AppShell>
       </body>
     </html>
   );

@@ -17,7 +17,21 @@ const naoEhNovo = (u) =>
   const falha = (msg) => { throw new Error(msg); };
 
   try {
-    passos.push("0. Nova usina (CRUD)");
+    passos.push("0. Registrar e entrar");
+    const email = `e2e-${ts}@teste.local`;
+    await page.goto(`${BASE}/registro`, { waitUntil: "networkidle" });
+    await page.fill('input[name="nome"]', "Usuario E2E");
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', "Teste12345");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/login/, { timeout: 20000 });
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', "Teste12345");
+    await page.click('button[type="submit"]');
+    await page.waitForURL((u) => u.pathname === "/", { timeout: 20000 });
+    passos.push("Autenticado (dashboard)");
+
+    passos.push("1. Nova usina (CRUD)");
     await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });
     await page.fill('input[name="nome"]', NOME_USINA);
     await page.selectOption('select[name="modelo"]', "coruripe");
