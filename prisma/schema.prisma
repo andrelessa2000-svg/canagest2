@@ -15,44 +15,10 @@ model User {
   image         String?
   passwordHash  String?
   criadoEm      DateTime  @default(now())
-  contaId       String?
-  conta         Conta?    @relation(fields: [contaId], references: [id], onDelete: SetNull)
 
   accounts Account[]
   sessions Session[]
   passwordResets PasswordResetToken[]
-  contas   UsuarioConta[]
-}
-
-model Conta {
-  id        String   @id @default(cuid())
-  nome      String
-  plano     String   @default("gratis")
-  ativo     Boolean  @default(true)
-  criadaEm  DateTime @default(now())
-
-  users     User[]
-  usuarios  UsuarioConta[]
-  fazendas  Fazenda[]
-  talhoes   Talhao[]
-  usinas    Usina[]
-  colheitas Colheita[]
-  plantios  Plantio[]
-  tratos    Trato[]
-
-  @@index([nome])
-}
-
-model UsuarioConta {
-  id        String @id @default(cuid())
-  usuarioId String
-  contaId   String
-  papel     String @default("operador")
-
-  usuario User  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  conta   Conta @relation(fields: [contaId], references: [id], onDelete: Cascade)
-
-  @@unique([usuarioId, contaId])
 }
 
 model Account {
@@ -92,18 +58,16 @@ model VerificationToken {
 }
 
 model PasswordResetToken {
-  id      String   @id @default(cuid())
-  userId  String
-  token   String   @unique
-  expires DateTime
-  usado   Boolean  @default(false)
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expires   DateTime
+  usado     Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Fazenda {
   id          String    @id @default(cuid())
-  contaId     String
-  conta       Conta     @relation(fields: [contaId], references: [id], onDelete: Cascade)
   nome        String
   criadaEm    DateTime  @default(now())
   atualizadaEm DateTime @updatedAt
@@ -112,13 +76,11 @@ model Fazenda {
   plantios    Plantio[]
   tratos      Trato[]
 
-  @@index([contaId, nome])
+  @@index([nome])
 }
 
 model Talhao {
   id        String   @id @default(cuid())
-  contaId   String
-  conta     Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
   fazendaId String
   fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   nome      String
@@ -128,26 +90,21 @@ model Talhao {
   tratos    Trato[]
 
   @@unique([fazendaId, nome])
-  @@index([contaId])
   @@index([fazendaId])
 }
 
 model Usina {
   id        String     @id @default(cuid())
-  contaId   String
-  conta     Conta      @relation(fields: [contaId], references: [id], onDelete: Cascade)
-  nome      String
+  nome      String     @unique
   modelo    String
   criadaEm  DateTime   @default(now())
   colheitas Colheita[]
 
-  @@index([contaId, nome])
+  @@index([nome])
 }
 
 model Colheita {
   id        String   @id @default(cuid())
-  contaId   String
-  conta     Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
   fazendaId String
   fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   usinaId   String
@@ -157,18 +114,18 @@ model Colheita {
   safra     String?
   toneladas Float
 
-  // Remuneracao - Pindorama
+  // Remuneração — Pindorama
   precoCana Float?
   agio      Float?
 
-  // Remuneracao - Coruripe
+  // Remuneração — Coruripe
   atrPorTonelada Float?
   precoKgAtr     Float?
 
   // CTC (valor informado pela usina)
   ctc Float @default(0)
 
-  // Area colhida (tarefas) - base para arrendamento, adubo e herbicida
+  // Area colhida (tarefas) — base para arrendamento, adubo e herbicida
   areaColhida Float?
 
   // Arrendamento (calculado: t/tarefa x preco da cana x tarefas arrendadas)
@@ -181,19 +138,18 @@ model Colheita {
   precoTonAdubo Float?
   tarefasAdubo  Float?
 
-  // Herbicida - itens da calda [{ nome, valor }]
+  // Herbicida — itens da calda [{ nome, valor }]
   herbicidas Json?
 
-  // Outros insumos - itens dinamicos [{ nome, valor }]
+  // Outros insumos — itens dinamicos [{ nome, valor }] (calcario, po de rocha, biologico, vinhaça...)
   insumos Json?
 
-  // Despesas com a usina - itens dinamicos [{ nome, valor }]
+  // Despesas com a usina — itens dinamicos [{ nome, valor }]
   despesasUsina Json?
 
   observacao String?
   criadaEm   DateTime @default(now())
 
-  @@index([contaId, data])
   @@index([fazendaId, data])
   @@index([usinaId])
   @@index([data])
@@ -201,8 +157,6 @@ model Colheita {
 
 model Plantio {
   id         String   @id @default(cuid())
-  contaId    String
-  conta      Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
   fazendaId  String
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
@@ -214,15 +168,12 @@ model Plantio {
   observacao String?
   criadaEm   DateTime @default(now())
 
-  @@index([contaId, data])
   @@index([fazendaId, data])
   @@index([talhaoId])
 }
 
 model Trato {
   id         String   @id @default(cuid())
-  contaId    String
-  conta      Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
   fazendaId  String
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
@@ -237,7 +188,6 @@ model Trato {
   observacao String?
   criadaEm   DateTime @default(now())
 
-  @@index([contaId, data])
   @@index([fazendaId, data])
   @@index([talhaoId])
 }
