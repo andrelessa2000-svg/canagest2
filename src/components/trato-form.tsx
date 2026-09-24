@@ -460,12 +460,12 @@ export function TratoForm({
         </div>
       </div>
 
-      {tipo === "herbicida" && (
+      {tipo === "herbicida" || tipo === "adubacao" || tipo === "formicida" || tipo === "insecticida" ? (
         <section className="ledger-panel grid gap-4 p-5">
-          <h2 className="font-display text-lg text-ink">Produtos da calda</h2>
+          <h2 className="font-display text-lg text-ink">Produtos/insumos aplicados</h2>
           <p className="text-xs text-ink-3">
-            Dose segundo o receituário (o app NÃO recomenda dose). A quantidade por tanque se calcula
-            na calculadora de herbicida; aquí puedes anotar lo aplicado.
+            Registre os produtos aplicados (ex.: herbicida ou adubo). Dose só para herbicida — o app NÃO
+            recomenda dose. A quantidade por tanque se calcula na calculadora de herbicida.
           </p>
           <input type="hidden" name="produtos" value={JSON.stringify(produtos)} />
           <div className="flex items-center justify-between">
@@ -522,7 +522,7 @@ export function TratoForm({
             </div>
           ))}
         </section>
-      )}
+      ) : null}
 
       <div className="flex justify-end">
         <BotaoSubmit>{inicial ? "Salvar alterações" : "Registrar trato"}</BotaoSubmit>

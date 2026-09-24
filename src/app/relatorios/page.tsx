@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, Download, Filter } from "lucide-react";
 import { prisma } from "@/lib/db";
 import {
   fmtCount,
@@ -277,6 +277,9 @@ export default async function RelatoriosPage() {
         descricao="Safra, produtividade e resultado — valores e gráficos para imprimir."
         acao={
           <>
+            <Link href="/relatorios/insumos" className="btn btn-ghost">
+              <Filter className="size-4" /> Insumos e gastos
+            </Link>
             <Link href="/relatorios/csv" className="btn btn-soft">
               <Download className="size-4" /> CSV
             </Link>
