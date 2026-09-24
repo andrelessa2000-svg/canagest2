@@ -27,7 +27,7 @@ export default async function EditarPlantioPage({
       orderBy: { nome: "asc" },
     }),
     prisma.talhao.findMany({
-      select: { id: true, nome: true, fazendaId: true },
+      select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({
@@ -41,6 +41,9 @@ export default async function EditarPlantioPage({
   if (!plantio) notFound();
 
   const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
+  const talhoesIdsInicial =
+    (plantio.talhoesIds as string[] | null) ??
+    (plantio.talhaoId ? [plantio.talhaoId] : []);
 
   return (
     <>
@@ -63,7 +66,9 @@ export default async function EditarPlantioPage({
           safras={safras}
           inicial={{
             fazendaId: plantio.fazendaId,
-            talhaoId: plantio.talhaoId ?? "",
+            escopo: plantio.escopo,
+            talhoesIds: talhoesIdsInicial,
+            tarefas: numero(plantio.tarefas),
             safra: plantio.safra ?? "",
             tipo: plantio.tipo,
             data: toDateInputValue(plantio.data),

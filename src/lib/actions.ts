@@ -463,6 +463,9 @@ function camposPlantio(formData: FormData) {
   return {
     fazendaId: campo(formData, "fazendaId"),
     talhaoId: campo(formData, "talhaoId") || undefined,
+    talhoesIds: campo(formData, "talhoesIds"),
+    escopo: campo(formData, "escopo"),
+    tarefas: campo(formData, "tarefas"),
     safra: campo(formData, "safra"),
     tipo: campo(formData, "tipo"),
     data: campo(formData, "data"),
@@ -476,7 +479,10 @@ function camposPlantio(formData: FormData) {
 function dadosPlantio(d: PlantioInput) {
   return {
     fazendaId: d.fazendaId,
-    talhaoId: d.talhaoId || null,
+    talhaoId: d.talhoesIds[0] ?? d.talhaoId ?? null,
+    talhoesIds: d.talhoesIds as unknown as Prisma.InputJsonValue,
+    escopo: d.escopo,
+    tarefas: d.tarefas,
     safra: d.safra,
     tipo: d.tipo,
     data: new Date(`${d.data}T12:00:00`),

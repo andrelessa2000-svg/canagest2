@@ -163,6 +163,9 @@ model Plantio {
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
   talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  talhoesIds Json?
+  escopo     String   @default("fazenda")
+  tarefas    Float?
   safra      String?
   tipo       String
   data       DateTime @default(now())

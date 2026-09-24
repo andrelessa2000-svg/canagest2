@@ -14,7 +14,7 @@ export default async function NovoPlantioPage() {
       orderBy: { nome: "asc" },
     }),
     prisma.talhao.findMany({
-      select: { id: true, nome: true, fazendaId: true },
+      select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({

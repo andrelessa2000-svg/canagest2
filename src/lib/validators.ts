@@ -130,6 +130,9 @@ export const TIPOS_PLANTIO_LABEL: Record<string, string> = {
 export const plantioSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),
   talhaoId: z.string().optional(),
+  talhoesIds: itensStringJson(),
+  escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }),
+  tarefas: numeroOpcional("Tarefas"),
   safra: optionalField(30),
   tipo: z.enum(TIPOS_PLANTIO, { error: "Selecione o tipo de plantio" }),
   data: z.string().min(1, "Informe a data"),
@@ -138,6 +141,22 @@ export const plantioSchema = z.object({
   areaHa: numeroOpcional("Área"),
   observacao: optionalField(300),
 });
+
+function itensStringJson() {
+  return z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v || v.trim() === "") return [];
+      try {
+        const arr = JSON.parse(v);
+        return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+      } catch {
+        return [];
+      }
+    })
+    .pipe(z.array(z.string()));
+}
 
 export const TIPOS_TRATO = [
   "adubacao",

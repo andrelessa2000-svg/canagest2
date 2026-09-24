@@ -16,15 +16,28 @@ export default async function PlantioPage({
   searchParams: Promise<{ reg?: string }>;
 }) {
   const { reg } = await searchParams;
-  const plantios = await prisma.plantio.findMany({
-    where:
-      reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {},
-    include: {
-      fazenda: { select: { nome: true } },
-      talhao: { select: { nome: true } },
-    },
-    orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
-  });
+  const [plantios, talhoesTodos] = await Promise.all([
+    prisma.plantio.findMany({
+      where:
+        reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {},
+      include: {
+        fazenda: { select: { nome: true } },
+        talhao: { select: { nome: true } },
+      },
+      orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+    }),
+    prisma.talhao.findMany({ select: { id: true, nome: true } }),
+  ]);
+
+  const nomeTalhao = new Map(talhoesTodos.map((t) => [t.id, t.nome]));
+
+  const nomesDe = (p: (typeof plantios)[number]): string => {
+    const ids =
+      (p.talhoesIds as string[] | null) ?? (p.talhaoId ? [p.talhaoId] : []);
+    const nomes = ids.map((id) => nomeTalhao.get(id) ?? "").filter(Boolean);
+    if (nomes.length > 3) return `${nomes.slice(0, 3).join(", ")} e ${nomes.length - 3} mais`;
+    return nomes.join(", ");
+  };
 
   const total = plantios.reduce((acc, p) => acc + p.valor, 0);
 
@@ -76,12 +89,19 @@ export default async function PlantioPage({
                 <span className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
                     {p.fazenda.nome}
-                    {p.talhao && (
-                      <span className="font-normal text-ink-2"> · Talhão {p.talhao.nome}</span>
-                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(p.data)}</span>
+                    <span aria-hidden>·</span>
+                    {p.escopo === "fazenda" ? (
+                      <span>Fazenda inteira</span>
+                    ) : p.escopo === "parte" ? (
+                      <span>
+                        Parte de {nomesDe(p)} {p.tarefas ? `(${fmtCount(p.tarefas)} tarefas)` : ""}
+                      </span>
+                    ) : nomesDe(p) ? (
+                      <span>Talhões: {nomesDe(p)}</span>
+                    ) : null}
                     <span aria-hidden>·</span>
                     <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
                       {TIPOS_PLANTIO_LABEL[p.tipo] ?? p.tipo}
