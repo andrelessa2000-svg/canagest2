@@ -1,6 +1,6 @@
 import { Check, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { fmtDate, fmtMoney, fmtToneladas } from "@/lib/format";
+import { fmtCount, fmtDate, fmtMoney, fmtToneladas } from "@/lib/format";
 import { cargarCascata } from "@/lib/relatorio";
 import { concretizarPlantio, concretizarTrato, excluirInvestimento } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
@@ -124,6 +124,57 @@ export default async function FinanceiroPage() {
         />
         <CelulaMetrica rotulo="Lucro líquido estimado" valor={fmtMoney(t.lucroNetoEstimado)} destaque />
       </div>
+
+      <section className="mt-8 grid gap-3">
+        <h2 className="font-display text-xl text-ink">Safra atual vs próxima (prevista)</h2>
+        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+          <table className="w-full min-w-[520px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                <th className="px-3 py-2 font-semibold">Indicador</th>
+                <th className="px-3 py-2 text-right font-semibold">Safra atual (real)</th>
+                <th className="px-3 py-2 text-right font-semibold">Próxima (prevista)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-ink">Toneladas</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtToneladas(t.toneladas)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtToneladas(t.toneladasProj)}
+                </td>
+              </tr>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-ink">Área (tarefas)</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtCount(Math.round(t.tarefas))}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtCount(Math.round(t.tarefasProj))}
+                </td>
+              </tr>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-ink">Receita</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(t.receita)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtMoney(t.receitaProj)}
+                </td>
+              </tr>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-ink">Custos previstos</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtMoney(t.receita - t.lucroNeto)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtMoney(t.custosProj + t.proj)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="px-1 text-xs text-ink-3">
+          Os dados “previstos” vêm das projeções de colheita, tratos, plantio e investimentos futuros.
+          Quando se concretizam, passam à columna real.
+        </p>
+      </section>
 
       <section className="mt-8 grid gap-4">
         <h2 className="font-display text-xl text-ink">Investimentos futuros</h2>

@@ -76,6 +76,7 @@ export default async function EditarColheitaPage({
             data: toDateInputValue(colheita.data),
             tipo: colheita.tipo,
             safra: colheita.safra ?? "",
+            projecao: colheita.projecao,
             toneladas: numero(colheita.toneladas),
             precoCana: numero(colheita.precoCana),
             agio: numero(colheita.agio),

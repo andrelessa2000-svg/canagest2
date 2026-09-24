@@ -27,6 +27,7 @@ type Campos = {
   data: string;
   tipo: string;
   safra: string;
+  projecao: boolean;
   toneladas: string;
   precoCana: string;
   agio: string;
@@ -156,6 +157,7 @@ export function ColheitaForm({
     data: inicial?.data ?? toDateInputValue(new Date()),
     tipo: inicial?.tipo ?? "planta",
     safra: inicial?.safra ?? "",
+    projecao: inicial?.projecao ?? false,
     toneladas: inicial?.toneladas ?? "",
     precoCana: inicial?.precoCana ?? "",
     agio: inicial?.agio ?? "",
@@ -363,6 +365,19 @@ export function ColheitaForm({
               ))}
             </datalist>
           </Campo>
+
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
+              <input
+                type="checkbox"
+                name="projecao"
+                className="size-4 accent-[var(--accent)]"
+                checked={c.projecao}
+                onChange={(e) => set("projecao", e.target.checked)}
+              />
+              É uma projeção (simulada, ainda não aconteceu)
+            </label>
+          </div>
         </div>
       </section>
 

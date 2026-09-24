@@ -17,6 +17,10 @@ export type FilaCascata = {
   proj: number;
   lucroNeto: number;
   lucroNetoEstimado: number;
+  toneladasProj: number;
+  tarefasProj: number;
+  receitaProj: number;
+  custosProj: number;
 };
 
 export type Cascata = {
@@ -87,6 +91,17 @@ export async function cargarCascata(): Promise<Cascata> {
       despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
     });
 
+    if (c.projecao) {
+      const pf = mapa.get(c.fazendaId);
+      if (pf) {
+        pf.toneladasProj += r.toneladas;
+        pf.tarefasProj += areaTarefas;
+        pf.receitaProj += r.receita;
+        pf.custosProj += r.totalDespesas;
+      }
+      continue;
+    }
+
     const fila = mapa.get(c.fazendaId) ?? {
       fazendaId: c.fazenda.id,
       fazendaNome: c.fazenda.nome,
@@ -103,6 +118,10 @@ export async function cargarCascata(): Promise<Cascata> {
       proj: 0,
       lucroNeto: 0,
       lucroNetoEstimado: 0,
+      toneladasProj: 0,
+      tarefasProj: 0,
+      receitaProj: 0,
+      custosProj: 0,
     };
     fila.toneladas += r.toneladas;
     fila.tarefas += areaTarefas;
@@ -141,6 +160,10 @@ export async function cargarCascata(): Promise<Cascata> {
     proj: 0,
     lucroNeto: 0,
     lucroNetoEstimado: 0,
+    toneladasProj: 0,
+    tarefasProj: 0,
+    receitaProj: 0,
+    custosProj: 0,
   });
 
   const total = filas.reduce((acc, f) => {
@@ -158,6 +181,10 @@ export async function cargarCascata(): Promise<Cascata> {
     t.proj += f.proj;
     t.lucroNeto += f.lucroNeto;
     t.lucroNetoEstimado += f.lucroNetoEstimado;
+    t.toneladasProj += f.toneladasProj;
+    t.tarefasProj += f.tarefasProj;
+    t.receitaProj += f.receitaProj;
+    t.custosProj += f.custosProj;
     return t;
   }, vacio("TOTAL"));
 

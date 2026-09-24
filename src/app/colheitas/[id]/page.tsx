@@ -120,7 +120,7 @@ export default async function ColheitaPage({
       <PageHeader
         rotulo={`colheita · ${c.usina.nome}`}
         titulo={fmtDate(c.data)}
-        descricao={`${c.fazenda.nome} · ${tipoLabel(c.tipo)}`}
+        descricao={`${c.fazenda.nome} · ${tipoLabel(c.tipo)}${c.projecao ? " · Projeção" : ""}`}
         acao={
           <>
             <Link

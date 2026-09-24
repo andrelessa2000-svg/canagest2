@@ -113,6 +113,7 @@ model Colheita {
   data      DateTime @default(now())
   tipo      String
   safra     String?
+  projecao  Boolean  @default(false)
   toneladas Float
 
   // Remuneração — Pindorama

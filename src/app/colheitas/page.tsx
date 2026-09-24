@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Pencil, Plus, Sprout } from "lucide-react";
+import { Check, Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtDate, fmtMoney, fmtToneladas, fmtCount } from "@/lib/format";
 import { tipoLabel, TIPOS_COLHEITA } from "@/lib/validators";
 import { calcularColheita } from "@/lib/colheita";
-import { excluirColheita } from "@/lib/actions";
+import { concretizarColheita, excluirColheita } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -18,6 +18,7 @@ type Filtros = {
   tipo?: string;
   de?: string;
   ate?: string;
+  reg?: string;
 };
 
 export default async function ColheitasPage({
@@ -25,9 +26,10 @@ export default async function ColheitasPage({
 }: {
   searchParams: Promise<Filtros>;
 }) {
-  const { fazenda, usina, tipo, de, ate } = await searchParams;
+  const { fazenda, usina, tipo, de, ate, reg } = await searchParams;
 
   const where = {
+    ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(usina ? { usinaId: usina } : {}),
     ...(tipo ? { tipo } : {}),
@@ -94,7 +96,12 @@ export default async function ColheitasPage({
     { toneladas: 0, receita: 0, despesas: 0, lucro: 0 },
   );
 
-  const temFiltro = Boolean(fazenda || usina || tipo || de || ate);
+  const temFiltro = Boolean(reg || fazenda || usina || tipo || de || ate);
+
+  const regs = [
+    { id: "", rotulo: "Caderno de campo" },
+    { id: "proj", rotulo: "Projeções" },
+  ];
 
   return (
     <>
@@ -108,6 +115,20 @@ export default async function ColheitasPage({
           </Link>
         }
       />
+
+      <div className="mb-4 flex flex-wrap gap-1">
+        {regs.map((r) => (
+          <Link
+            key={r.id}
+            href={`/colheitas${r.id ? `?reg=${r.id}` : ""}`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              (reg ?? "") === r.id ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+            }`}
+          >
+            {r.rotulo}
+          </Link>
+        ))}
+      </div>
 
       <form
         action="/colheitas"
@@ -203,6 +224,11 @@ export default async function ColheitasPage({
                     </span>
                     <span aria-hidden>·</span>
                     <span>{c.usina.nome}</span>
+                    {c.projecao && (
+                      <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                        Projeção
+                      </span>
+                    )}
                   </span>
                 </Link>
                 <span className="hidden text-right sm:grid">
@@ -217,6 +243,18 @@ export default async function ColheitasPage({
                     {fmtMoney(r.lucro)}
                   </span>
                 </span>
+                {c.projecao && (
+                  <form action={concretizarColheita.bind(null, c.id)}>
+                    <button
+                      type="submit"
+                      className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-accent transition-colors hover:border-accent hover:bg-accent-soft"
+                      aria-label="Concretizar colheita"
+                      title="Marcar como realizado"
+                    >
+                      <Check className="size-4" />
+                    </button>
+                  </form>
+                )}
                 <Link
                   href={`/colheitas/${c.id}/editar`}
                   className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-line-strong hover:bg-surface-muted hover:text-ink"

@@ -279,6 +279,7 @@ function camposColheita(formData: FormData) {
     data: campo(formData, "data"),
     tipo: campo(formData, "tipo"),
     safra: campo(formData, "safra"),
+    projecao: campo(formData, "projecao"),
     toneladas: campo(formData, "toneladas"),
     precoCana: campo(formData, "precoCana"),
     agio: campo(formData, "agio"),
@@ -325,6 +326,7 @@ function dadosColheita(d: ColheitaInput) {
     data: new Date(`${d.data}T12:00:00`),
     tipo: d.tipo,
     safra: d.safra,
+    projecao: d.projecao,
     toneladas: d.toneladas,
     precoCana: d.precoCana,
     agio: d.agio,
@@ -443,6 +445,18 @@ async function removerColheita(id: string): Promise<void> {
   revalidatePath("/colheitas");
   revalidatePath("/talhoes", "layout");
   revalidatePath("/fazendas", "layout");
+}
+
+export async function concretizarColheita(id: string): Promise<void> {
+  try {
+    await prisma.colheita.update({ where: { id }, data: { projecao: false } });
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+  revalidatePath("/");
+  revalidatePath("/colheitas");
+  redirect("/colheitas");
 }
 
 function camposPlantio(formData: FormData) {
