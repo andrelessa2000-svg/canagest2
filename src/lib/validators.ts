@@ -30,6 +30,7 @@ export function tipoLabel(tipo: string): string {
 
 export const fazendaSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome da fazenda").max(80),
+  ativa: ligaField(),
 });
 
 export const talhaoSchema = z
@@ -82,11 +83,12 @@ const itensJson = () =>
     })
     .pipe(z.array(itemDespesaSchema));
 
-const ligaField = () =>
-  z
+function ligaField() {
+  return z
     .string()
     .optional()
     .transform((v) => v === "on");
+}
 
 export const colheitaSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),

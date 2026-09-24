@@ -37,6 +37,7 @@ export async function criarFazenda(
 ): Promise<ActionState> {
   const parsed = fazendaSchema.safeParse({
     nome: campo(formData, "nome"),
+    ativa: campo(formData, "ativa"),
   });
 
   if (!parsed.success) {
@@ -47,6 +48,7 @@ export async function criarFazenda(
     await prisma.fazenda.create({
       data: {
         nome: parsed.data.nome,
+        ativa: parsed.data.ativa,
       },
     });
   } catch (e) {
@@ -66,6 +68,7 @@ export async function atualizarFazenda(
 ): Promise<ActionState> {
   const parsed = fazendaSchema.safeParse({
     nome: campo(formData, "nome"),
+    ativa: campo(formData, "ativa"),
   });
 
   if (!parsed.success) {
@@ -77,6 +80,7 @@ export async function atualizarFazenda(
       where: { id },
       data: {
         nome: parsed.data.nome,
+        ativa: parsed.data.ativa,
       },
     });
   } catch (e) {

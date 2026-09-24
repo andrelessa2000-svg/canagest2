@@ -69,6 +69,7 @@ model PasswordResetToken {
 model Fazenda {
   id          String    @id @default(cuid())
   nome        String
+  ativa       Boolean   @default(true)
   criadaEm    DateTime  @default(now())
   atualizadaEm DateTime @updatedAt
   talhoes     Talhao[]

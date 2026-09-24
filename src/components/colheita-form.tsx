@@ -9,7 +9,6 @@ import { TIPOS_COLHEITA, type TipoColheita } from "@/lib/validators";
 import {
   fmtMoney,
   fmtCount,
-  fmtToneladas,
   parseDecimal,
   TAREFAS_POR_HA,
   toDateInputValue,

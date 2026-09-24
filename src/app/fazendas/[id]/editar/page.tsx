@@ -35,6 +35,7 @@ export default async function EditarFazendaPage({
           acao={atualizarFazenda.bind(null, id)}
           inicial={{
             nome: fazenda.nome,
+            ativa: fazenda.ativa,
           }}
         />
       </div>

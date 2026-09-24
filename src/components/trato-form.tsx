@@ -84,6 +84,24 @@ export function TratoForm({
     setLinhasCalc(linhasCalc.map((l, k) => (k === idx ? { ...l, [campo]: v } : l)));
   }
 
+  function usarTotalAdubo() {
+    setValor(String(totalAdubo));
+    if (kg <= 0) return;
+    const existe = produtos.findIndex((p) => p.nome === "Adubo");
+    if (existe >= 0) {
+      setProdutos(
+        produtos.map((p, k) =>
+          k === existe ? { ...p, unidade: "kg", quantidade: String(kg) } : p,
+        ),
+      );
+    } else {
+      setProdutos([
+        ...produtos,
+        { nome: "Adubo", dose: "", unidade: "kg", quantidade: String(kg) },
+      ]);
+    }
+  }
+
   const talhoesFazenda = fazendaId
     ? talhoes.filter((t) => t.fazendaId === fazendaId)
     : [];
@@ -341,7 +359,7 @@ export function TratoForm({
                   <CelulaMetrica rotulo="Custo" valor={fmtMoney(totalAdubo)} destaque />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={() => setValor(String(totalAdubo))} className="btn btn-soft">
+                  <button type="button" onClick={usarTotalAdubo} className="btn btn-soft">
                     Usar este total
                   </button>
                   <span className="text-xs text-ink-3">

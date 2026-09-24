@@ -1,8 +1,18 @@
 import { Check, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { fmtCount, fmtDate, fmtMoney, fmtToneladas } from "@/lib/format";
+import {
+  fmtDate,
+  fmtMoney,
+  TAREFAS_POR_HA,
+} from "@/lib/format";
+import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
 import { cargarCascata } from "@/lib/relatorio";
-import { concretizarPlantio, concretizarTrato, excluirInvestimento } from "@/lib/actions";
+import {
+  concretizarColheita,
+  concretizarPlantio,
+  concretizarTrato,
+  excluirInvestimento,
+} from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -12,40 +22,127 @@ import { InvestimentoForm } from "@/components/investimento-form";
 
 export const dynamic = "force-dynamic";
 
+function safraDe(ano: number): string {
+  return `${ano}/${String(ano + 1).slice(-2)}`;
+}
+
 export default async function FinanceiroPage() {
-  const [cascata, investimentos, projeccTratos, projeccPlantios, fazendas, safrasRaw] =
+  const ano = new Date().getFullYear();
+  const safraAtual = safraDe(ano);
+  const safraProxima = safraDe(ano + 1);
+
+  const [cascata, fazendas, safrasRaw, projeccTratos, projeccPlantios, investimentos, colheitasProj] =
     await Promise.all([
       cargarCascata(),
-      prisma.investimento.findMany({
-        include: { fazenda: { select: { nome: true } } },
-        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      prisma.fazenda.findMany({
+        select: { id: true, nome: true, ativa: true },
+        orderBy: { nome: "asc" },
       }),
-      prisma.trato.findMany({
-        where: { projecao: true },
-        include: { fazenda: { select: { nome: true } } },
-        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
-      }),
-      prisma.plantio.findMany({
-        where: { projecao: true },
-        include: { fazenda: { select: { nome: true } } },
-        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
-      }),
-      prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
       prisma.colheita.findMany({
         where: { safra: { not: null } },
         select: { safra: true },
         distinct: ["safra"],
         orderBy: { safra: "asc" },
       }),
+      prisma.trato.findMany({
+        where: { projecao: true },
+        include: { fazenda: { select: { nome: true, ativa: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.plantio.findMany({
+        where: { projecao: true },
+        include: { fazenda: { select: { nome: true, ativa: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.investimento.findMany({
+        include: { fazenda: { select: { nome: true, ativa: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.colheita.findMany({
+        where: { projecao: true },
+        include: {
+          fazenda: {
+            select: { id: true, nome: true, ativa: true, talhoes: { select: { areaHa: true } } },
+          },
+          usina: { select: { modelo: true } },
+        },
+      }),
     ]);
 
   const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
   const t = cascata.total;
 
+  // Caixa = lucro bruto real (receita real − gastos reales)
+  const caixa = t.lucroNeto;
+
+  const esProxima = (s: string | null) => s === safraProxima;
+
+  const gastosProjPorFazenda = new Map<string, number>();
+  const sumar = (rows: { fazendaId: string; valor: number }[]) => {
+    for (const r of rows) gastosProjPorFazenda.set(r.fazendaId, (gastosProjPorFazenda.get(r.fazendaId) ?? 0) + r.valor);
+  };
+  sumar(
+    projeccTratos
+      .filter((x) => x.fazenda.ativa && esProxima(x.safra))
+      .map((x) => ({ fazendaId: x.fazendaId, valor: x.valor })),
+  );
+  sumar(
+    projeccPlantios
+      .filter((x) => x.fazenda.ativa && esProxima(x.safra))
+      .map((x) => ({ fazendaId: x.fazendaId, valor: x.valor })),
+  );
+  sumar(
+    investimentos
+      .filter((i) => i.fazenda.ativa && esProxima(i.safra))
+      .map((i) => ({ fazendaId: i.fazendaId, valor: i.valor })),
+  );
+
+  const gastosProximaSafra = [...gastosProjPorFazenda.values()].reduce((a, v) => a + v, 0);
+
+  const receitaColheitaProj = (c: (typeof colheitasProj)[number]): number => {
+    const areaTarefas =
+      c.areaColhida ??
+      c.fazenda.talhoes.reduce((a, tt) => a + tt.areaHa, 0) * TAREFAS_POR_HA;
+    return calcularColheita({
+      modelo: c.usina.modelo,
+      tipo: c.tipo,
+      toneladas: c.toneladas,
+      precoCana: c.precoCana,
+      agio: c.agio,
+      atrPorTonelada: c.atrPorTonelada,
+      precoKgAtr: c.precoKgAtr,
+      ctc: c.ctc,
+      areaColhida: areaTarefas,
+      arrendar: c.arrendar,
+      tonsPorTarefa: c.tonsPorTarefa,
+      tarefasArrendadas: c.tarefasArrendadas,
+      adubo: c.adubo,
+      precoTonAdubo: c.precoTonAdubo,
+      tarefasAdubo: c.tarefasAdubo ?? areaTarefas,
+      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
+      insumos: (c.insumos ?? []) as ItemDespesa[],
+      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+    }).receita;
+  };
+
+  const receitaProjPorFazenda = new Map<string, number>();
+  for (const c of colheitasProj) {
+    if (!c.fazenda.ativa || !esProxima(c.safra)) continue;
+    receitaProjPorFazenda.set(
+      c.fazendaId,
+      (receitaProjPorFazenda.get(c.fazendaId) ?? 0) + receitaColheitaProj(c),
+    );
+  }
+  const receitaProximaSafra = [...receitaProjPorFazenda.values()].reduce((a, v) => a + v, 0);
+
+  const caixaProyectado = caixa - gastosProximaSafra + receitaProximaSafra;
+
   const projecciones: {
     id: string;
     nome: string;
     fazenda: string;
+    fazendaId: string;
+    ativa: boolean;
     safra: string | null;
     data: Date;
     valor: number;
@@ -55,6 +152,8 @@ export default async function FinanceiroPage() {
       id: i.id,
       nome: i.nome,
       fazenda: i.fazenda.nome,
+      fazendaId: i.fazendaId,
+      ativa: i.fazenda.ativa,
       safra: i.safra,
       data: i.data,
       valor: i.valor,
@@ -64,6 +163,8 @@ export default async function FinanceiroPage() {
       id: x.id,
       nome: `${TIPOS_TRATO_LABEL[x.tipo] ?? x.tipo} (${ESCOPOS_TRATO_LABEL[x.escopo] ?? x.escopo})`,
       fazenda: x.fazenda.nome,
+      fazendaId: x.fazendaId,
+      ativa: x.fazenda.ativa,
       safra: x.safra,
       data: x.data,
       valor: x.valor,
@@ -73,6 +174,8 @@ export default async function FinanceiroPage() {
       id: x.id,
       nome: "Plantio",
       fazenda: x.fazenda.nome,
+      fazendaId: x.fazendaId,
+      ativa: x.fazenda.ativa,
       safra: x.safra,
       data: x.data,
       valor: x.valor,
@@ -88,12 +191,12 @@ export default async function FinanceiroPage() {
         <PageHeader
           rotulo="financeiro"
           titulo="Financeiro"
-          descricao="Receita, gastos e investimentos futuros — o lucro líquido real e estimado do canavial."
+          descricao={`Caixa e proyecciones — safra atual ${safraAtual}, próxima ${safraProxima}.`}
         />
         <EmptyState
           icone={Wallet}
           titulo="Nada para mostrar ainda"
-          descricao="Registre colheitas e investimentos futuros para ver o resultado financeiro do canavial."
+          descricao="Registre colheitas e proyecciones futuras para ver o resultado financeiro do canavial."
           ctaTexto="Registrar colheita"
           ctaHref="/colheitas/nova"
         />
@@ -101,87 +204,97 @@ export default async function FinanceiroPage() {
     );
   }
 
+  const filasCaixa = fazendas
+    .filter((f) => f.ativa)
+    .map((f) => {
+      const real = cascata.filas.find((x) => x.fazendaId === f.id);
+      const gastosProj = gastosProjPorFazenda.get(f.id) ?? 0;
+      const receitaProj = receitaProjPorFazenda.get(f.id) ?? 0;
+      return {
+        nome: f.nome,
+        caixa: real?.lucroNeto ?? 0,
+        gastosProj,
+        receitaProj,
+        caixaProyectado: (real?.lucroNeto ?? 0) - gastosProj + receitaProj,
+      };
+    })
+    .sort((a, b) => b.caixa - a.caixa);
+
   return (
     <>
       <PageHeader
         rotulo="financeiro"
         titulo="Financeiro"
-        descricao="O que entra (receita das colheitas) e o que sai (gastos reais e investimentos futuros)."
+        descricao={`Caixa e proyecciones por safra. Safra atual: ${safraAtual} · próxima: ${safraProxima}. O caixa descuenta só as proyecciones da próxima safra.`}
       />
 
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
-        <CelulaMetrica rotulo="Receita" valor={fmtMoney(t.receita)} legenda={fmtToneladas(t.toneladas)} />
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
         <CelulaMetrica
-          rotulo="Gastos reais"
-          valor={fmtMoney(t.receita - t.lucroNeto)}
-          legenda="colheita + tratos + plantio"
+          rotulo="Caixa atual"
+          valor={fmtMoney(caixa)}
+          legenda="lucro bruto real"
+          destaque
         />
-        <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(t.lucroNeto)} destaque />
         <CelulaMetrica
-          rotulo="Investimentos futuros"
-          valor={fmtMoney(totalProjecc)}
-          legenda="até a próxima safra"
+          rotulo={`Gastos previstos ${safraProxima}`}
+          valor={fmtMoney(gastosProximaSafra)}
+          legenda="plantio + tratos + investimentos"
         />
-        <CelulaMetrica rotulo="Lucro líquido estimado" valor={fmtMoney(t.lucroNetoEstimado)} destaque />
+        <CelulaMetrica
+          rotulo={`Receita prevista ${safraProxima}`}
+          valor={fmtMoney(receitaProximaSafra)}
+          legenda="colheita proyectada"
+        />
+        <CelulaMetrica
+          rotulo="Caixa proyectado"
+          valor={fmtMoney(caixaProyectado)}
+          legenda={`${safraProxima} · após proyecciones`}
+          destaque
+        />
       </div>
 
       <section className="mt-8 grid gap-3">
-        <h2 className="font-display text-xl text-ink">Safra atual vs próxima (prevista)</h2>
+        <h2 className="font-display text-xl text-ink">Caixa por fazenda</h2>
         <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-          <table className="w-full min-w-[520px] text-left text-sm">
+          <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
-                <th className="px-3 py-2 font-semibold">Indicador</th>
-                <th className="px-3 py-2 text-right font-semibold">Safra atual (real)</th>
-                <th className="px-3 py-2 text-right font-semibold">Próxima (prevista)</th>
+                <th className="px-3 py-2 font-semibold">Fazenda</th>
+                <th className="px-3 py-2 text-right font-semibold">Caixa atual</th>
+                <th className="px-3 py-2 text-right font-semibold">Gastos previstos</th>
+                <th className="px-3 py-2 text-right font-semibold">Receita prevista</th>
+                <th className="px-3 py-2 text-right font-semibold">Caixa proyectado</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-line">
-                <td className="px-3 py-2 font-medium text-ink">Toneladas</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtToneladas(t.toneladas)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                  {fmtToneladas(t.toneladasProj)}
-                </td>
-              </tr>
-              <tr className="border-b border-line">
-                <td className="px-3 py-2 font-medium text-ink">Área (tarefas)</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtCount(Math.round(t.tarefas))}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                  {fmtCount(Math.round(t.tarefasProj))}
-                </td>
-              </tr>
-              <tr className="border-b border-line">
-                <td className="px-3 py-2 font-medium text-ink">Receita</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(t.receita)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                  {fmtMoney(t.receitaProj)}
-                </td>
-              </tr>
-              <tr className="border-b border-line">
-                <td className="px-3 py-2 font-medium text-ink">Custos previstos</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                  {fmtMoney(t.receita - t.lucroNeto)}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                  {fmtMoney(t.custosProj + t.proj)}
-                </td>
-              </tr>
+              {filasCaixa.map((f) => (
+                <tr key={f.nome} className="border-b border-line">
+                  <td className="px-3 py-2 font-medium text-ink">{f.nome}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.caixa)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.gastosProj)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.receitaProj)}</td>
+                  <td
+                    className={`px-3 py-2 text-right font-bold tabular-nums ${
+                      f.caixaProyectado < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(f.caixaProyectado)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <p className="px-1 text-xs text-ink-3">
-          Os dados “previstos” vêm das projeções de colheita, tratos, plantio e investimentos futuros.
-          Quando se concretizam, passam à columna real.
+          Fazendas inativas (vendidas/entregadas) ficam fora do caixa; suas proyecciones não descontam.
         </p>
       </section>
 
       <section className="mt-8 grid gap-4">
-        <h2 className="font-display text-xl text-ink">Investimentos futuros</h2>
+        <h2 className="font-display text-xl text-ink">Proyecciones e investimentos futuros</h2>
         <p className="text-sm text-ink-2">
-          Custos previstos até a próxima safra (tratos, plantio, adubação, foliar…). Se descontam do
-          lucro líquido para estimar o que realmente te fica. Quando o trato/plantio aconteça, clique
-          Concretizar e ajuste ao valor real.
+          Descuenta do caixa só o que pertence à próxima safra ({safraProxima}). Quando um trato/plantio
+          aconteça, clique Concretizar; se não aconteça, exclua o registro.
         </p>
         <div className="rounded-[10px] border border-line bg-surface p-5">
           <InvestimentoForm fazendas={fazendas} safras={safras} />
@@ -206,6 +319,15 @@ export default async function FinanceiroPage() {
                     <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
                       Projeção
                     </span>
+                    {i.ativa && esProxima(i.safra) ? (
+                      <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
+                        Descuenta do caixa
+                      </span>
+                    ) : !i.ativa ? (
+                      <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
+                        Fazenda inactiva
+                      </span>
+                    ) : null}
                   </span>
                 </span>
                 <span className="tnum text-sm font-semibold text-ink">{fmtMoney(i.valor)}</span>
@@ -222,7 +344,9 @@ export default async function FinanceiroPage() {
                     action={
                       i.tipo === "trato"
                         ? concretizarTrato.bind(null, i.id)
-                        : concretizarPlantio.bind(null, i.id)
+                        : i.tipo === "plantio"
+                          ? concretizarPlantio.bind(null, i.id)
+                          : concretizarColheita.bind(null, i.id)
                     }
                   >
                     <button
@@ -239,46 +363,6 @@ export default async function FinanceiroPage() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="mt-8 grid gap-3">
-        <h2 className="font-display text-xl text-ink">Por fazenda</h2>
-        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
-                <th className="px-3 py-2 font-semibold">Fazenda</th>
-                <th className="px-3 py-2 text-right font-semibold">Receita</th>
-                <th className="px-3 py-2 text-right font-semibold">Gastos</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
-                <th className="px-3 py-2 text-right font-semibold">Inversões futuras</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro líquido estimado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cascata.filas.map((f) => (
-                <tr key={f.fazendaId} className="border-b border-line">
-                  <td className="px-3 py-2 font-medium text-ink">{f.fazendaNome}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                    {fmtMoney(f.receita - f.lucroNeto)}
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">
-                    {fmtMoney(f.lucroNeto)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.proj)}</td>
-                  <td
-                    className={`px-3 py-2 text-right font-bold tabular-nums ${
-                      f.lucroNetoEstimado < 0 ? "text-danger-strong" : "text-accent"
-                    }`}
-                  >
-                    {fmtMoney(f.lucroNetoEstimado)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
     </>
   );

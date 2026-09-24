@@ -8,8 +8,18 @@ import { LinhaLink } from "@/components/stat-cells";
 
 export const dynamic = "force-dynamic";
 
-export default async function FazendasPage() {
+export default async function FazendasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}) {
+  const { estado } = await searchParams;
+
+  const where =
+    estado === "inactivas" ? { ativa: false } : estado === "ativas" ? { ativa: true } : {};
+
   const fazendas = await prisma.fazenda.findMany({
+    where,
     include: { talhoes: { select: { id: true, areaHa: true } } },
     orderBy: { nome: "asc" },
   });
@@ -18,6 +28,12 @@ export default async function FazendasPage() {
     (acc, f) => acc + f.talhoes.reduce((a, t) => a + t.areaHa, 0),
     0,
   );
+
+  const filtros = [
+    { id: "", rotulo: "Todas" },
+    { id: "ativas", rotulo: "Ativas" },
+    { id: "inactivas", rotulo: "Inactivas" },
+  ];
 
   return (
     <>
@@ -32,13 +48,35 @@ export default async function FazendasPage() {
         }
       />
 
+      <div className="mb-4 flex flex-wrap gap-1">
+        {filtros.map((r) => (
+          <Link
+            key={r.id}
+            href={`/fazendas${r.id ? `?estado=${r.id}` : ""}`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              (estado ?? "") === r.id ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+            }`}
+          >
+            {r.rotulo}
+          </Link>
+        ))}
+      </div>
+
       {fazendas.length === 0 ? (
         <EmptyState
           icone={Sprout}
-          titulo="Nenhuma fazenda ainda"
-          descricao="Cadastre a primeira fazenda para começar a estruturar seus talhões."
-          ctaTexto="Cadastrar fazenda"
-          ctaHref="/fazendas/nova"
+          titulo={
+            estado === "inactivas"
+              ? "Nenhuma fazenda inactiva"
+              : "Nenhuma fazenda ainda"
+          }
+          descricao={
+            estado === "inactivas"
+              ? "Quando venda/entregue uma fazenda, desmarque 'Ativa' e ela aparecerá aqui (archivada)."
+              : "Cadastre a primeira fazenda para começar a estruturar seus talhões."
+          }
+          ctaTexto={estado ? undefined : "Cadastrar fazenda"}
+          ctaHref={estado ? undefined : "/fazendas/nova"}
         />
       ) : (
         <div className="grid gap-3">
@@ -58,6 +96,11 @@ export default async function FazendasPage() {
                       </span>
                       <span aria-hidden>·</span>
                       <span>{fmtTarefas(area)}</span>
+                      {!f.ativa && (
+                        <span className="rounded-md border border-dashed border-line-strong bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
+                          Inactiva
+                        </span>
+                      )}
                     </>
                   }
                   destaque={fmtHa(area)}

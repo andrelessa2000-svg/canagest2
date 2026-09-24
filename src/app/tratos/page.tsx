@@ -86,9 +86,16 @@ export default async function TratosPage({
                       <span aria-hidden>·</span>
                       <span>{ESCOPOS_TRATO_LABEL[t.escopo] ?? t.escopo}</span>
                       {t.projecao && (
-                        <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
-                          Projeção
-                        </span>
+                        <>
+                          <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                            Projeção
+                          </span>
+                          {t.data < new Date() && (
+                            <span className="rounded-md border border-dashed border-danger-strong/40 bg-danger-soft px-1.5 py-0.5 font-semibold text-danger-strong">
+                              Vencida
+                            </span>
+                          )}
+                        </>
                       )}
                       {t.talhao && (
                         <>

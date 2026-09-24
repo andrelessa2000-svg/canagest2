@@ -225,9 +225,16 @@ export default async function ColheitasPage({
                     <span aria-hidden>·</span>
                     <span>{c.usina.nome}</span>
                     {c.projecao && (
-                      <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
-                        Projeção
-                      </span>
+                      <>
+                        <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                          Projeção
+                        </span>
+                        {c.data < new Date() && (
+                          <span className="rounded-md border border-dashed border-danger-strong/40 bg-danger-soft px-1.5 py-0.5 font-semibold text-danger-strong">
+                            Vencida
+                          </span>
+                        )}
+                      </>
                     )}
                   </span>
                 </Link>

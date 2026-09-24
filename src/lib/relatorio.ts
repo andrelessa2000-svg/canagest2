@@ -29,7 +29,7 @@ export type Cascata = {
 };
 
 export async function cargarCascata(): Promise<Cascata> {
-  const [colheitas, tratos, plantios, investimentos] = await Promise.all([
+  const [colheitas, tratos, plantios, investimentos, fazendasEstado] = await Promise.all([
     prisma.colheita.findMany({
       include: {
         fazenda: {
@@ -47,7 +47,14 @@ export async function cargarCascata(): Promise<Cascata> {
     prisma.investimento.findMany({
       select: { fazendaId: true, valor: true },
     }),
+    prisma.fazenda.findMany({
+      select: { id: true, ativa: true },
+    }),
   ]);
+
+  const fazendasInactivas = new Set(
+    fazendasEstado.filter((f) => !f.ativa).map((f) => f.id),
+  );
 
   const sumarPorFazenda = (rows: { fazendaId: string; valor: number }[]) => {
     const m = new Map<string, number>();
@@ -56,9 +63,15 @@ export async function cargarCascata(): Promise<Cascata> {
   };
   const tratosPorFazenda = sumarPorFazenda(tratos.filter((t) => !t.projecao));
   const plantioPorFazenda = sumarPorFazenda(plantios.filter((p) => !p.projecao));
-  const projTratos = sumarPorFazenda(tratos.filter((t) => t.projecao));
-  const projPlantio = sumarPorFazenda(plantios.filter((p) => p.projecao));
-  const projInvest = sumarPorFazenda(investimentos);
+  const projTratos = sumarPorFazenda(
+    tratos.filter((t) => t.projecao && !fazendasInactivas.has(t.fazendaId)),
+  );
+  const projPlantio = sumarPorFazenda(
+    plantios.filter((p) => p.projecao && !fazendasInactivas.has(p.fazendaId)),
+  );
+  const projInvest = sumarPorFazenda(
+    investimentos.filter((i) => !fazendasInactivas.has(i.fazendaId)),
+  );
 
   const projPorFazenda = new Map<string, number>();
   for (const [fazendaId, v] of projTratos) projPorFazenda.set(fazendaId, (projPorFazenda.get(fazendaId) ?? 0) + v);
