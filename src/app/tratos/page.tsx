@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Pencil, Plus, Sprout } from "lucide-react";
+import { Check, Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtCount, fmtDate, fmtMoney } from "@/lib/format";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
-import { excluirTrato } from "@/lib/actions";
+import { concretizarTrato, excluirTrato } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -59,6 +59,11 @@ export default async function TratosPage() {
                       <span>{fmtDate(t.data)}</span>
                       <span aria-hidden>·</span>
                       <span>{ESCOPOS_TRATO_LABEL[t.escopo] ?? t.escopo}</span>
+                      {t.projecao && (
+                        <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                          Projeção
+                        </span>
+                      )}
                       {t.talhao && (
                         <>
                           <span aria-hidden>·</span>
@@ -86,6 +91,18 @@ export default async function TratosPage() {
                     </span>
                   </span>
                   <span className="tnum text-sm font-semibold text-ink">{fmtMoney(t.valor)}</span>
+                  {t.projecao && (
+                    <form action={concretizarTrato.bind(null, t.id)}>
+                      <button
+                        type="submit"
+                        className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-accent transition-colors hover:border-accent hover:bg-accent-soft"
+                        aria-label="Concretizar trato"
+                        title="Marcar como realizado"
+                      >
+                        <Check className="size-4" />
+                      </button>
+                    </form>
+                  )}
                   <Link
                     href={`/tratos/${t.id}/editar`}
                     className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-line-strong hover:bg-surface-muted hover:text-ink"

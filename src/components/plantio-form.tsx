@@ -16,6 +16,7 @@ type Inicial = {
   tipo?: string;
   data?: string;
   valor?: string;
+  projecao?: boolean;
   areaHa?: string;
   observacao?: string;
 };
@@ -36,6 +37,7 @@ export function PlantioForm({
   const [state, action] = useActionState(acao, undefined);
   const [fazendaId, setFazendaId] = useState(inicial?.fazendaId ?? "");
   const [talhaoId, setTalhaoId] = useState(inicial?.talhaoId ?? "");
+  const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
 
   const talhoesFazenda = fazendaId
     ? talhoes.filter((t) => t.fazendaId === fazendaId)
@@ -139,6 +141,19 @@ export function PlantioForm({
             placeholder="0,00"
           />
         </Campo>
+
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              name="projecao"
+              className="size-4 accent-[var(--accent)]"
+              checked={projecao}
+              onChange={(e) => setProjecao(e.target.checked)}
+            />
+            É uma projeção (simulada, ainda não aconteceu)
+          </label>
+        </div>
 
         <Campo
           label="Área (ha, opcional)"

@@ -453,6 +453,7 @@ function camposPlantio(formData: FormData) {
     tipo: campo(formData, "tipo"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
+    projecao: campo(formData, "projecao"),
     areaHa: campo(formData, "areaHa"),
     observacao: campo(formData, "observacao"),
   };
@@ -466,6 +467,7 @@ function dadosPlantio(d: PlantioInput) {
     tipo: d.tipo,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
+    projecao: d.projecao,
     areaHa: d.areaHa,
     observacao: d.observacao,
   };
@@ -535,6 +537,7 @@ function camposTrato(formData: FormData) {
     tarefas: campo(formData, "tarefas"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
+    projecao: campo(formData, "projecao"),
     produtos: campo(formData, "produtos"),
     observacao: campo(formData, "observacao"),
   };
@@ -550,6 +553,7 @@ function dadosTrato(d: TratoInput) {
     tarefas: d.tarefas,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
+    projecao: d.projecao,
     produtos: d.produtos as unknown as Prisma.InputJsonValue,
     observacao: d.observacao,
   };
@@ -607,6 +611,30 @@ export async function excluirTrato(id: string): Promise<ActionState> {
   revalidatePath("/tratos");
   revalidatePath("/fazendas", "layout");
   return { ok: true };
+}
+
+export async function concretizarPlantio(id: string): Promise<void> {
+  try {
+    await prisma.plantio.update({ where: { id }, data: { projecao: false } });
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+  revalidatePath("/");
+  revalidatePath("/plantio");
+  redirect("/plantio");
+}
+
+export async function concretizarTrato(id: string): Promise<void> {
+  try {
+    await prisma.trato.update({ where: { id }, data: { projecao: false } });
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+  revalidatePath("/");
+  revalidatePath("/tratos");
+  redirect("/tratos");
 }
 
 export async function criarInvestimento(

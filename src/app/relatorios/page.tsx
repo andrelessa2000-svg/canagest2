@@ -449,7 +449,7 @@ export default async function RelatoriosPage() {
           Receita da colheita − (CTC + arrendamento + insumos + despesas com usina) ={" "}
           <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos reais −
           plantio reais = <span className="font-semibold text-ink">lucro líquido</span>. Lucro líquido −
-          inversões futuras (registradas no módulo Financeiro, até a próxima safra) ={" "}
+          investimentos futuros (registrados no módulo Financeiro, até a próxima safra) ={" "}
           <span className="font-semibold text-ink">lucro líquido estimado</span>.
         </p>
         <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">

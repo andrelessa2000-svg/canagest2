@@ -35,10 +35,10 @@ export async function cargarCascata(): Promise<Cascata> {
       },
     }),
     prisma.trato.findMany({
-      select: { fazendaId: true, valor: true },
+      select: { fazendaId: true, valor: true, projecao: true },
     }),
     prisma.plantio.findMany({
-      select: { fazendaId: true, valor: true },
+      select: { fazendaId: true, valor: true, projecao: true },
     }),
     prisma.investimento.findMany({
       select: { fazendaId: true, valor: true },
@@ -50,9 +50,16 @@ export async function cargarCascata(): Promise<Cascata> {
     for (const r of rows) m.set(r.fazendaId, (m.get(r.fazendaId) ?? 0) + r.valor);
     return m;
   };
-  const tratosPorFazenda = sumarPorFazenda(tratos);
-  const plantioPorFazenda = sumarPorFazenda(plantios);
-  const projPorFazenda = sumarPorFazenda(investimentos);
+  const tratosPorFazenda = sumarPorFazenda(tratos.filter((t) => !t.projecao));
+  const plantioPorFazenda = sumarPorFazenda(plantios.filter((p) => !p.projecao));
+  const projTratos = sumarPorFazenda(tratos.filter((t) => t.projecao));
+  const projPlantio = sumarPorFazenda(plantios.filter((p) => p.projecao));
+  const projInvest = sumarPorFazenda(investimentos);
+
+  const projPorFazenda = new Map<string, number>();
+  for (const [fazendaId, v] of projTratos) projPorFazenda.set(fazendaId, (projPorFazenda.get(fazendaId) ?? 0) + v);
+  for (const [fazendaId, v] of projPlantio) projPorFazenda.set(fazendaId, (projPorFazenda.get(fazendaId) ?? 0) + v);
+  for (const [fazendaId, v] of projInvest) projPorFazenda.set(fazendaId, (projPorFazenda.get(fazendaId) ?? 0) + v);
 
   const mapa = new Map<string, FilaCascata>();
 

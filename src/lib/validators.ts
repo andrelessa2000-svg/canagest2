@@ -133,6 +133,7 @@ export const plantioSchema = z.object({
   tipo: z.enum(TIPOS_PLANTIO, { error: "Selecione o tipo de plantio" }),
   data: z.string().min(1, "Informe a data"),
   valor: moedaField("Valor do plantio"),
+  projecao: ligaField(),
   areaHa: numeroOpcional("Área"),
   observacao: optionalField(300),
 });
@@ -202,6 +203,7 @@ export const tratoSchema = z.object({
   tarefas: numeroOpcional("Tarefas"),
   data: z.string().min(1, "Informe a data"),
   valor: moedaField("Valor do trato"),
+  projecao: ligaField(),
   produtos: produtosJson(),
   observacao: optionalField(300),
 });

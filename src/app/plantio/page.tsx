@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Pencil, Plus, Sprout } from "lucide-react";
+import { Check, Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtCount, fmtDate, fmtMoney } from "@/lib/format";
 import { TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { excluirPlantio } from "@/lib/actions";
+import { concretizarPlantio, excluirPlantio } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -60,6 +60,11 @@ export default async function PlantioPage() {
                     <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
                       {TIPOS_PLANTIO_LABEL[p.tipo] ?? p.tipo}
                     </span>
+                    {p.projecao && (
+                      <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                        Projeção
+                      </span>
+                    )}
                     {p.safra && (
                       <>
                         <span aria-hidden>·</span>
@@ -71,6 +76,18 @@ export default async function PlantioPage() {
                 <span className="tnum text-sm font-semibold text-ink">
                   {fmtMoney(p.valor)}
                 </span>
+                {p.projecao && (
+                  <form action={concretizarPlantio.bind(null, p.id)}>
+                    <button
+                      type="submit"
+                      className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-accent transition-colors hover:border-accent hover:bg-accent-soft"
+                      aria-label="Concretizar plantio"
+                      title="Marcar como realizado"
+                    >
+                      <Check className="size-4" />
+                    </button>
+                  </form>
+                )}
                 <Link
                   href={`/plantio/${p.id}/editar`}
                   className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-line-strong hover:bg-surface-muted hover:text-ink"

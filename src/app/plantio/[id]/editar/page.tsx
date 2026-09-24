@@ -68,6 +68,7 @@ export default async function EditarPlantioPage({
             tipo: plantio.tipo,
             data: toDateInputValue(plantio.data),
             valor: numero(plantio.valor),
+            projecao: plantio.projecao,
             areaHa: numero(plantio.areaHa),
             observacao: plantio.observacao ?? "",
           }}

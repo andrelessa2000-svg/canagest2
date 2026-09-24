@@ -1,8 +1,9 @@
-import { Wallet } from "lucide-react";
+import { Check, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtDate, fmtMoney, fmtToneladas } from "@/lib/format";
 import { cargarCascata } from "@/lib/relatorio";
-import { excluirInvestimento } from "@/lib/actions";
+import { concretizarPlantio, concretizarTrato, excluirInvestimento } from "@/lib/actions";
+import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -12,25 +13,76 @@ import { InvestimentoForm } from "@/components/investimento-form";
 export const dynamic = "force-dynamic";
 
 export default async function FinanceiroPage() {
-  const [cascata, investimentos, fazendas, safrasRaw] = await Promise.all([
-    cargarCascata(),
-    prisma.investimento.findMany({
-      include: { fazenda: { select: { nome: true } } },
-      orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
-    }),
-    prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
-    prisma.colheita.findMany({
-      where: { safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
-  ]);
+  const [cascata, investimentos, projeccTratos, projeccPlantios, fazendas, safrasRaw] =
+    await Promise.all([
+      cargarCascata(),
+      prisma.investimento.findMany({
+        include: { fazenda: { select: { nome: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.trato.findMany({
+        where: { projecao: true },
+        include: { fazenda: { select: { nome: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.plantio.findMany({
+        where: { projecao: true },
+        include: { fazenda: { select: { nome: true } } },
+        orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
+      }),
+      prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
+      prisma.colheita.findMany({
+        where: { safra: { not: null } },
+        select: { safra: true },
+        distinct: ["safra"],
+        orderBy: { safra: "asc" },
+      }),
+    ]);
 
   const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
   const t = cascata.total;
 
-  if (t.receita === 0 && investimentos.length === 0) {
+  const projecciones: {
+    id: string;
+    nome: string;
+    fazenda: string;
+    safra: string | null;
+    data: Date;
+    valor: number;
+    tipo: "investimento" | "trato" | "plantio";
+  }[] = [
+    ...investimentos.map((i) => ({
+      id: i.id,
+      nome: i.nome,
+      fazenda: i.fazenda.nome,
+      safra: i.safra,
+      data: i.data,
+      valor: i.valor,
+      tipo: "investimento" as const,
+    })),
+    ...projeccTratos.map((x) => ({
+      id: x.id,
+      nome: `${TIPOS_TRATO_LABEL[x.tipo] ?? x.tipo} (${ESCOPOS_TRATO_LABEL[x.escopo] ?? x.escopo})`,
+      fazenda: x.fazenda.nome,
+      safra: x.safra,
+      data: x.data,
+      valor: x.valor,
+      tipo: "trato" as const,
+    })),
+    ...projeccPlantios.map((x) => ({
+      id: x.id,
+      nome: "Plantio",
+      fazenda: x.fazenda.nome,
+      safra: x.safra,
+      data: x.data,
+      valor: x.valor,
+      tipo: "plantio" as const,
+    })),
+  ].sort((a, b) => b.data.getTime() - a.data.getTime());
+
+  const totalProjecc = projecciones.reduce((a, p) => a + p.valor, 0);
+
+  if (t.receita === 0 && totalProjecc === 0) {
     return (
       <>
         <PageHeader
@@ -66,31 +118,32 @@ export default async function FinanceiroPage() {
         />
         <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(t.lucroNeto)} destaque />
         <CelulaMetrica
-          rotulo="Inversões futuras"
-          valor={fmtMoney(t.proj)}
+          rotulo="Investimentos futuros"
+          valor={fmtMoney(totalProjecc)}
           legenda="até a próxima safra"
         />
         <CelulaMetrica rotulo="Lucro líquido estimado" valor={fmtMoney(t.lucroNetoEstimado)} destaque />
       </div>
 
       <section className="mt-8 grid gap-4">
-        <h2 className="font-display text-xl text-ink">Inversões futuras</h2>
+        <h2 className="font-display text-xl text-ink">Investimentos futuros</h2>
         <p className="text-sm text-ink-2">
-          Custos previstos até a próxima safra (tratos, plantio, adubação…). Se descontam do lucro
-          líquido para estimar o que realmente te fica.
+          Custos previstos até a próxima safra (tratos, plantio, adubação, foliar…). Se descontam do
+          lucro líquido para estimar o que realmente te fica. Quando o trato/plantio aconteça, clique
+          Concretizar e ajuste ao valor real.
         </p>
         <div className="rounded-[10px] border border-line bg-surface p-5">
           <InvestimentoForm fazendas={fazendas} safras={safras} />
         </div>
 
-        {investimentos.length > 0 && (
+        {projecciones.length > 0 && (
           <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
-            {investimentos.map((i) => (
-              <li key={i.id} className="-mx-2 flex items-center gap-2 px-2 py-3">
+            {projecciones.map((i) => (
+              <li key={`${i.tipo}-${i.id}`} className="-mx-2 flex items-center gap-2 px-2 py-3">
                 <span className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">{i.nome}</span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
-                    <span>{i.fazenda.nome}</span>
+                    <span>{i.fazenda}</span>
                     <span aria-hidden>·</span>
                     <span>{fmtDate(i.data)}</span>
                     {i.safra && (
@@ -99,16 +152,38 @@ export default async function FinanceiroPage() {
                         <span>Safra {i.safra}</span>
                       </>
                     )}
+                    <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">
+                      Projeção
+                    </span>
                   </span>
                 </span>
                 <span className="tnum text-sm font-semibold text-ink">{fmtMoney(i.valor)}</span>
-                <ConfirmDelete
-                  action={excluirInvestimento.bind(null, i.id)}
-                  titulo="Excluir inversão?"
-                  mensagem={`"${i.nome}" (${fmtMoney(i.valor)}) será removida.`}
-                  verbo="Excluir"
-                  modo="stay"
-                />
+                {i.tipo === "investimento" ? (
+                  <ConfirmDelete
+                    action={excluirInvestimento.bind(null, i.id)}
+                    titulo="Excluir investimento?"
+                    mensagem={`"${i.nome}" (${fmtMoney(i.valor)}) será removido.`}
+                    verbo="Excluir"
+                    modo="stay"
+                  />
+                ) : (
+                  <form
+                    action={
+                      i.tipo === "trato"
+                        ? concretizarTrato.bind(null, i.id)
+                        : concretizarPlantio.bind(null, i.id)
+                    }
+                  >
+                    <button
+                      type="submit"
+                      className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-accent transition-colors hover:border-accent hover:bg-accent-soft"
+                      aria-label="Concretizar"
+                      title="Marcar como realizado"
+                    >
+                      <Check className="size-4" />
+                    </button>
+                  </form>
+                )}
               </li>
             ))}
           </ul>
