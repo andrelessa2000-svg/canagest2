@@ -4,9 +4,12 @@ import { useActionState, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
-import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
+import { fmtCount, fmtMoney, parseDecimal, TAREFAS_POR_HA, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { SelectorRegistro } from "./selector-registro";
+import { CelulaMetrica } from "./stat-cells";
+
+const nf3 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
@@ -56,13 +59,22 @@ export function TratoForm({
   const [valor, setValor] = useState(inicial?.valor ?? "");
   const [calculadora, setCalculadora] = useState(false);
   const [tipoCana, setTipoCana] = useState("soca");
-  const [areaTarefas, setAreaTarefas] = useState("");
-  const [precoTonAdubo, setPrecoTonAdubo] = useState("");
+  const [sacosCustom, setSacosCustom] = useState("3");
+  const [areaUnidad, setAreaUnidad] = useState("tarefas");
+  const [areaValor, setAreaValor] = useState("");
+  const [pesoSaco, setPesoSaco] = useState("50");
+  const [prezzoBase, setPrezzoBase] = useState("ton");
+  const [prezzoAdubo, setPrezzoAdubo] = useState("");
   const [areaHa, setAreaHa] = useState("");
   const [linhasCalc, setLinhasCalc] = useState<LinhaCalc[]>([]);
 
-  const sacosTarefa = tipoCana === "planta" ? 4 : 3;
-  const totalAdubo = num(areaTarefas) * sacosTarefa * 50 * (num(precoTonAdubo) / 1000);
+  const sacosPorTarefa =
+    tipoCana === "planta" ? 4 : tipoCana === "soca" ? 3 : num(sacosCustom);
+  const tarefasCalc = areaUnidad === "ha" ? num(areaValor) * TAREFAS_POR_HA : num(areaValor);
+  const sacos = tarefasCalc * sacosPorTarefa;
+  const kg = sacos * num(pesoSaco);
+  const toneladas = kg / 1000;
+  const totalAdubo = prezzoBase === "ton" ? toneladas * num(prezzoAdubo) : sacos * num(prezzoAdubo);
   const totalHerbicida = linhasCalc.reduce(
     (a, l) => a + num(l.dose) * num(areaHa) * num(l.prezzo),
     0,
@@ -245,9 +257,10 @@ export function TratoForm({
             {tipo === "adubacao" ? (
               <>
                 <p className="text-xs text-ink-3">
-                  Cana planta: 4 sacos de 50 kg por tarefa · Cana soca: 3 sacos. O app calcula o custo.
+                  Calcule quanto adubo comprar e o custo: área × sacos por tarefa → total de sacos →
+                  peso (kg/t) → custo. Ou registre direto no campo Valor.
                 </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Campo label="Tipo de cana" htmlFor="calcCana">
                     <select
                       id="calcCana"
@@ -257,33 +270,84 @@ export function TratoForm({
                     >
                       <option value="planta">Cana planta (4 sacos/tarefa)</option>
                       <option value="soca">Cana soca (3 sacos/tarefa)</option>
+                      <option value="custom">Personalizado (sacos/tarefa)</option>
                     </select>
                   </Campo>
-                  <Campo label="Área aplicada (tarefas)" htmlFor="calcTarefas">
+                  {tipoCana === "custom" && (
+                    <Campo label="Sacos por tarefa" htmlFor="calcSacosCustom">
+                      <input
+                        id="calcSacosCustom"
+                        className="field-input tnum"
+                        inputMode="decimal"
+                        value={sacosCustom}
+                        onChange={(e) => setSacosCustom(e.target.value)}
+                      />
+                    </Campo>
+                  )}
+                  <Campo label="Área (tarefas o ha)" htmlFor="calcAreaUnidad">
+                    <select
+                      id="calcAreaUnidad"
+                      className="field-input"
+                      value={areaUnidad}
+                      onChange={(e) => setAreaUnidad(e.target.value)}
+                    >
+                      <option value="tarefas">Tarefas</option>
+                      <option value="ha">Hectares (ha)</option>
+                    </select>
+                  </Campo>
+                  <Campo label="Valor da área" htmlFor="calcAreaValor">
                     <input
-                      id="calcTarefas"
+                      id="calcAreaValor"
                       className="field-input tnum"
                       inputMode="decimal"
-                      value={areaTarefas}
-                      onChange={(e) => setAreaTarefas(e.target.value)}
+                      value={areaValor}
+                      onChange={(e) => setAreaValor(e.target.value)}
                     />
                   </Campo>
-                  <Campo label="Preço da tonelada de adubo" htmlFor="calcPrecoAdubo">
+                  <Campo label="Peso por saco (kg)" htmlFor="calcPesoSaco">
                     <input
-                      id="calcPrecoAdubo"
+                      id="calcPesoSaco"
                       className="field-input tnum"
                       inputMode="decimal"
-                      value={precoTonAdubo}
-                      onChange={(e) => setPrecoTonAdubo(e.target.value)}
+                      value={pesoSaco}
+                      onChange={(e) => setPesoSaco(e.target.value)}
+                    />
+                  </Campo>
+                  <Campo label="Preço do adubo" htmlFor="calcPrezzoBase">
+                    <select
+                      id="calcPrezzoBase"
+                      className="field-input"
+                      value={prezzoBase}
+                      onChange={(e) => setPrezzoBase(e.target.value)}
+                    >
+                      <option value="ton">Por tonelada (R$/t)</option>
+                      <option value="saco">Por saco (R$/saco)</option>
+                    </select>
+                  </Campo>
+                  <Campo label="Valor do preço" htmlFor="calcPrezzoAdubo">
+                    <input
+                      id="calcPrezzoAdubo"
+                      className="field-input tnum"
+                      inputMode="decimal"
+                      value={prezzoAdubo}
+                      onChange={(e) => setPrezzoAdubo(e.target.value)}
                     />
                   </Campo>
                 </div>
-                <p className="mt-3 text-sm text-ink-2">
-                  Custo calculado: <span className="tnum font-semibold text-ink">{fmtMoney(totalAdubo)}</span>
-                </p>
-                <button type="button" onClick={() => setValor(String(totalAdubo))} className="btn btn-soft">
-                  Usar este total
-                </button>
+                <div className="mt-3 grid gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-4">
+                  <CelulaMetrica rotulo="Sacos" valor={fmtCount(Math.round(sacos))} />
+                  <CelulaMetrica rotulo="Peso" valor={`${fmtCount(Math.round(kg))} kg`} />
+                  <CelulaMetrica rotulo="Toneladas" valor={`${nf3.format(toneladas)} t`} />
+                  <CelulaMetrica rotulo="Custo" valor={fmtMoney(totalAdubo)} destaque />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => setValor(String(totalAdubo))} className="btn btn-soft">
+                    Usar este total
+                  </button>
+                  <span className="text-xs text-ink-3">
+                    {sacosPorTarefa} sacos/tarefa × {nf3.format(tarefasCalc)} tarefas = {fmtCount(Math.round(sacos))} sacos
+                  </span>
+                </div>
               </>
             ) : tipo === "herbicida" ? (
               <>

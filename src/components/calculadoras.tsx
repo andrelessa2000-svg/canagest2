@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { parseDecimal } from "@/lib/format";
+import { fmtMoney, parseDecimal } from "@/lib/format";
 import { Campo } from "./forms";
 
 const nf0 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -199,11 +199,13 @@ function AbaArea() {
 function AbaAdubo() {
   const [tipo, setTipo] = useState("soca");
   const [tarefas, setTarefas] = useState("");
+  const [prezzo, setPrezzo] = useState("");
 
   const sacosTarefa = tipo === "planta" ? 4 : 3;
   const sacos = num(tarefas) * sacosTarefa;
   const kg = sacos * 50;
   const ton = kg / 1000;
+  const custo = ton * num(prezzo);
 
   return (
     <div className="grid gap-4">
@@ -214,6 +216,16 @@ function AbaAdubo() {
             <option value="planta">Cana planta — 4 sacos de 50 kg por tarefa</option>
             <option value="soca">Cana soca — 3 sacos de 50 kg por tarefa</option>
           </select>
+        </Campo>
+        <Campo label="Valor da tonelada de adubo (R$)" htmlFor="prezzoAdubo">
+          <input
+            id="prezzoAdubo"
+            className="field-input tnum"
+            inputMode="decimal"
+            value={prezzo}
+            onChange={(e) => setPrezzo(e.target.value)}
+            placeholder="Ex.: 2.500"
+          />
         </Campo>
         <Campo label="Área (tarefas)" htmlFor="tarefasAdubo">
           <input
@@ -229,6 +241,7 @@ function AbaAdubo() {
         {linha("Sacos de 50 kg", `${nf0.format(sacos)}`)}
         {linha("Quilogramos", `${nf0.format(kg)} kg`)}
         {linha("Toneladas", `${nf3.format(ton)} t`)}
+        {linha("Custo do adubo", fmtMoney(custo))}
       </dl>
     </div>
   );
