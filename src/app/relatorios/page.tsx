@@ -527,7 +527,7 @@ export default async function RelatoriosPage() {
           <CelulaMetrica
             rotulo="Lucro líquido estimado"
             valor={fmtMoney(cascata.total.lucroNetoEstimado)}
-            legenda="após costos reais e projeções"
+            legenda="após custos reais e projeções"
             destaque
           />
         </div>
@@ -538,7 +538,7 @@ export default async function RelatoriosPage() {
         <h2 className="font-display text-xl text-ink">Talhões vazios (neutros)</h2>
         <p className="text-sm text-ink-2">
           Fazendas sem colheita registrada na safra — talhões deixados sem moer (normalmente para
-          renovación).
+          renovação).
         </p>
         {talhoesVacios.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line-strong bg-surface/60 px-4 py-6 text-sm text-ink-2">

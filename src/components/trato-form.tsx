@@ -15,7 +15,7 @@ export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
 
 type Produto = { nome: string; dose: string; unidade: string; quantidade: string };
-type LinhaCalc = { nome: string; dose: string; unidade: string; prezzo: string };
+type LinhaCalc = { nome: string; dose: string; unidade: string; valorUnitario: string };
 
 function num(v: string): number {
   const p = parseDecimal(v);
@@ -63,8 +63,8 @@ export function TratoForm({
   const [areaUnidad, setAreaUnidad] = useState("tarefas");
   const [areaValor, setAreaValor] = useState("");
   const [pesoSaco, setPesoSaco] = useState("50");
-  const [prezzoBase, setPrezzoBase] = useState("ton");
-  const [prezzoAdubo, setPrezzoAdubo] = useState("");
+  const [modoValor, setModoValor] = useState("ton");
+  const [valorAdubo, setValorAdubo] = useState("");
   const [areaHa, setAreaHa] = useState("");
   const [linhasCalc, setLinhasCalc] = useState<LinhaCalc[]>([]);
 
@@ -74,9 +74,9 @@ export function TratoForm({
   const sacos = tarefasCalc * sacosPorTarefa;
   const kg = sacos * num(pesoSaco);
   const toneladas = kg / 1000;
-  const totalAdubo = prezzoBase === "ton" ? toneladas * num(prezzoAdubo) : sacos * num(prezzoAdubo);
+  const totalAdubo = modoValor === "ton" ? toneladas * num(valorAdubo) : sacos * num(valorAdubo);
   const totalHerbicida = linhasCalc.reduce(
-    (a, l) => a + num(l.dose) * num(areaHa) * num(l.prezzo),
+    (a, l) => a + num(l.dose) * num(areaHa) * num(l.valorUnitario),
     0,
   );
 
@@ -313,24 +313,24 @@ export function TratoForm({
                       onChange={(e) => setPesoSaco(e.target.value)}
                     />
                   </Campo>
-                  <Campo label="Preço do adubo" htmlFor="calcPrezzoBase">
+                  <Campo label="Preço do adubo" htmlFor="calcModoValor">
                     <select
-                      id="calcPrezzoBase"
+                      id="calcModoValor"
                       className="field-input"
-                      value={prezzoBase}
-                      onChange={(e) => setPrezzoBase(e.target.value)}
+                      value={modoValor}
+                      onChange={(e) => setModoValor(e.target.value)}
                     >
                       <option value="ton">Por tonelada (R$/t)</option>
                       <option value="saco">Por saco (R$/saco)</option>
                     </select>
                   </Campo>
-                  <Campo label="Valor do preço" htmlFor="calcPrezzoAdubo">
+                  <Campo label="Valor do preço" htmlFor="calcValorAdubo">
                     <input
-                      id="calcPrezzoAdubo"
+                      id="calcValorAdubo"
                       className="field-input tnum"
                       inputMode="decimal"
-                      value={prezzoAdubo}
-                      onChange={(e) => setPrezzoAdubo(e.target.value)}
+                      value={valorAdubo}
+                      onChange={(e) => setValorAdubo(e.target.value)}
                     />
                   </Campo>
                 </div>
@@ -383,12 +383,12 @@ export function TratoForm({
                       <input
                         className="field-input tnum w-24"
                         inputMode="decimal"
-                        value={l.prezzo}
-                        onChange={(e) => setLinhaCalc(idx, "prezzo", e.target.value)}
+                        value={l.valorUnitario}
+                        onChange={(e) => setLinhaCalc(idx, "valorUnitario", e.target.value)}
                         placeholder="R$/L|kg"
                       />
                       <span className="tnum w-28 shrink-0 text-right text-xs text-ink-2">
-                        {fmtMoney(num(l.dose) * num(areaHa) * num(l.prezzo))}
+                        {fmtMoney(num(l.dose) * num(areaHa) * num(l.valorUnitario))}
                       </span>
                       <button
                         type="button"
@@ -404,7 +404,7 @@ export function TratoForm({
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setLinhasCalc([...linhasCalc, { nome: "", dose: "", unidade: "L/ha", prezzo: "" }])}
+                    onClick={() => setLinhasCalc([...linhasCalc, { nome: "", dose: "", unidade: "L/ha", valorUnitario: "" }])}
                     className="text-sm font-semibold text-accent hover:text-accent-strong"
                   >
                     + Adicionar produto

@@ -38,7 +38,7 @@ export default async function NovoTratoPage() {
       <PageHeader
         rotulo="cultivos"
         titulo="Novo trato"
-        descricao="Registre adubação, herbicida y demás tratos."
+        descricao="Registre adubação, herbicida e demais tratos."
       />
       <div className="mx-auto max-w-2xl rounded-[10px] border border-line bg-surface p-5 sm:p-8">
         <TratoForm

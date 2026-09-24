@@ -88,12 +88,12 @@ export default async function FinanceiroPage() {
         <PageHeader
           rotulo="financeiro"
           titulo="Financeiro"
-          descricao="Receita, gastos e inversões futuras — o lucro líquido real e estimado do canavial."
+          descricao="Receita, gastos e investimentos futuros — o lucro líquido real e estimado do canavial."
         />
         <EmptyState
           icone={Wallet}
           titulo="Nada para mostrar ainda"
-          descricao="Registre colheitas e inversões futuras para ver o resultado financeiro do canavial."
+          descricao="Registre colheitas e investimentos futuros para ver o resultado financeiro do canavial."
           ctaTexto="Registrar colheita"
           ctaHref="/colheitas/nova"
         />
@@ -106,7 +106,7 @@ export default async function FinanceiroPage() {
       <PageHeader
         rotulo="financeiro"
         titulo="Financeiro"
-        descricao="O que entra (receita das colheitas) e o que sai (gastos reais e inversões futuras)."
+        descricao="O que entra (receita das colheitas) e o que sai (gastos reais e investimentos futuros)."
       />
 
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">

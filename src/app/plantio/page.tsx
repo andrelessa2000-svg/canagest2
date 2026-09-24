@@ -51,7 +51,7 @@ export default async function PlantioPage({
       <PageHeader
         rotulo="cultivos"
         titulo="Plantio"
-        descricao="Custos de plantio e reforma por fazenda — não geran receita."
+        descricao="Custos de plantio e reforma por fazenda — não geram receita."
         acao={
           <Link href="/plantio/nova" className="btn btn-primary">
             <Plus className="size-4" /> Novo plantio

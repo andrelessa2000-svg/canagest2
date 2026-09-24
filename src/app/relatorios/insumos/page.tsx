@@ -124,7 +124,7 @@ export default async function InsumosReportPage({
       <PageHeader
         rotulo="relatório · insumos e gastos"
         titulo="Insumos e gastos"
-        descricao="O que apliqué e quanto gastei — filtre por safra, fazenda e tipo."
+        descricao="O que apliquei e quanto gastei — filtre por safra, fazenda e tipo."
       />
 
       <form

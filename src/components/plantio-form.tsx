@@ -235,7 +235,7 @@ export function PlantioForm({
         <Campo
           label="Área (ha, opcional)"
           htmlFor="areaHa"
-          hint="Útil para calcular a media de costo por ha dos plantios."
+          hint="Útil para calcular a média de custo por ha dos plantios."
         >
           <input
             id="areaHa"

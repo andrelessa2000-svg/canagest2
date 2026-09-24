@@ -182,7 +182,7 @@ function AbaArea() {
       <dl className="mt-2 divide-y divide-line rounded-[10px] border border-line bg-surface px-4">
         <div className="flex items-baseline justify-between gap-4 py-2">
           <dt className="text-sm font-medium text-ink">Resultado</dt>
-          <dd className="text-xs text-ink-3">em todas las unidades</dd>
+          <dd className="text-xs text-ink-3">em todas as unidades</dd>
         </div>
         {linha("Tarefas", `${nf2.format(tarefas)}`)}
         {linha("Hectares", `${nf3.format(m2 / HA_M2)} ha`)}
@@ -199,13 +199,13 @@ function AbaArea() {
 function AbaAdubo() {
   const [tipo, setTipo] = useState("soca");
   const [tarefas, setTarefas] = useState("");
-  const [prezzo, setPrezzo] = useState("");
+  const [valorAdubo, setValorAdubo] = useState("");
 
   const sacosTarefa = tipo === "planta" ? 4 : 3;
   const sacos = num(tarefas) * sacosTarefa;
   const kg = sacos * 50;
   const ton = kg / 1000;
-  const custo = ton * num(prezzo);
+  const custo = ton * num(valorAdubo);
 
   return (
     <div className="grid gap-4">
@@ -217,13 +217,13 @@ function AbaAdubo() {
             <option value="soca">Cana soca — 3 sacos de 50 kg por tarefa</option>
           </select>
         </Campo>
-        <Campo label="Valor da tonelada de adubo (R$)" htmlFor="prezzoAdubo">
+        <Campo label="Valor da tonelada de adubo (R$)" htmlFor="valorAdubo">
           <input
-            id="prezzoAdubo"
+            id="valorAdubo"
             className="field-input tnum"
             inputMode="decimal"
-            value={prezzo}
-            onChange={(e) => setPrezzo(e.target.value)}
+            value={valorAdubo}
+            onChange={(e) => setValorAdubo(e.target.value)}
             placeholder="Ex.: 2.500"
           />
         </Campo>
@@ -253,10 +253,10 @@ type Produto = { nome: string; dose: string; unidade: string };
 
 function AbaHerbicida() {
   const [tanque, setTanque] = useState("600");
-  const [rendimiento, setRendimiento] = useState("3");
+  const [rendimento, setRendimento] = useState("3");
   const [produtos, setProdutos] = useState<Produto[]>([{ nome: "", dose: "", unidade: "L/ha" }]);
 
-  const haTanque = num(rendimiento);
+  const haTanque = num(rendimento);
   const tanqueL = num(tanque);
 
   function setProduto(idx: number, campo: keyof Produto, valor: string) {
@@ -267,15 +267,15 @@ function AbaHerbicida() {
     <div className="grid gap-4">
       <h2 className="font-display text-lg text-ink">Calda — barra tratorizada</h2>
       <p className="text-xs text-ink-3">
-        Tanque de {tanqueL || "600"} L, rinde {nf2.format(haTanque)} ha por tanque. A dose vem do
+        Tanque de {tanqueL || "600"} L, rende {nf2.format(haTanque)} ha por tanque. A dose vem do
         receituário; o app NÃO recomenda dose.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo label="Tanque (L)" htmlFor="tanqueL">
           <input id="tanqueL" className="field-input tnum" inputMode="decimal" value={tanque} onChange={(e) => setTanque(e.target.value)} />
         </Campo>
-        <Campo label="Rendimento (ha por tanque)" htmlFor="rendimiento">
-          <input id="rendimiento" className="field-input tnum" inputMode="decimal" value={rendimiento} onChange={(e) => setRendimiento(e.target.value)} />
+        <Campo label="Rendimento (ha por tanque)" htmlFor="rendimento">
+          <input id="rendimento" className="field-input tnum" inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
         </Campo>
       </div>
 
@@ -355,7 +355,7 @@ function AbaMuda() {
         <Campo label="Área (ha)" htmlFor="mudaArea">
           <input id="mudaArea" className="field-input tnum" inputMode="decimal" value={area} onChange={(e) => setArea(e.target.value)} />
         </Campo>
-        <Campo label="Espaciamiento entre sulcos (m)" htmlFor="mudaEsp">
+        <Campo label="Espaciamento entre sulcos (m)" htmlFor="mudaEsp">
           <input id="mudaEsp" className="field-input tnum" inputMode="decimal" value={espaciamiento} onChange={(e) => setEspaciamiento(e.target.value)} />
         </Campo>
         <Campo label="Gemas por metro de sulco" htmlFor="mudaGemas">

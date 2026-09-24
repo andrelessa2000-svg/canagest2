@@ -66,7 +66,7 @@ export default async function TalhaoPage({
         />
       </GradeMetricas>
       <p className="mt-6 text-sm leading-relaxed text-ink-2">
-        As colheitas se registran por fazenda (a usina passa o relatório da fazenda,
+        As colheitas se registram por fazenda (a usina passa o relatório da fazenda,
         não de cada talhão). Veja o histórico no cadastro da fazenda.
       </p>
     </>

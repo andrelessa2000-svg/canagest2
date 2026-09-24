@@ -136,8 +136,8 @@ export function InvestimentoForm({
       {calculadora && (
         <div className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-4">
           <p className="text-xs text-ink-3">
-            Suma las operaciones (trator, adubo, herbicida, mão de obra, semente…) o multiplica
-            valor/ha × área. El total se aplica al campo Valor.
+            Sume as operações (trator, adubo, herbicida, mão de obra, semente…) ou multiplique
+            valor/ha × área. O total se aplica ao campo Valor.
           </p>
           <div className="mt-3 grid gap-2">
             {linhas.map((l, idx) => (
