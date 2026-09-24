@@ -95,6 +95,7 @@ export const colheitaSchema = z.object({
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),
   safra: optionalField(30),
   projecao: ligaField(),
+  talhoesIds: itensStringJson(),
   toneladas: numField("Toneladas"),
 
   precoCana: numeroOpcional("Preço da cana"),

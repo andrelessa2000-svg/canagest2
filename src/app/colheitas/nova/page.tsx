@@ -12,7 +12,7 @@ export default async function NovaColheitaPage({
 }: {
   searchParams: Promise<{ fazenda?: string }>;
 }) {
-  const [{ fazenda }, fazendasRaw, usinas, safrasRaw] = await Promise.all([
+  const [{ fazenda }, fazendasRaw, usinas, talhoes, safrasRaw] = await Promise.all([
     searchParams,
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -20,6 +20,10 @@ export default async function NovaColheitaPage({
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.talhao.findMany({
+      select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({
@@ -64,6 +68,7 @@ export default async function NovaColheitaPage({
             acao={criarColheita}
             fazendas={fazendas}
             usinas={usinas}
+            talhoes={talhoes}
             safras={safras}
             inicial={inicial}
           />

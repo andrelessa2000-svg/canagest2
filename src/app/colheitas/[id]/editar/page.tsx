@@ -21,7 +21,7 @@ export default async function EditarColheitaPage({
 }) {
   const { id } = await params;
 
-  const [colheita, fazendasRaw, usinas, safrasRaw] = await Promise.all([
+  const [colheita, fazendasRaw, usinas, talhoes, safrasRaw] = await Promise.all([
     prisma.colheita.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -29,6 +29,10 @@ export default async function EditarColheitaPage({
     }),
     prisma.usina.findMany({
       select: { id: true, nome: true, modelo: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.talhao.findMany({
+      select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({
@@ -67,6 +71,7 @@ export default async function EditarColheitaPage({
           acao={atualizarColheita.bind(null, id)}
           fazendas={fazendas}
           usinas={usinas}
+          talhoes={talhoes}
           safras={safras}
           modo="editar"
           cancelarHref={`/colheitas/${id}`}
@@ -77,6 +82,7 @@ export default async function EditarColheitaPage({
             tipo: colheita.tipo,
             safra: colheita.safra ?? "",
             projecao: colheita.projecao,
+            talhoesIds: (colheita.talhoesIds as string[] | null) ?? [],
             toneladas: numero(colheita.toneladas),
             precoCana: numero(colheita.precoCana),
             agio: numero(colheita.agio),

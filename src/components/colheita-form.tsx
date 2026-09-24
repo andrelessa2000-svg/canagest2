@@ -6,7 +6,14 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ActionState } from "@/lib/actions";
 import { TIPOS_COLHEITA, type TipoColheita } from "@/lib/validators";
-import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
+import {
+  fmtMoney,
+  fmtCount,
+  fmtToneladas,
+  parseDecimal,
+  TAREFAS_POR_HA,
+  toDateInputValue,
+} from "@/lib/format";
 import {
   calcularColheita,
   sacosAduboTarefa,
@@ -19,6 +26,7 @@ import { SelectorRegistro } from "./selector-registro";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
+export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
 
 type Item = { nome: string; valor: string };
 
@@ -128,6 +136,7 @@ export function ColheitaForm({
   acao,
   fazendas,
   usinas,
+  talhoes = [],
   safras = [],
   inicial,
   modo = "criar",
@@ -136,8 +145,14 @@ export function ColheitaForm({
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
   fazendas: FazendaOpcao[];
   usinas: UsinaOpcao[];
+  talhoes?: TalhaoOpcao[];
   safras?: string[];
-  inicial?: Partial<Campos> & { herbicidas?: Item[]; insumos?: Item[]; despesasUsina?: Item[] };
+  inicial?: Partial<Campos> & {
+    herbicidas?: Item[];
+    insumos?: Item[];
+    despesasUsina?: Item[];
+    talhoesIds?: string[];
+  };
   modo?: "criar" | "editar";
   cancelarHref?: string;
 }) {
@@ -181,6 +196,9 @@ export function ColheitaForm({
   const [insumos, setInsumos] = useState<Item[]>(inicial?.insumos ?? []);
   const [despesasUsina, setDespesasUsina] = useState<Item[]>(
     inicial?.despesasUsina ?? [],
+  );
+  const [talhoesSel, setTalhoesSel] = useState<string[]>(
+    (inicial?.talhoesIds as string[] | undefined) ?? [],
   );
 
   useEffect(() => {
@@ -267,6 +285,23 @@ export function ColheitaForm({
     { r: "Outros insumos", v: resultado.insumos },
     { r: "Despesas com a usina", v: resultado.despesasUsina },
   ].filter((x) => x.v > 0);
+
+  const talhoesFazenda = c.fazendaId
+    ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
+    : [];
+  const talhoesColhidos = talhoesFazenda.filter((t) => talhoesSel.includes(t.id));
+  const tarefasColhidas = talhoesColhidos.reduce((a, t) => a + t.areaHa * TAREFAS_POR_HA, 0);
+  const rateio = talhoesColhidos.map((t) => {
+    const tarefas = t.areaHa * TAREFAS_POR_HA;
+    const prop = tarefasColhidas > 0 ? tarefas / tarefasColhidas : 0;
+    return {
+      nome: t.nome,
+      tarefas,
+      toneladas: n(c.toneladas) * prop,
+      tHa: tarefas > 0 ? (n(c.toneladas) * prop) / tarefas : 0,
+      receita: resultado.receita * prop,
+    };
+  });
 
   return (
     <form action={acaoForm} className="grid gap-6 pb-4">
@@ -498,6 +533,75 @@ export function ColheitaForm({
             />
           </Campo>
         </div>
+      </section>
+
+      {/* Talhões colhidos */}
+      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
+        <h2 className="font-display text-lg text-ink">Talhões colhidos</h2>
+        <p className="text-xs text-ink-3">
+          Marque os talhões que foram/serão colhidos. Toneladas e receita se repartem proporcional à
+          área, para ter a produtividade (t/ha) media de cada talhão.
+        </p>
+        {c.fazendaId && talhoesFazenda.length > 0 ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {talhoesFazenda.map((t) => (
+                <label
+                  key={t.id}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
+                    talhoesSel.includes(t.id)
+                      ? "border-accent bg-accent-soft text-ink"
+                      : "border-line bg-surface text-ink-2"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-[var(--accent)]"
+                    checked={talhoesSel.includes(t.id)}
+                    onChange={() =>
+                      setTalhoesSel(
+                        talhoesSel.includes(t.id)
+                          ? talhoesSel.filter((x) => x !== t.id)
+                          : [...talhoesSel, t.id],
+                      )
+                    }
+                  />
+                  {t.nome}
+                  <span className="text-xs text-ink-3">{fmtCount(Math.round(t.areaHa * TAREFAS_POR_HA))} tarefas</span>
+                </label>
+              ))}
+            </div>
+            <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesSel)} />
+            {rateio.length > 0 && (
+              <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+                <table className="w-full min-w-[420px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                      <th className="px-3 py-2 font-semibold">Talhão</th>
+                      <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                      <th className="px-3 py-2 text-right font-semibold">t/ha</th>
+                      <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rateio.map((r) => (
+                      <tr key={r.nome} className="border-b border-line">
+                        <td className="px-3 py-2 font-medium text-ink">{r.nome}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-ink">{r.toneladas.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-ink">{r.tHa.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(r.receita)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-ink-2">
+            Selecione primeiro a fazenda para marcar os talhões colhidos.
+          </p>
+        )}
       </section>
 
       {/* Arrendamento */}

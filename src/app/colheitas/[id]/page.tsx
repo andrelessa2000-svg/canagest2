@@ -9,6 +9,7 @@ import {
   fmtProd,
   fmtToneladas,
   fmtCount,
+  TAREFAS_POR_HA,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
 import {
@@ -107,6 +108,23 @@ export default async function ColheitaPage({
 
   const ehCoruripe = c.usina.modelo === "coruripe";
   const modeloLabel = MODELO_USINA_LABEL[c.usina.modelo as ModeloUsina];
+
+  const talhoesColhidos = (c.talhoesIds as string[] | null) ?? [];
+  const talhoesTodos = await prisma.talhao.findMany({
+    select: { id: true, nome: true, areaHa: true },
+  });
+  const sel = talhoesTodos.filter((t) => talhoesColhidos.includes(t.id));
+  const areaSel = sel.reduce((a, t) => a + t.areaHa * TAREFAS_POR_HA, 0);
+  const rateio = sel.map((t) => {
+    const tarefas = t.areaHa * TAREFAS_POR_HA;
+    const prop = areaSel > 0 ? tarefas / areaSel : 0;
+    return {
+      nome: t.nome,
+      toneladas: c.toneladas * prop,
+      tHa: tarefas > 0 ? (c.toneladas * prop) / tarefas : 0,
+      receita: r.receita * prop,
+    };
+  });
 
   return (
     <>
@@ -228,6 +246,37 @@ export default async function ColheitaPage({
         <ListaItens titulo="Despesas com a usina" itens={despesasUsina} />
         <div />
       </div>
+
+      {rateio.length > 0 && (
+        <section className="ledger-panel mt-4 p-5">
+          <h2 className="font-display text-lg text-ink">Talhões colhidos (rateio por área)</h2>
+          <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+            <table className="w-full min-w-[420px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                  <th className="px-3 py-2 font-semibold">Talhão</th>
+                  <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                  <th className="px-3 py-2 text-right font-semibold">t/ha</th>
+                  <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rateio.map((r) => (
+                  <tr key={r.nome} className="border-b border-line">
+                    <td className="px-3 py-2 font-medium text-ink">{r.nome}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">{r.toneladas.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">{r.tHa.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(r.receita)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-ink-3">
+            Media por talhão — a usina reporta o total da fazenda; se reparte proporcional à área.
+          </p>
+        </section>
+      )}
 
       <section className="ledger-panel mt-4 p-5">
         <h2 className="font-display text-lg text-ink">Resultado</h2>
