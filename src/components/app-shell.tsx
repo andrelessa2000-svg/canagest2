@@ -21,12 +21,12 @@ import { OfflineBanner } from "./offline-banner";
 
 const itens = [
   { href: "/", rotulo: "Início", icone: Home },
-  { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
   { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
   { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
   { href: "/plantio", rotulo: "Plantio", icone: Leaf },
   { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
+  { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
   { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
   { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
 ];

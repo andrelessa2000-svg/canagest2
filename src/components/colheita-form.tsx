@@ -15,6 +15,7 @@ import {
 } from "@/lib/colheita";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CelulaMetrica } from "./stat-cells";
+import { SelectorRegistro } from "./selector-registro";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
@@ -367,16 +368,9 @@ export function ColheitaForm({
           </Campo>
 
           <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-ink">
-              <input
-                type="checkbox"
-                name="projecao"
-                className="size-4 accent-[var(--accent)]"
-                checked={c.projecao}
-                onChange={(e) => set("projecao", e.target.checked)}
-              />
-              É uma projeção (simulada, ainda não aconteceu)
-            </label>
+            <p className="field-label">Tipo de registro</p>
+            <SelectorRegistro valor={c.projecao} onChange={(v) => set("projecao", v)} />
+            <input type="hidden" name="projecao" value={c.projecao ? "on" : ""} />
           </div>
         </div>
       </section>

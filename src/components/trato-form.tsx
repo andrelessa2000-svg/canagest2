@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
+import { SelectorRegistro } from "./selector-registro";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
@@ -370,16 +371,9 @@ export function TratoForm({
         )}
 
         <div className="sm:col-span-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-ink">
-            <input
-              type="checkbox"
-              name="projecao"
-              className="size-4 accent-[var(--accent)]"
-              checked={projecao}
-              onChange={(e) => setProjecao(e.target.checked)}
-            />
-            É uma projeção (simulada, ainda não aconteceu)
-          </label>
+          <p className="field-label">Tipo de registro</p>
+          <SelectorRegistro valor={projecao} onChange={setProjecao} />
+          <input type="hidden" name="projecao" value={projecao ? "on" : ""} />
         </div>
 
         {escopo === "talhao" && talhaoAtual && (

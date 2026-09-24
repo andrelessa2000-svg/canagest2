@@ -10,8 +10,15 @@ import { ConfirmDelete } from "@/components/confirm-delete";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlantioPage() {
+export default async function PlantioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reg?: string }>;
+}) {
+  const { reg } = await searchParams;
   const plantios = await prisma.plantio.findMany({
+    where:
+      reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {},
     include: {
       fazenda: { select: { nome: true } },
       talhao: { select: { nome: true } },
@@ -20,6 +27,11 @@ export default async function PlantioPage() {
   });
 
   const total = plantios.reduce((acc, p) => acc + p.valor, 0);
+
+  const regs = [
+    { id: "", rotulo: "Caderno de campo" },
+    { id: "proj", rotulo: "Projeções" },
+  ];
 
   return (
     <>
@@ -33,6 +45,20 @@ export default async function PlantioPage() {
           </Link>
         }
       />
+
+      <div className="mb-4 flex flex-wrap gap-1">
+        {regs.map((r) => (
+          <Link
+            key={r.id}
+            href={`/plantio${r.id ? `?reg=${r.id}` : ""}`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              (reg ?? "") === r.id ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+            }`}
+          >
+            {r.rotulo}
+          </Link>
+        ))}
+      </div>
 
       {plantios.length === 0 ? (
         <EmptyState
