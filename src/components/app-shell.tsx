@@ -11,6 +11,7 @@ import {
   SprayCan,
   Sprout,
   Tractor,
+  Wallet,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
@@ -20,6 +21,7 @@ import { OfflineBanner } from "./offline-banner";
 
 const itens = [
   { href: "/", rotulo: "Início", icone: Home },
+  { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
   { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
   { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
@@ -110,14 +112,17 @@ export function AppShell({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur md:hidden"
         aria-label="Navegação inferior"
       >
-        <div className="mx-auto grid max-w-5xl grid-cols-4">
+        <div
+          className="flex items-center gap-1 overflow-x-auto px-2 py-1"
+          style={{ scrollbarWidth: "none" }}
+        >
           {itens.map(({ href, rotulo, icone: Icone }) => {
             const current = ativo(pathname, href);
             return (
               <Link
                 key={href}
                 href={href}
-                className="flex flex-col items-center gap-1 py-2.5 text-[0.68rem] font-medium transition-colors"
+                className="flex min-w-14 shrink-0 flex-col items-center gap-1 py-2 text-[0.68rem] font-medium transition-colors"
                 data-active={current}
                 aria-current={current ? "page" : undefined}
                 style={{

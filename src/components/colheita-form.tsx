@@ -658,7 +658,7 @@ export function ColheitaForm({
             valor={fmtMoney(resultado.totalDespesas)}
           />
           <CelulaMetrica
-            rotulo="Lucro líquido"
+            rotulo="Lucro bruto"
             valor={fmtMoney(resultado.lucro)}
             destaque
           />

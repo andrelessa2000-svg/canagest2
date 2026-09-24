@@ -75,6 +75,7 @@ model Fazenda {
   colheitas   Colheita[]
   plantios    Plantio[]
   tratos      Trato[]
+  investimentos Investimento[]
 
   @@index([nome])
 }
@@ -165,9 +166,7 @@ model Plantio {
   tipo       String
   data       DateTime @default(now())
   valor      Float
-  projecao   Boolean  @default(false)
   areaHa     Float?
-  valorPorHa Float?
   observacao String?
   criadaEm   DateTime @default(now())
 
@@ -187,11 +186,24 @@ model Trato {
   tarefas    Float?
   data       DateTime @default(now())
   valor      Float
-  projecao   Boolean  @default(false)
   produtos   Json?
   observacao String?
   criadaEm   DateTime @default(now())
 
   @@index([fazendaId, data])
   @@index([talhaoId])
+}
+
+model Investimento {
+  id         String   @id @default(cuid())
+  fazendaId  String
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  safra      String?
+  nome       String
+  valor      Float
+  data       DateTime @default(now())
+  observacao String?
+  criadaEm   DateTime @default(now())
+
+  @@index([fazendaId, data])
 }

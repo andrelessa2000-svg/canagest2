@@ -151,7 +151,7 @@ export default async function ColheitaPage({
           />
         )}
         <CelulaMetrica rotulo="Receita" valor={fmtMoney(r.receita)} />
-        <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(r.lucro)} destaque />
+        <CelulaMetrica rotulo="Lucro bruto" valor={fmtMoney(r.lucro)} destaque />
       </div>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -246,7 +246,7 @@ export default async function ColheitaPage({
             <Linha rotulo="Despesas com a usina" valor={fmtMoney(r.despesasUsina)} />
           )}
           <Linha rotulo="Total de despesas" valor={fmtMoney(r.totalDespesas)} />
-          <Linha rotulo="Lucro líquido" valor={fmtMoney(r.lucro)} />
+          <Linha rotulo="Lucro bruto" valor={fmtMoney(r.lucro)} />
         </dl>
         <div className="mt-3 grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-3">
           <CelulaMetrica rotulo="Receita/t" valor={fmtMoney(r.receitaPorTonelada)} />

@@ -171,7 +171,7 @@ export default async function ColheitasPage({
         <CelulaMetrica rotulo="Toneladas" valor={fmtToneladas(totais.toneladas)} />
         <CelulaMetrica rotulo="Receita" valor={fmtMoney(totais.receita)} />
         <CelulaMetrica rotulo="Despesas" valor={fmtMoney(totais.despesas)} />
-        <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(totais.lucro)} destaque />
+        <CelulaMetrica rotulo="Lucro bruto" valor={fmtMoney(totais.lucro)} destaque />
       </div>
 
       {linhas.length === 0 ? (

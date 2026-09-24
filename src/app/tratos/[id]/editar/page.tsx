@@ -76,7 +76,6 @@ export default async function EditarTratoPage({
             tarefas: numero(trato.tarefas),
             data: toDateInputValue(trato.data),
             valor: numero(trato.valor),
-            projecao: trato.projecao,
             observacao: trato.observacao ?? "",
             produtos: produtos.map((p) => ({
               nome: p.nome ?? "",

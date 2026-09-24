@@ -154,7 +154,7 @@ export default async function DashboardPage() {
       <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
         <CelulaMetrica rotulo="Receita bruta" valor={fmtMoney(fin.receita)} />
         <CelulaMetrica rotulo="Despesas" valor={fmtMoney(fin.despesas)} />
-        <CelulaMetrica rotulo="Lucro líquido" valor={fmtMoney(fin.lucro)} destaque />
+        <CelulaMetrica rotulo="Lucro bruto" valor={fmtMoney(fin.lucro)} destaque />
         <CelulaMetrica
           rotulo="Lucro por tonelada"
           valor={fmtMoney(fin.toneladas > 0 ? fin.lucro / fin.toneladas : 0)}

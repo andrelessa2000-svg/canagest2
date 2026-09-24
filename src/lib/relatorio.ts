@@ -14,8 +14,7 @@ export type FilaCascata = {
   lucroBruto: number;
   tratos: number;
   plantio: number;
-  projTratos: number;
-  projPlantio: number;
+  proj: number;
   lucroNeto: number;
   lucroNetoEstimado: number;
 };
@@ -26,7 +25,7 @@ export type Cascata = {
 };
 
 export async function cargarCascata(): Promise<Cascata> {
-  const [colheitas, tratos, plantios] = await Promise.all([
+  const [colheitas, tratos, plantios, investimentos] = await Promise.all([
     prisma.colheita.findMany({
       include: {
         fazenda: {
@@ -36,10 +35,13 @@ export async function cargarCascata(): Promise<Cascata> {
       },
     }),
     prisma.trato.findMany({
-      select: { fazendaId: true, valor: true, projecao: true },
+      select: { fazendaId: true, valor: true },
     }),
     prisma.plantio.findMany({
-      select: { fazendaId: true, valor: true, projecao: true },
+      select: { fazendaId: true, valor: true },
+    }),
+    prisma.investimento.findMany({
+      select: { fazendaId: true, valor: true },
     }),
   ]);
 
@@ -48,10 +50,9 @@ export async function cargarCascata(): Promise<Cascata> {
     for (const r of rows) m.set(r.fazendaId, (m.get(r.fazendaId) ?? 0) + r.valor);
     return m;
   };
-  const tratosPorFazenda = sumarPorFazenda(tratos.filter((t) => !t.projecao));
-  const projTratosPorFazenda = sumarPorFazenda(tratos.filter((t) => t.projecao));
-  const plantioPorFazenda = sumarPorFazenda(plantios.filter((p) => !p.projecao));
-  const projPlantioPorFazenda = sumarPorFazenda(plantios.filter((p) => p.projecao));
+  const tratosPorFazenda = sumarPorFazenda(tratos);
+  const plantioPorFazenda = sumarPorFazenda(plantios);
+  const projPorFazenda = sumarPorFazenda(investimentos);
 
   const mapa = new Map<string, FilaCascata>();
 
@@ -92,8 +93,7 @@ export async function cargarCascata(): Promise<Cascata> {
       lucroBruto: 0,
       tratos: 0,
       plantio: 0,
-      projTratos: 0,
-      projPlantio: 0,
+      proj: 0,
       lucroNeto: 0,
       lucroNetoEstimado: 0,
     };
@@ -110,12 +110,11 @@ export async function cargarCascata(): Promise<Cascata> {
   const filas = [...mapa.values()].map((f) => {
     f.tratos = tratosPorFazenda.get(f.fazendaId) ?? 0;
     f.plantio = plantioPorFazenda.get(f.fazendaId) ?? 0;
-    f.projTratos = projTratosPorFazenda.get(f.fazendaId) ?? 0;
-    f.projPlantio = projPlantioPorFazenda.get(f.fazendaId) ?? 0;
+    f.proj = projPorFazenda.get(f.fazendaId) ?? 0;
     f.lucroBruto =
       f.receita - f.ctc - f.arrendamento - f.insumos - f.despesasUsina;
     f.lucroNeto = f.lucroBruto - f.tratos - f.plantio;
-    f.lucroNetoEstimado = f.lucroNeto - f.projTratos - f.projPlantio;
+    f.lucroNetoEstimado = f.lucroNeto - f.proj;
     return f;
   });
 
@@ -132,8 +131,7 @@ export async function cargarCascata(): Promise<Cascata> {
     lucroBruto: 0,
     tratos: 0,
     plantio: 0,
-    projTratos: 0,
-    projPlantio: 0,
+    proj: 0,
     lucroNeto: 0,
     lucroNetoEstimado: 0,
   });
@@ -150,8 +148,7 @@ export async function cargarCascata(): Promise<Cascata> {
     t.lucroBruto += f.lucroBruto;
     t.tratos += f.tratos;
     t.plantio += f.plantio;
-    t.projTratos += f.projTratos;
-    t.projPlantio += f.projPlantio;
+    t.proj += f.proj;
     t.lucroNeto += f.lucroNeto;
     t.lucroNetoEstimado += f.lucroNetoEstimado;
     return t;
@@ -176,7 +173,7 @@ export function filaCascataCSV(f: FilaCascata): string {
     num(f.tratos),
     num(f.plantio),
     num(f.lucroNeto),
-    num(f.projTratos + f.projPlantio),
+    num(f.proj),
     num(f.lucroNetoEstimado),
   ].join(";");
 }

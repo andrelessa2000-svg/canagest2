@@ -265,12 +265,9 @@ export default async function RelatoriosPage() {
     cascata.total.despesasUsina +
     cascata.total.tratos +
     cascata.total.plantio +
-    cascata.total.projTratos +
-    cascata.total.projPlantio;
+    cascata.total.proj;
   const custoTonelada = cascata.total.toneladas > 0 ? costosCascata / cascata.total.toneladas : 0;
   const costoTarefa = cascata.total.tarefas > 0 ? costosCascata / cascata.total.tarefas : 0;
-
-  const linhaNum = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
   return (
     <>
@@ -452,7 +449,7 @@ export default async function RelatoriosPage() {
           Receita da colheita − (CTC + arrendamento + insumos + despesas com usina) ={" "}
           <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos reais −
           plantio reais = <span className="font-semibold text-ink">lucro líquido</span>. Lucro líquido −
-          projeções (tratos/plantio futuros, até a próxima safra) ={" "}
+          inversões futuras (registradas no módulo Financeiro, até a próxima safra) ={" "}
           <span className="font-semibold text-ink">lucro líquido estimado</span>.
         </p>
         <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
@@ -485,7 +482,7 @@ export default async function RelatoriosPage() {
                     {fmtMoney(f.lucroNeto)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                    {fmtMoney(f.projTratos + f.projPlantio)}
+                    {fmtMoney(f.proj)}
                   </td>
                   <td
                     className={`px-3 py-2 text-right font-bold tabular-nums ${
@@ -504,7 +501,7 @@ export default async function RelatoriosPage() {
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.plantio)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">
-                  {fmtMoney(cascata.total.projTratos + cascata.total.projPlantio)}
+                  {fmtMoney(cascata.total.proj)}
                 </td>
                 <td className="px-3 py-2 text-right font-bold tabular-nums text-ink">
                   {fmtMoney(cascata.total.lucroNetoEstimado)}

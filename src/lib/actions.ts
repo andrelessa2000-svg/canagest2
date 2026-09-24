@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
+import { parseDecimal } from "./format";
 import {
   colheitaSchema,
   fazendaSchema,
@@ -452,9 +453,7 @@ function camposPlantio(formData: FormData) {
     tipo: campo(formData, "tipo"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
-    projecao: campo(formData, "projecao"),
     areaHa: campo(formData, "areaHa"),
-    valorPorHa: campo(formData, "valorPorHa"),
     observacao: campo(formData, "observacao"),
   };
 }
@@ -467,9 +466,7 @@ function dadosPlantio(d: PlantioInput) {
     tipo: d.tipo,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
-    projecao: d.projecao,
     areaHa: d.areaHa,
-    valorPorHa: d.valorPorHa,
     observacao: d.observacao,
   };
 }
@@ -538,7 +535,6 @@ function camposTrato(formData: FormData) {
     tarefas: campo(formData, "tarefas"),
     data: campo(formData, "data"),
     valor: campo(formData, "valor"),
-    projecao: campo(formData, "projecao"),
     produtos: campo(formData, "produtos"),
     observacao: campo(formData, "observacao"),
   };
@@ -554,7 +550,6 @@ function dadosTrato(d: TratoInput) {
     tarefas: d.tarefas,
     data: new Date(`${d.data}T12:00:00`),
     valor: d.valor,
-    projecao: d.projecao,
     produtos: d.produtos as unknown as Prisma.InputJsonValue,
     observacao: d.observacao,
   };
@@ -611,5 +606,56 @@ export async function excluirTrato(id: string): Promise<ActionState> {
   revalidatePath("/");
   revalidatePath("/tratos");
   revalidatePath("/fazendas", "layout");
+  return { ok: true };
+}
+
+export async function criarInvestimento(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const fazendaId = campo(formData, "fazendaId");
+  const safra = campo(formData, "safra");
+  const nome = campo(formData, "nome");
+  const valor = formData.get("valor")?.toString() ?? "";
+  const data = campo(formData, "data");
+  const observacao = campo(formData, "observacao");
+
+  if (!fazendaId) return { ok: false, error: "Selecione a fazenda." };
+  if (nome.length < 2) return { ok: false, error: "Informe o nome da inversão." };
+  const valorNum = parseDecimal(valor);
+  if (Number.isNaN(valorNum) || valorNum < 0) {
+    return { ok: false, error: "Valor inválido." };
+  }
+
+  try {
+    await prisma.investimento.create({
+      data: {
+        fazendaId,
+        safra: safra || null,
+        nome,
+        valor: valorNum,
+        data: data ? new Date(`${data}T12:00:00`) : new Date(),
+        observacao: observacao || null,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Não foi possível registrar a inversão." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/financeiro");
+  redirect("/financeiro");
+}
+
+export async function excluirInvestimento(id: string): Promise<ActionState> {
+  try {
+    await prisma.investimento.delete({ where: { id } });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/");
+  revalidatePath("/financeiro");
   return { ok: true };
 }
