@@ -150,7 +150,7 @@ export function ColheitaForm({
     herbicidas?: Item[];
     insumos?: Item[];
     despesasUsina?: Item[];
-    talhoesIds?: string[];
+    talhoesColhidos?: { id: string; areaHa: number }[];
   };
   modo?: "criar" | "editar";
   cancelarHref?: string;
@@ -196,9 +196,9 @@ export function ColheitaForm({
   const [despesasUsina, setDespesasUsina] = useState<Item[]>(
     inicial?.despesasUsina ?? [],
   );
-  const [talhoesSel, setTalhoesSel] = useState<string[]>(
-    (inicial?.talhoesIds as string[] | undefined) ?? [],
-  );
+  const [talhoesSel, setTalhoesSel] = useState<
+    { id: string; areaHa: number }[]
+  >((inicial?.talhoesColhidos as { id: string; areaHa: number }[] | undefined) ?? []);
 
   useEffect(() => {
     if (state && !state.ok) {
@@ -288,16 +288,20 @@ export function ColheitaForm({
   const talhoesFazenda = c.fazendaId
     ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
     : [];
-  const talhoesColhidos = talhoesFazenda.filter((t) => talhoesSel.includes(t.id));
-  const tarefasColhidas = talhoesColhidos.reduce((a, t) => a + t.areaHa * TAREFAS_POR_HA, 0);
+  const talhoesColhidos = talhoesFazenda
+    .map((t) => {
+      const sel = talhoesSel.find((s) => s.id === t.id);
+      return sel ? { ...t, areaColhida: sel.areaHa } : null;
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
+  const areaColhidaTotal = talhoesColhidos.reduce((a, t) => a + t.areaColhida, 0);
   const rateio = talhoesColhidos.map((t) => {
-    const tarefas = t.areaHa * TAREFAS_POR_HA;
-    const prop = tarefasColhidas > 0 ? tarefas / tarefasColhidas : 0;
+    const prop = areaColhidaTotal > 0 ? t.areaColhida / areaColhidaTotal : 0;
     return {
       nome: t.nome,
-      tarefas,
+      areaColhida: t.areaColhida,
       toneladas: n(c.toneladas) * prop,
-      tHa: tarefas > 0 ? (n(c.toneladas) * prop) / tarefas : 0,
+      tHa: t.areaColhida > 0 ? (n(c.toneladas) * prop) / t.areaColhida : 0,
       receita: resultado.receita * prop,
     };
   });
@@ -538,63 +542,100 @@ export function ColheitaForm({
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
         <h2 className="font-display text-lg text-ink">Talhões colhidos</h2>
         <p className="text-xs text-ink-3">
-          Marque os talhões que foram/serão colhidos. Toneladas e receita se repartem proporcional à
-          área, para ter a produtividade (t/ha) media de cada talhão.
+          Marque os talhões e informe quantos ha colheu em cada um (ex.: talhão todo ou só parte).
+          Toneladas e receita se repartem proporcional à área colhida.
         </p>
         {c.fazendaId && talhoesFazenda.length > 0 ? (
           <>
             <div className="flex flex-wrap gap-2">
-              {talhoesFazenda.map((t) => (
-                <label
-                  key={t.id}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
-                    talhoesSel.includes(t.id)
-                      ? "border-accent bg-accent-soft text-ink"
-                      : "border-line bg-surface text-ink-2"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-[var(--accent)]"
-                    checked={talhoesSel.includes(t.id)}
-                    onChange={() =>
-                      setTalhoesSel(
-                        talhoesSel.includes(t.id)
-                          ? talhoesSel.filter((x) => x !== t.id)
-                          : [...talhoesSel, t.id],
-                      )
-                    }
-                  />
-                  {t.nome}
-                  <span className="text-xs text-ink-3">{fmtCount(Math.round(t.areaHa * TAREFAS_POR_HA))} tarefas</span>
-                </label>
-              ))}
+              {talhoesFazenda.map((t) => {
+                const sel = talhoesSel.find((s) => s.id === t.id);
+                return (
+                  <label
+                    key={t.id}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
+                      sel
+                        ? "border-accent bg-accent-soft text-ink"
+                        : "border-line bg-surface text-ink-2"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-[var(--accent)]"
+                      checked={Boolean(sel)}
+                      onChange={() =>
+                        setTalhoesSel(
+                          sel
+                            ? talhoesSel.filter((x) => x.id !== t.id)
+                            : [...talhoesSel, { id: t.id, areaHa: t.areaHa }],
+                        )
+                      }
+                    />
+                    {t.nome}
+                    <span className="text-xs text-ink-3">
+                      {fmtCount(Math.round(t.areaHa * TAREFAS_POR_HA))} tarefas · {t.areaHa} ha
+                    </span>
+                  </label>
+                );
+              })}
             </div>
-            <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesSel)} />
-            {rateio.length > 0 && (
+            {talhoesColhidos.length > 0 && (
               <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-                <table className="w-full min-w-[420px] text-left text-sm">
+                <table className="w-full min-w-[460px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
                       <th className="px-3 py-2 font-semibold">Talhão</th>
+                      <th className="px-3 py-2 text-right font-semibold">Área colhida (ha)</th>
                       <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
                       <th className="px-3 py-2 text-right font-semibold">t/ha</th>
                       <th className="px-3 py-2 text-right font-semibold">Receita</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rateio.map((r) => (
-                      <tr key={r.nome} className="border-b border-line">
-                        <td className="px-3 py-2 font-medium text-ink">{r.nome}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-ink">{r.toneladas.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-ink">{r.tHa.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(r.receita)}</td>
-                      </tr>
-                    ))}
+                    {talhoesColhidos.map((t) => {
+                      const r = rateio.find((x) => x.nome === t.nome);
+                      return (
+                        <tr key={t.id} className="border-b border-line">
+                          <td className="px-3 py-2 font-medium text-ink">{t.nome}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="field-input tnum w-28 py-1.5"
+                              inputMode="decimal"
+                              value={String(t.areaColhida)}
+                              onChange={(e) =>
+                                setTalhoesSel(
+                                  talhoesSel.map((s) =>
+                                    s.id === t.id
+                                      ? { ...s, areaHa: n(e.target.value) }
+                                      : s,
+                                  ),
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-ink">
+                            {r?.toneladas.toFixed(2)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-ink">
+                            {r?.tHa.toFixed(2)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-ink">
+                            {fmtMoney(r?.receita ?? 0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+            <input
+              type="hidden"
+              name="talhoesColhidos"
+              value={JSON.stringify(
+                talhoesSel.map((s) => ({ id: s.id, areaHa: s.areaHa })),
+              )}
+            />
           </>
         ) : (
           <p className="text-sm text-ink-2">

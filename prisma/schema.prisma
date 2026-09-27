@@ -115,7 +115,7 @@ model Colheita {
   tipo      String
   safra     String?
   projecao  Boolean  @default(false)
-  talhoesIds Json?
+  talhoesColhidos Json?
   toneladas Float
 
   // Remuneração — Pindorama

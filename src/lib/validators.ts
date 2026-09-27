@@ -97,7 +97,7 @@ export const colheitaSchema = z.object({
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),
   safra: optionalField(30),
   projecao: ligaField(),
-  talhoesIds: itensStringJson(),
+  talhoesColhidos: itensTalhaoAreaJson(),
   toneladas: numField("Toneladas"),
 
   precoCana: numeroOpcional("Preço da cana"),
@@ -159,6 +159,32 @@ function itensStringJson() {
       }
     })
     .pipe(z.array(z.string()));
+}
+
+function itensTalhaoAreaJson() {
+  const itemSchema = z.object({
+    id: z.string().min(1, "Talhão inválido"),
+    areaHa: z.number().min(0, "Área inválida").finite("Área inválida"),
+  });
+  return z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v || v.trim() === "") return [];
+      try {
+        const arr = JSON.parse(v);
+        if (!Array.isArray(arr)) return [];
+        return arr
+          .filter((x) => typeof x?.id === "string" && x?.id)
+          .map((x) => ({
+            id: x.id,
+            areaHa: Number.isFinite(Number(x.areaHa)) ? Number(x.areaHa) : 0,
+          }));
+      } catch {
+        return [];
+      }
+    })
+    .pipe(z.array(itemSchema));
 }
 
 export const TIPOS_TRATO = [

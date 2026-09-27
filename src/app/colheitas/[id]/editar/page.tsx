@@ -82,7 +82,9 @@ export default async function EditarColheitaPage({
             tipo: colheita.tipo,
             safra: colheita.safra ?? "",
             projecao: colheita.projecao,
-            talhoesIds: (colheita.talhoesIds as string[] | null) ?? [],
+            talhoesColhidos:
+              (colheita.talhoesColhidos as { id: string; areaHa: number }[] | null) ??
+              [],
             toneladas: numero(colheita.toneladas),
             precoCana: numero(colheita.precoCana),
             agio: numero(colheita.agio),

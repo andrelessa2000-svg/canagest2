@@ -109,19 +109,24 @@ export default async function ColheitaPage({
   const ehCoruripe = c.usina.modelo === "coruripe";
   const modeloLabel = MODELO_USINA_LABEL[c.usina.modelo as ModeloUsina];
 
-  const talhoesColhidos = (c.talhoesIds as string[] | null) ?? [];
+  const talhoesColhidosInfo =
+    (c.talhoesColhidos as { id: string; areaHa: number }[] | null) ?? [];
   const talhoesTodos = await prisma.talhao.findMany({
     select: { id: true, nome: true, areaHa: true },
   });
-  const sel = talhoesTodos.filter((t) => talhoesColhidos.includes(t.id));
-  const areaSel = sel.reduce((a, t) => a + t.areaHa * TAREFAS_POR_HA, 0);
+  const sel = talhoesTodos
+    .map((t) => {
+      const info = talhoesColhidosInfo.find((x) => x.id === t.id);
+      return info ? { ...t, areaColhida: info.areaHa } : null;
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
+  const areaSel = sel.reduce((a, t) => a + t.areaColhida, 0);
   const rateio = sel.map((t) => {
-    const tarefas = t.areaHa * TAREFAS_POR_HA;
-    const prop = areaSel > 0 ? tarefas / areaSel : 0;
+    const prop = areaSel > 0 ? t.areaColhida / areaSel : 0;
     return {
       nome: t.nome,
       toneladas: c.toneladas * prop,
-      tHa: tarefas > 0 ? (c.toneladas * prop) / tarefas : 0,
+      tHa: t.areaColhida > 0 ? (c.toneladas * prop) / t.areaColhida : 0,
       receita: r.receita * prop,
     };
   });

@@ -1,11 +1,28 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { toDateInputValue } from "@/lib/format";
+import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { SelectorRegistro } from "./selector-registro";
+
+function num(v: string): number {
+  const p = parseDecimal(v);
+  return Number.isFinite(p) ? p : 0;
+}
+
+const TIPOS_MAQUINA = ["dia", "mes", "hora", "tarefa", "ha"] as const;
+const TIPOS_MAQUINA_LABEL: Record<string, string> = {
+  dia: "por dia",
+  mes: "por mês",
+  hora: "por hora",
+  tarefa: "por tarefa",
+  ha: "por ha",
+};
+
+type Operacao = { nome: string; maquinaValor: string; maquinaTipo: string; maquinaQtd: string; maodeobra: string; insumo: string };
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
@@ -43,6 +60,26 @@ export function PlantioForm({
   const [escopo, setEscopo] = useState(inicial?.escopo ?? "fazenda");
   const [talhoesSel, setTalhoesSel] = useState<string[]>(inicial?.talhoesIds ?? []);
   const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
+  const [valor, setValor] = useState(inicial?.valor ?? "");
+  const [calculadora, setCalculadora] = useState(false);
+
+  const [maquinaTipo, setMaquinaTipo] = useState<string>("dia");
+  const [maquinaValor, setMaquinaValor] = useState("");
+  const [maquinaQtd, setMaquinaQtd] = useState("");
+
+  const [operacoes, setOperacoes] = useState<Operacao[]>([]);
+
+  const totalMaquina = num(maquinaValor) * num(maquinaQtd);
+  const totalOperacoes = operacoes.reduce(
+    (a, o) =>
+      a + num(o.maquinaValor) * num(o.maquinaQtd) + num(o.maodeobra) + num(o.insumo),
+    0,
+  );
+  const totalPlantio = totalMaquina + totalOperacoes;
+
+  function setOperacao(idx: number, campo: keyof Operacao, v: string) {
+    setOperacoes(operacoes.map((o, k) => (k === idx ? { ...o, [campo]: v } : o)));
+  }
 
   const talhoesFazenda = fazendaId
     ? talhoes.filter((t) => t.fazendaId === fazendaId)
@@ -220,17 +257,159 @@ export function PlantioForm({
           />
         </Campo>
 
-        <Campo label="Valor (R$)" htmlFor="valor" hint="Costo do plantio; não gera receita.">
+        <Campo label="Valor (R$)" htmlFor="valor" hint="Digite o valor ou use Calcular.">
           <input
             id="valor"
             name="valor"
             className="field-input tnum"
             inputMode="decimal"
             required
-            defaultValue={inicial?.valor ?? ""}
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
             placeholder="0,00"
           />
         </Campo>
+
+        <div className="sm:col-span-2">
+          <button
+            type="button"
+            onClick={() => setCalculadora(!calculadora)}
+            className="text-sm font-semibold text-accent hover:text-accent-strong"
+          >
+            {calculadora ? "Ocultar calculadora" : "+ Calcular custo do plantio"}
+          </button>
+        </div>
+
+        {calculadora && (
+          <div className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-4 sm:col-span-2">
+            <p className="text-xs text-ink-3">
+              Maquinário por dia/mês/hora/tarefa/ha + etapas do plantio (preparo, corte de semente,
+              espalhar, adubar, cobrir, herbicida…), cada uma com máquina, mão de obra e insumo.
+            </p>
+
+            <p className="mt-4 text-sm font-medium text-ink">Maquinário</p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <Campo label="Tipo de pagamento" htmlFor="maqTipo">
+                <select
+                  id="maqTipo"
+                  className="field-input"
+                  value={maquinaTipo}
+                  onChange={(e) => setMaquinaTipo(e.target.value)}
+                >
+                  {TIPOS_MAQUINA.map((m) => (
+                    <option key={m} value={m}>
+                      {TIPOS_MAQUINA_LABEL[m]}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Valor (R$)" htmlFor="maqValor">
+                <input
+                  id="maqValor"
+                  className="field-input tnum"
+                  inputMode="decimal"
+                  value={maquinaValor}
+                  onChange={(e) => setMaquinaValor(e.target.value)}
+                />
+              </Campo>
+              <Campo label="Quantidade" htmlFor="maqQtd" hint={`dias, horas, ${maquinaTipo}…`}>
+                <input
+                  id="maqQtd"
+                  className="field-input tnum"
+                  inputMode="decimal"
+                  value={maquinaQtd}
+                  onChange={(e) => setMaquinaQtd(e.target.value)}
+                />
+              </Campo>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm font-medium text-ink">Etapas do plantio</p>
+              <button
+                type="button"
+                onClick={() =>
+                  setOperacoes([
+                    ...operacoes,
+                    { nome: "", maquinaValor: "", maquinaTipo: "ha", maquinaQtd: "", maodeobra: "", insumo: "" },
+                  ])
+                }
+                className="text-sm font-semibold text-accent hover:text-accent-strong"
+              >
+                + Adicionar etapa
+              </button>
+            </div>
+            <div className="mt-2 grid gap-2">
+              {operacoes.map((o, idx) => (
+                <div key={idx} className="grid gap-2 border-b border-line pb-2 sm:grid-cols-[1fr_5rem_6rem_5rem_5rem_5rem_2.5rem]">
+                  <input
+                    className="field-input"
+                    value={o.nome}
+                    onChange={(e) => setOperacao(idx, "nome", e.target.value)}
+                    placeholder="Etapa (preparo, corte, espalhar, adubar, cobrir, herbicida…)"
+                    maxLength={40}
+                  />
+                  <select
+                    className="field-input"
+                    value={o.maquinaTipo}
+                    onChange={(e) => setOperacao(idx, "maquinaTipo", e.target.value)}
+                  >
+                    {TIPOS_MAQUINA.map((m) => (
+                      <option key={m} value={m}>
+                        {TIPOS_MAQUINA_LABEL[m]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="field-input tnum"
+                    inputMode="decimal"
+                    value={o.maquinaValor}
+                    onChange={(e) => setOperacao(idx, "maquinaValor", e.target.value)}
+                    placeholder="Máquina R$"
+                  />
+                  <input
+                    className="field-input tnum"
+                    inputMode="decimal"
+                    value={o.maquinaQtd}
+                    onChange={(e) => setOperacao(idx, "maquinaQtd", e.target.value)}
+                    placeholder="Qtd"
+                  />
+                  <input
+                    className="field-input tnum"
+                    inputMode="decimal"
+                    value={o.maodeobra}
+                    onChange={(e) => setOperacao(idx, "maodeobra", e.target.value)}
+                    placeholder="Mão obra R$"
+                  />
+                  <input
+                    className="field-input tnum"
+                    inputMode="decimal"
+                    value={o.insumo}
+                    onChange={(e) => setOperacao(idx, "insumo", e.target.value)}
+                    placeholder="Insumo R$"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOperacoes(operacoes.filter((_, k) => k !== idx))}
+                    className="inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
+                    aria-label="Remover etapa"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className="tnum text-sm text-ink-2">
+                Maquinário: {fmtMoney(totalMaquina)} · Etapas: {fmtMoney(totalOperacoes)} ·{" "}
+                <span className="font-semibold text-ink">Total: {fmtMoney(totalPlantio)}</span>
+              </span>
+              <button type="button" onClick={() => setValor(String(totalPlantio))} className="btn btn-soft">
+                Usar este total
+              </button>
+            </div>
+          </div>
+        )}
 
         <Campo
           label="Área (ha, opcional)"
