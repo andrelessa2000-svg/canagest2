@@ -246,7 +246,7 @@ export default async function RelatoriosPage() {
   }
   const usinasResumo = [...porUsina.values()].sort((a, b) => b.receita - a.receita);
 
-  // Análisis por safra (productividad vs lucro)
+  // Análise por safra (produtividade vs lucro)
   const porSafra = new Map<
     string,
     { safra: string; area: number; tons: number; receita: number; custos: number; lucro: number; n: number }
@@ -308,7 +308,7 @@ export default async function RelatoriosPage() {
     })
     .filter((g) => g.vazios.length > 0);
 
-  const costosCascata =
+  const custosCascata =
     cascata.total.ctc +
     cascata.total.arrendamento +
     cascata.total.insumos +
@@ -316,8 +316,8 @@ export default async function RelatoriosPage() {
     cascata.total.tratos +
     cascata.total.plantio +
     cascata.total.proj;
-  const custoTonelada = cascata.total.toneladas > 0 ? costosCascata / cascata.total.toneladas : 0;
-  const costoTarefa = cascata.total.tarefas > 0 ? costosCascata / cascata.total.tarefas : 0;
+  const custoTonelada = cascata.total.toneladas > 0 ? custosCascata / cascata.total.toneladas : 0;
+  const custoTarefa = cascata.total.tarefas > 0 ? custosCascata / cascata.total.tarefas : 0;
 
   return (
     <>
@@ -572,7 +572,7 @@ export default async function RelatoriosPage() {
           />
           <CelulaMetrica
             rotulo="Custo por tarefa"
-            valor={fmtMoney(costoTarefa)}
+            valor={fmtMoney(custoTarefa)}
             legenda="despesas ÷ tarefas"
           />
           <CelulaMetrica
@@ -648,9 +648,9 @@ export default async function RelatoriosPage() {
         </div>
       </section>
 
-      {/* Análisis por safra */}
+      {/* Análise por safra */}
       <section className="mt-10 grid gap-3">
-        <h2 className="font-display text-xl text-ink">Análisis por safra — productividad vs lucro</h2>
+        <h2 className="font-display text-xl text-ink">Análise por safra — produtividade vs lucro</h2>
         <p className="text-sm leading-relaxed text-ink-2">
           O objetivo: ver se a safra rendeu e dejó lucro. Por safra: área colhida, toneladas,{" "}
           <span className="font-semibold text-ink">t/ha</span>, custo por tonelada, receita,{" "}

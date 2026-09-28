@@ -26,6 +26,8 @@ const itens = [
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
   { href: "/plantio", rotulo: "Plantio", icone: Leaf },
   { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
+  { href: "/simulador", rotulo: "Simulador", icone: Calculator },
+  { href: "/analise-talhoes", rotulo: "Análise talhões", icone: BarChart3 },
   { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
   { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
   { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
@@ -54,14 +56,15 @@ export function AppShell({
             <Brand />
 
             <nav
-              className="hidden items-center gap-1 md:flex"
+              className="hidden items-center gap-1 md:flex overflow-x-auto"
               aria-label="Navegação principal"
+              style={{ scrollbarWidth: "none" }}
             >
               {itens.map(({ href, rotulo }) => (
                 <Link
                   key={href}
                   href={href}
-                  className="nav-link"
+                  className="nav-link whitespace-nowrap shrink-0"
                   data-active={ativo(pathname, href)}
                   aria-current={ativo(pathname, href) ? "page" : undefined}
                 >
