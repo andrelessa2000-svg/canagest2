@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { userIdAtual } from "@/lib/auth";
 import { safrasDoUsuario } from "@/lib/safras-usuario";
+import { calcularColheita, type EntradaCalculo } from "@/lib/colheita";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,20 @@ type RegistroTalhao = {
   toneladas?: number;
   precoCana?: number | null;
   ctc?: number;
+  agio?: number | null;
+  atrPorTonelada?: number | null;
+  precoKgAtr?: number | null;
+  areaColhida?: number | null;
+  arrendar?: boolean;
+  tonsPorTarefa?: number | null;
+  tarefasArrendadas?: number | null;
+  adubo?: boolean;
+  precoTonAdubo?: number | null;
+  tarefasAdubo?: number | null;
+  herbicidas?: unknown;
+  insumos?: unknown;
+  despesasUsina?: unknown;
+  usina?: { modelo: string } | null;
 };
 
 function fracaoDoTalhao(r: RegistroTalhao, talhao: string, areas: Map<string, number>): number {
@@ -112,8 +127,23 @@ export default async function AnaliseTalhoesPage({
         talhoesColhidos: true,
         toneladas: true,
         precoCana: true,
+        agio: true,
+        atrPorTonelada: true,
+        precoKgAtr: true,
         ctc: true,
+        areaColhida: true,
+        arrendar: true,
+        tonsPorTarefa: true,
+        tarefasArrendadas: true,
+        adubo: true,
+        precoTonAdubo: true,
+        tarefasAdubo: true,
+        herbicidas: true,
+        insumos: true,
+        despesasUsina: true,
         fazendaId: true,
+        usinaId: true,
+        usina: { select: { modelo: true } },
         fazenda: { select: { nome: true } },
       },
     }),
@@ -175,9 +205,46 @@ export default async function AnaliseTalhoesPage({
       } else if (tipo === "trato") {
         ag.tratoValor += (r.valor || 0) * f;
       } else if (tipo === "colheita") {
-        ag.colheitaValor += (r.ctc || 0) * f;
+        const modelo = (r.usina?.modelo ?? "pindorama") as "pindorama" | "coruripe";
+        const entrada: EntradaCalculo = {
+          modelo,
+          tipo: r.tipo ?? undefined,
+          toneladas: r.toneladas ?? 0,
+          precoCana: r.precoCana ?? undefined,
+          agio: r.agio ?? undefined,
+          atrPorTonelada: r.atrPorTonelada ?? undefined,
+          precoKgAtr: r.precoKgAtr ?? undefined,
+          ctc: r.ctc ?? undefined,
+          areaColhida: r.areaColhida ?? undefined,
+          arrendar: r.arrendar ?? false,
+          tonsPorTarefa: r.tonsPorTarefa ?? undefined,
+          tarefasArrendadas: r.tarefasArrendadas ?? undefined,
+          adubo: r.adubo ?? false,
+          precoTonAdubo: r.precoTonAdubo ?? undefined,
+          tarefasAdubo: r.tarefasAdubo ?? undefined,
+          herbicidas: Array.isArray(r.herbicidas)
+            ? r.herbicidas.map((i: { nome?: unknown; valor?: unknown }) => ({
+                nome: String(i.nome ?? ""),
+                valor: Number(i.valor) || 0,
+              }))
+            : [],
+          insumos: Array.isArray(r.insumos)
+            ? r.insumos.map((i: { nome?: unknown; valor?: unknown }) => ({
+                nome: String(i.nome ?? ""),
+                valor: Number(i.valor) || 0,
+              }))
+            : [],
+          despesasUsina: Array.isArray(r.despesasUsina)
+            ? r.despesasUsina.map((i: { nome?: unknown; valor?: unknown }) => ({
+                nome: String(i.nome ?? ""),
+                valor: Number(i.valor) || 0,
+              }))
+            : [],
+        };
+        const resultado = calcularColheita(entrada);
+        ag.colheitaValor += resultado.totalDespesas * f;
         ag.colheitaToneladas += (r.toneladas || 0) * f;
-        ag.receita += ((r.toneladas || 0) * (r.precoCana || 0)) * f;
+        ag.receita += resultado.receita * f;
       }
       ag.nRegistros += 1;
       map.set(key, ag);
