@@ -20,20 +20,18 @@ import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { InvestimentoForm } from "@/components/investimento-form";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
+import { anoDeSafraIgual, safraDeAno } from "@/lib/safra";
 
 export const dynamic = "force-dynamic";
 
-function safraDe(ano: number): string {
-  return `${ano}/${String(ano + 1).slice(-2)}`;
-}
-
 export default async function FinanceiroPage() {
   const ano = new Date().getFullYear();
-  const safraAtual = safraDe(ano);
-  const safraProxima = safraDe(ano + 1);
+  const safraAtual = safraDeAno(ano);
+  const safraProxima = safraDeAno(ano + 1);
   const userId = await userIdAtual();
 
-  const [cascata, fazendas, safrasRaw, projeccTratos, projeccPlantios, investimentos, colheitasProj] =
+  const [cascata, fazendas, safras, projeccTratos, projeccPlantios, investimentos, colheitasProj] =
     await Promise.all([
       cargarCascata(),
       prisma.fazenda.findMany({
@@ -41,12 +39,7 @@ export default async function FinanceiroPage() {
         select: { id: true, nome: true, ativa: true },
         orderBy: { nome: "asc" },
       }),
-      prisma.colheita.findMany({
-        where: { userId, safra: { not: null } },
-        select: { safra: true },
-        distinct: ["safra"],
-        orderBy: { safra: "asc" },
-      }),
+      safrasDoUsuario(),
       prisma.trato.findMany({
         where: { userId, projecao: true },
         include: { fazenda: { select: { nome: true, ativa: true } } },
@@ -73,13 +66,12 @@ export default async function FinanceiroPage() {
       }),
     ]);
 
-  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
   const t = cascata.total;
 
-  // Caixa = lucro bruto real (receita real − gastos reales)
+  // Caixa = lucro bruto real (receita real − gastos reais)
   const caixa = t.lucroNeto;
 
-  const esProxima = (s: string | null) => s === safraProxima;
+  const esProxima = (s: string | null) => anoDeSafraIgual(s, ano + 1);
 
   const gastosProjPorFazenda = new Map<string, number>();
   const sumar = (rows: { fazendaId: string; valor: number }[]) => {

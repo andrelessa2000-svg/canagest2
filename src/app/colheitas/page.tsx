@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { userIdAtual } from "@/lib/auth";
+import { normalizarSafra } from "@/lib/safra";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ type Filtros = {
   de?: string;
   ate?: string;
   reg?: string;
+  safra?: string;
 };
 
 export default async function ColheitasPage({
@@ -27,7 +30,7 @@ export default async function ColheitasPage({
 }: {
   searchParams: Promise<Filtros>;
 }) {
-  const { fazenda, usina, tipo, de, ate, reg } = await searchParams;
+  const { fazenda, usina, tipo, de, ate, reg, safra } = await searchParams;
 
   const where = {
     userId: await userIdAtual(),
@@ -35,6 +38,7 @@ export default async function ColheitasPage({
     ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(usina ? { usinaId: usina } : {}),
     ...(tipo ? { tipo } : {}),
+    ...(safra ? { safra: normalizarSafra(safra) ?? "__nenhuma__" } : {}),
     ...(de || ate
       ? {
           data: {
@@ -45,7 +49,7 @@ export default async function ColheitasPage({
       : {}),
   };
 
-  const [colheitas, fazendas, usinas] = await Promise.all([
+  const [colheitas, fazendas, usinas, safras] = await Promise.all([
     prisma.colheita.findMany({
       where,
       include: {
@@ -64,6 +68,7 @@ export default async function ColheitasPage({
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
+    safrasDoUsuario(),
   ]);
 
   const linhas = colheitas.map((c) => ({
@@ -100,7 +105,7 @@ export default async function ColheitasPage({
     { toneladas: 0, receita: 0, despesas: 0, lucro: 0 },
   );
 
-  const temFiltro = Boolean(reg || fazenda || usina || tipo || de || ate);
+  const temFiltro = Boolean(reg || fazenda || usina || tipo || de || ate || safra);
 
   const regs = [
     { id: "", rotulo: "Caderno de campo" },
@@ -173,6 +178,17 @@ export default async function ColheitasPage({
           </select>
         </label>
         <label className="grid gap-1">
+          <span className="field-label">Safra</span>
+          <select name="safra" defaultValue={normalizarSafra(safra) ?? ""} className="field-input">
+            <option value="">Todas</option>
+            {safras.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
           <span className="field-label">De</span>
           <input type="date" name="de" defaultValue={de ?? ""} className="field-input" />
         </label>
@@ -228,6 +244,12 @@ export default async function ColheitasPage({
                     </span>
                     <span aria-hidden>·</span>
                     <span>{c.usina.nome}</span>
+                    {c.safra && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span className="font-semibold text-ink-2">Safra {c.safra}</span>
+                      </>
+                    )}
                     {c.projecao && (
                       <>
                         <span className="rounded-md border border-dashed border-line-strong bg-accent-soft px-1.5 py-0.5 font-semibold text-accent-strong">

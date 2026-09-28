@@ -6,6 +6,7 @@ import { TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { PageHeader } from "@/components/page-header";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function InsumosReportPage({
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
   };
 
-  const [plantios, tratos, fazendasRaw, talhoesRaw, safrasRaw] = await Promise.all([
+  const [plantios, tratos, fazendasRaw, talhoesRaw, safras] = await Promise.all([
     tipo && tipo !== "plantio"
       ? []
       : prisma.plantio.findMany({
@@ -62,19 +63,8 @@ export default async function InsumosReportPage({
       select: { id: true, nome: true, fazendaId: true },
       orderBy: { nome: "asc" },
     }),
-    prisma.plantio.findMany({
-      where: { userId: await userIdAtual(), safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
+    safrasDoUsuario(),
   ]);
-
-  const safras = [
-    ...new Set(
-      safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string"),
-    ),
-  ].sort();
 
   const totalPlantio = plantios.reduce((a, p) => a + p.valor, 0);
   const totalTratos = tratos.reduce((a, t) => a + t.valor, 0);

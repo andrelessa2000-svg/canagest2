@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { criarInvestimento } from "@/lib/actions";
 import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
+import { CampoSafra } from "./campo-safra";
 
 export type FazendaOpcao = { id: string; nome: string };
 
@@ -58,21 +59,7 @@ export function InvestimentoForm({
           </select>
         </Campo>
 
-        <Campo label="Safra" htmlFor="safra" hint="Opcional.">
-          <input
-            id="safra"
-            name="safra"
-            className="field-input"
-            list="safras-financeiro"
-            placeholder="Ex.: 2026/27"
-            maxLength={30}
-          />
-          <datalist id="safras-financeiro">
-            {safras.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </Campo>
+        <CampoSafra usadas={safras} id="safra-investimento" />
 
         <Campo
           label="Nome do investimento"

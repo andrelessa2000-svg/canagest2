@@ -20,6 +20,7 @@ import {
   type ModeloUsina,
 } from "@/lib/colheita";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
+import { CampoSafra } from "./campo-safra";
 import { CelulaMetrica } from "./stat-cells";
 import { SelectorRegistro } from "./selector-registro";
 
@@ -383,27 +384,7 @@ export function ColheitaForm({
             </select>
           </Campo>
 
-          <Campo
-            label="Safra"
-            htmlFor="safra"
-            hint="Opcional. Digite ou escolha uma safra usada antes."
-          >
-            <input
-              id="safra"
-              name="safra"
-              className="field-input"
-              list="safras"
-              value={c.safra}
-              onChange={(e) => set("safra", e.target.value)}
-              placeholder="Ex.: 2026/27"
-              maxLength={30}
-            />
-            <datalist id="safras">
-              {safras.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </Campo>
+          <CampoSafra defaultValue={c.safra} usadas={safras} id="safra-colheita" />
 
           <div className="sm:col-span-2">
             <p className="field-label">Tipo de registro</p>

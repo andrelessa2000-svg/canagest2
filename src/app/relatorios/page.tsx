@@ -10,13 +10,17 @@ import {
 } from "@/lib/format";
 import { calcularColheita } from "@/lib/colheita";
 import { cargarCascata } from "@/lib/relatorio";
+import { anoDeSafra, normalizarSafra } from "@/lib/safra";
 import { userIdAtual } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PrintButton } from "@/components/print-button";
+import { BotaoCorrigirSafras } from "@/components/botao-corrigir-safras";
 import { CelulaMetrica } from "@/components/stat-cells";
 
 export const dynamic = "force-dynamic";
+
+const SEM_SAFRA = "Sem safra";
 
 const nf0 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
@@ -101,7 +105,7 @@ export default async function RelatoriosPage() {
       id: c.id,
       data: c.data,
       ano: c.data.getFullYear(),
-      safra: c.safra ?? "Sin safra",
+      safra: normalizarSafra(c.safra) ?? SEM_SAFRA,
       projecao: c.projecao,
       toneladas: c.toneladas,
       areaTarefas,
@@ -130,19 +134,24 @@ export default async function RelatoriosPage() {
   const tonsPorTarefa = total.areaTarefas > 0 ? total.toneladas / total.areaTarefas : 0;
   const tonsPorHa = total.areaTarefas > 0 ? total.toneladas / (total.areaTarefas / TAREFAS_POR_HA) : 0;
 
-  // Por ano (safra)
-  const porAno = new Map<number, { tons: number; receita: number; lucro: number; n: number }>();
+  // Por safra (usa a safra registrada; sem safra cai no ano da data)
+  const porAno = new Map<string, { tons: number; receita: number; lucro: number; n: number }>();
   for (const l of linhas) {
-    const a = porAno.get(l.ano) ?? { tons: 0, receita: 0, lucro: 0, n: 0 };
+    const rotulo = l.safra === SEM_SAFRA ? String(l.ano) : l.safra;
+    const a = porAno.get(rotulo) ?? { tons: 0, receita: 0, lucro: 0, n: 0 };
     a.tons += l.toneladas;
     a.receita += l.r.receita;
     a.lucro += l.r.lucro;
     a.n += 1;
-    porAno.set(l.ano, a);
+    porAno.set(rotulo, a);
   }
   const anos = [...porAno.entries()]
     .map(([ano, v]) => ({ ano, ...v }))
-    .sort((a, b) => b.tons - a.tons);
+    .sort(
+      (a, b) =>
+        (anoDeSafra(a.ano) ?? Number(a.ano) * 10000) -
+        (anoDeSafra(b.ano) ?? Number(b.ano) * 10000),
+    );
 
   // Por fazenda
   const mapaFazenda = new Map<
@@ -264,21 +273,24 @@ export default async function RelatoriosPage() {
     .map((f) => ({
       ...f,
       tHa: f.area > 0 ? f.tons / (f.area / TAREFAS_POR_HA) : 0,
-      costoT: f.tons > 0 ? f.custos / f.tons : 0,
+      custoT: f.tons > 0 ? f.custos / f.tons : 0,
       lucroT: f.tons > 0 ? f.lucro / f.tons : 0,
     }))
-    .sort((a, b) => a.safra.localeCompare(b.safra));
+    .sort((a, b) => (anoDeSafra(a.safra) ?? 0) - (anoDeSafra(b.safra) ?? 0));
 
   // Relatório em cascata
   const cascata = await cargarCascata();
 
   const fazendasPorSafra = new Map<string, Set<string>>();
   for (const c of colheitas) {
-    if (!c.safra) continue;
-    if (!fazendasPorSafra.has(c.safra)) fazendasPorSafra.set(c.safra, new Set());
-    fazendasPorSafra.get(c.safra)!.add(c.fazendaId);
+    const s = normalizarSafra(c.safra);
+    if (!s) continue;
+    if (!fazendasPorSafra.has(s)) fazendasPorSafra.set(s, new Set());
+    fazendasPorSafra.get(s)!.add(c.fazendaId);
   }
-  const safrasUsadas = [...fazendasPorSafra.keys()].sort();
+  const safrasUsadas = [...fazendasPorSafra.keys()].sort(
+    (a, b) => (anoDeSafra(a) ?? 0) - (anoDeSafra(b) ?? 0),
+  );
   const talhoesVacios = safrasUsadas
     .map((safra) => {
       const colhidas = fazendasPorSafra.get(safra) ?? new Set();
@@ -321,6 +333,7 @@ export default async function RelatoriosPage() {
             <Link href="/relatorios/csv" className="btn btn-soft">
               <Download className="size-4" /> CSV
             </Link>
+            <BotaoCorrigirSafras />
             <PrintButton />
           </>
         }
@@ -397,7 +410,7 @@ export default async function RelatoriosPage() {
         <section className="grid gap-3">
           <div className="flex items-end justify-between">
             <h2 className="font-display text-xl text-ink">Toneladas por safra</h2>
-            <span className="text-xs text-ink-3">agrupado por ano</span>
+            <span className="text-xs text-ink-3">agrupado pela safra registrada</span>
           </div>
           <div className="ledger-panel p-5">
             <div className="flex h-44 items-end gap-2">
@@ -665,7 +678,7 @@ export default async function RelatoriosPage() {
                   <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtCount(Math.round(f.area))}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtToneladas(f.tons)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink">{nf1.format(f.tHa)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.costoT)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.custoT)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
                   <td
                     className={`px-3 py-2 text-right font-semibold tabular-nums ${

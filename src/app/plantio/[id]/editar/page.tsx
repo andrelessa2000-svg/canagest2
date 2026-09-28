@@ -7,6 +7,7 @@ import { toDateInputValue } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { PlantioForm } from "@/components/plantio-form";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function EditarPlantioPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [plantio, fazendas, talhoes, safrasRaw] = await Promise.all([
+  const [plantio, fazendas, talhoes, safras] = await Promise.all([
     prisma.plantio.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
@@ -33,17 +34,11 @@ export default async function EditarPlantioPage({
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
-    prisma.colheita.findMany({
-      where: { userId: await userIdAtual(), safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
+    safrasDoUsuario(),
   ]);
 
   if (!plantio) notFound();
 
-  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
   const talhoesIdsInicial =
     (plantio.talhoesIds as string[] | null) ??
     (plantio.talhaoId ? [plantio.talhaoId] : []);

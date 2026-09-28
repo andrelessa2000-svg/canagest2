@@ -7,6 +7,7 @@ import { toDateInputValue } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { TratoForm } from "@/components/trato-form";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function EditarTratoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [trato, fazendas, talhoes, safrasRaw] = await Promise.all([
+  const [trato, fazendas, talhoes, safras] = await Promise.all([
     prisma.trato.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
@@ -33,17 +34,11 @@ export default async function EditarTratoPage({
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
-    prisma.colheita.findMany({
-      where: { userId: await userIdAtual(), safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
+    safrasDoUsuario(),
   ]);
 
   if (!trato) notFound();
 
-  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
   const produtos = (trato.produtos as unknown as {
     nome?: string;
     dose?: string;

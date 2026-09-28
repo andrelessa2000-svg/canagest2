@@ -5,11 +5,12 @@ import { criarTrato } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { TratoForm } from "@/components/trato-form";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovoTratoPage() {
-  const [fazendas, talhoes, safrasRaw] = await Promise.all([
+  const [fazendas, talhoes, safras] = await Promise.all([
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -20,15 +21,9 @@ export default async function NovoTratoPage() {
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
-    prisma.colheita.findMany({
-      where: { userId: await userIdAtual(), safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
+    safrasDoUsuario(),
   ]);
 
-  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
 
   return (
     <>

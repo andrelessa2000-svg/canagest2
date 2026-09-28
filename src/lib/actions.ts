@@ -6,6 +6,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { parseDecimal } from "./format";
 import { userIdAtual } from "./auth";
+import { MENSAGEM_SAFRA_INVALIDA, normalizarSafra } from "./safra";
+import { normalizarSafrasDoUsuario } from "./safras-usuario";
 
 async function usuarioId(): Promise<string> {
   const id = await userIdAtual();
@@ -25,7 +27,7 @@ import {
   type TratoInput,
 } from "./validators";
 
-export type ActionState = { ok: true } | { ok: false; error: string };
+export type ActionState = { ok: true; mensagem?: string } | { ok: false; error: string };
 
 function campo(formData: FormData, nome: string): string {
   return formData.get(nome)?.toString() ?? "";
@@ -701,7 +703,7 @@ export async function criarInvestimento(
   formData: FormData,
 ): Promise<ActionState> {
   const fazendaId = campo(formData, "fazendaId");
-  const safra = campo(formData, "safra");
+  const safraBruta = campo(formData, "safra");
   const nome = campo(formData, "nome");
   const valor = formData.get("valor")?.toString() ?? "";
   const data = campo(formData, "data");
@@ -713,6 +715,8 @@ export async function criarInvestimento(
   if (Number.isNaN(valorNum) || valorNum < 0) {
     return { ok: false, error: "Valor inválido." };
   }
+  const safra = normalizarSafra(safraBruta);
+  if (safraBruta && !safra) return { ok: false, error: MENSAGEM_SAFRA_INVALIDA };
 
   try {
     await prisma.investimento.create({
@@ -748,4 +752,26 @@ export async function excluirInvestimento(id: string): Promise<ActionState> {
   revalidatePath("/");
   revalidatePath("/financeiro");
   return { ok: true };
+}
+
+export async function corrigirSafrasAntigas(): Promise<ActionState> {
+  try {
+    const r = await normalizarSafrasDoUsuario();
+    revalidatePath("/");
+    revalidatePath("/relatorios");
+    revalidatePath("/relatorios/insumos");
+    revalidatePath("/financeiro");
+    revalidatePath("/colheitas");
+    revalidatePath("/plantio");
+    revalidatePath("/tratos");
+    return {
+      ok: true,
+      mensagem: r.atualizados
+        ? `${r.atualizados} registro(s) corrigido(s) para o formato AAAA/AA. Safras agora: ${r.safras.join(", ") || "nenhuma"}.`
+        : "Nenhuma safra antiga encontrada — seus registros já usam o formato AAAA/AA.",
+    };
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
 }

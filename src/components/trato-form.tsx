@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { fmtCount, fmtMoney, parseDecimal, TAREFAS_POR_HA, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
+import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
 import { CelulaMetrica } from "./stat-cells";
 
@@ -140,22 +141,7 @@ export function TratoForm({
           </select>
         </Campo>
 
-        <Campo label="Safra" htmlFor="safra" hint="Opcional. Sugere safras usadas antes.">
-          <input
-            id="safra"
-            name="safra"
-            className="field-input"
-            list="safras-trato"
-            defaultValue={inicial?.safra ?? ""}
-            placeholder="Ex.: 2026/27"
-            maxLength={30}
-          />
-          <datalist id="safras-trato">
-            {safras.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </Campo>
+        <CampoSafra defaultValue={inicial?.safra} usadas={safras} id="safra-trato" />
 
         <Campo label="Tipo de trato" htmlFor="tipo">
           <select

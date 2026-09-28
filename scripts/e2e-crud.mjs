@@ -79,9 +79,9 @@ const naoEhNovo = (u) =>
     await page.click('button[type="submit"]');
     await page.waitForURL(naoEhNovo, { timeout: 20000 });
     await page.getByRole("heading", { name: NOME_TALHAO }).waitFor({ timeout: 15000 });
-    await page.getByText(/30 ha/).first().waitFor({ timeout: 15000 });
+    await page.getByText(/29,9 ha|29,94 ha/).first().waitFor({ timeout: 15000 });
     await page.getByText(/99 tarefas/).first().waitFor({ timeout: 15000 });
-    passos.push("Talhão criado (99 tarefas = 30 ha), página de detalhe aberta");
+    passos.push("Talhão criado (99 tarefas = 29,94 ha com 3,3058 tarefas/ha), página de detalhe aberta");
 
     passos.push("4. Registrar colheita");
     await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });

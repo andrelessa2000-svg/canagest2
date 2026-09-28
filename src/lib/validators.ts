@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { parseDecimal, tarefasParaHa, UNIDADES_AREA } from "./format";
 import { MODELOS_USINA } from "./colheita";
+import { MENSAGEM_SAFRA_INVALIDA, normalizarSafra } from "./safra";
 
 const TIPOS = ["planta", "soca", "ressoca"] as const;
 export type TipoColheita = (typeof TIPOS)[number];
@@ -15,6 +16,20 @@ const optionalField = (max: number) =>
   z
     .union([z.literal(""), z.string().trim().min(1).max(max)])
     .transform((v) => (v === "" ? undefined : v));
+
+export const safraSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .transform((v, ctx) => {
+    if (!v) return undefined;
+    const canonica = normalizarSafra(v);
+    if (!canonica) {
+      ctx.addIssue({ code: "custom", message: MENSAGEM_SAFRA_INVALIDA });
+      return z.NEVER;
+    }
+    return canonica;
+  });
 
 function numField(label: string) {
   return z
@@ -95,7 +110,7 @@ export const colheitaSchema = z.object({
   usinaId: z.string().min(1, "Selecione a usina"),
   data: z.string().min(1, "Informe a data"),
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),
-  safra: optionalField(30),
+  safra: safraSchema,
   projecao: ligaField(),
   talhoesColhidos: itensTalhaoAreaJson(),
   toneladas: numField("Toneladas"),
@@ -136,7 +151,7 @@ export const plantioSchema = z.object({
   talhoesIds: itensStringJson(),
   escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }),
   tarefas: numeroOpcional("Tarefas"),
-  safra: optionalField(30),
+  safra: safraSchema,
   tipo: z.enum(TIPOS_PLANTIO, { error: "Selecione o tipo de plantio" }),
   data: z.string().min(1, "Informe a data"),
   valor: moedaField("Valor do plantio"),
@@ -246,7 +261,7 @@ const produtosJson = () =>
 export const tratoSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),
   talhaoId: z.string().optional(),
-  safra: optionalField(30),
+  safra: safraSchema,
   tipo: z.enum(TIPOS_TRATO, { error: "Selecione o tipo de trato" }),
   escopo: z.enum(ESCOPOS_TRATO, { error: "Selecione o escopo" }),
   tarefas: numeroOpcional("Tarefas"),

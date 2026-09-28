@@ -5,6 +5,7 @@ import { criarColheita } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { ColheitaForm } from "@/components/colheita-form";
 import { userIdAtual } from "@/lib/auth";
+import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function NovaColheitaPage({
 }: {
   searchParams: Promise<{ fazenda?: string }>;
 }) {
-  const [{ fazenda }, fazendasRaw, usinas, talhoes, safrasRaw] = await Promise.all([
+  const [{ fazenda }, fazendasRaw, usinas, talhoes, safras] = await Promise.all([
     searchParams,
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
@@ -30,15 +31,9 @@ export default async function NovaColheitaPage({
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
-    prisma.colheita.findMany({
-      where: { userId: await userIdAtual(), safra: { not: null } },
-      select: { safra: true },
-      distinct: ["safra"],
-      orderBy: { safra: "asc" },
-    }),
+    safrasDoUsuario(),
   ]);
 
-  const safras = safrasRaw.map((s) => s.safra).filter((s) => typeof s === "string");
 
   const fazendas = fazendasRaw.map((f) => ({
     id: f.id,

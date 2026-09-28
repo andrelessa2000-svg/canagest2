@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_PLANTIO_LABEL } from "@/lib/validators";
 import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
+import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
 
 function num(v: string): number {
@@ -220,22 +221,7 @@ export function PlantioForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Campo label="Safra" htmlFor="safra" hint="Opcional. Sugere safras usadas antes.">
-          <input
-            id="safra"
-            name="safra"
-            className="field-input"
-            list="safras-plantio"
-            defaultValue={inicial?.safra ?? ""}
-            placeholder="Ex.: 2026/27"
-            maxLength={30}
-          />
-          <datalist id="safras-plantio">
-            {safras.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </Campo>
+        <CampoSafra defaultValue={inicial?.safra} usadas={safras} id="safra-plantio" />
 
         <Campo label="Tipo" htmlFor="tipo">
           <select id="tipo" name="tipo" className="field-input" defaultValue={inicial?.tipo ?? "planta"}>
