@@ -14,6 +14,7 @@ import {
   alocacoesParaJson,
   type Alocacao,
 } from "./seletor-porcoes";
+import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
 import { CelulaMetrica } from "./stat-cells";
 
 const nf3 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
@@ -34,6 +35,7 @@ type Inicial = {
   talhaoId?: string;
   talhoesIds?: string[];
   alocacoes?: unknown;
+  insumos?: unknown;
   safra?: string;
   tipo?: string;
   escopo?: string;
@@ -81,6 +83,7 @@ export function TratoForm({
   const [tipo, setTipo] = useState(inicial?.tipo ?? "adubacao");
   const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
   const [produtos, setProdutos] = useState<Produto[]>(inicial?.produtos ?? []);
+  const [insumos, setInsumos] = useState<Insumo[]>(inicial?.insumos ? insumosDeJson(inicial.insumos) : []);
   const [valor, setValor] = useState(inicial?.valor ?? "");
   const [calculadora, setCalculadora] = useState(false);
   const [tipoCana, setTipoCana] = useState("soca");
@@ -146,6 +149,7 @@ export function TratoForm({
 
       <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
       <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
+      <input type="hidden" name="insumos" value={JSON.stringify(insumosParaJson(insumos))} />
       <input type="hidden" name="talhaoId" value={escopoTalhoes ? talhaoUnico : ""} />
       <input
         type="hidden"
@@ -437,6 +441,16 @@ export function TratoForm({
             )}
           </div>
         )}
+
+        <div className="sm:col-span-2">
+          <SeletorInsumos
+            id="insumos-trato"
+            talhoes={talhoesFazenda}
+            value={insumos}
+            onChange={setInsumos}
+            alocacoes={porcoes.filter((p) => p.completo || p.tarefas)}
+          />
+        </div>
 
         <div className="sm:col-span-2">
           <p className="field-label">Tipo de registro</p>

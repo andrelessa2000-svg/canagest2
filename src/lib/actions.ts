@@ -316,6 +316,7 @@ function camposColheita(formData: FormData) {
     tarefasAdubo: campo(formData, "tarefasAdubo"),
     herbicidas: campo(formData, "herbicidas"),
     insumos: campo(formData, "insumos"),
+    insumosComuns: campo(formData, "insumosComuns"),
     despesasUsina: campo(formData, "despesasUsina"),
     observacao: campo(formData, "observacao"),
   };
@@ -364,6 +365,9 @@ ctc: d.ctc,
     tarefasAdubo: d.tarefasAdubo,
     herbicidas: d.herbicidas as unknown as Prisma.InputJsonValue,
     insumos: d.insumos as unknown as Prisma.InputJsonValue,
+    insumosComuns: d.insumosComuns?.length > 0
+      ? (d.insumosComuns as unknown as Prisma.InputJsonValue)
+      : undefined,
     despesasUsina: d.despesasUsina as unknown as Prisma.InputJsonValue,
     observacao: d.observacao,
   };
@@ -490,6 +494,7 @@ function camposPlantio(formData: FormData) {
     talhaoId: campo(formData, "talhaoId") || undefined,
     talhoesIds: campo(formData, "talhoesIds"),
     alocacoes: campo(formData, "alocacoes"),
+    insumos: campo(formData, "insumos"),
     escopo: campo(formData, "escopo"),
     tarefas: campo(formData, "tarefas"),
     safra: campo(formData, "safra"),
@@ -511,6 +516,7 @@ function dadosPlantio(d: PlantioInput) {
     alocacoes: escopoTalhoes && d.alocacoes.length > 0
       ? (d.alocacoes as unknown as Prisma.InputJsonValue)
       : undefined,
+    insumos: d.insumos.length > 0 ? (d.insumos as unknown as Prisma.InputJsonValue) : undefined,
     escopo: d.escopo,
     tarefas: d.tarefas,
     safra: d.safra,
@@ -588,6 +594,7 @@ function camposTrato(formData: FormData) {
     talhaoId: campo(formData, "talhaoId") || undefined,
     talhoesIds: campo(formData, "talhoesIds"),
     alocacoes: campo(formData, "alocacoes"),
+    insumos: campo(formData, "insumos"),
     safra: campo(formData, "safra"),
     tipo: campo(formData, "tipo"),
     escopo: campo(formData, "escopo"),
@@ -609,6 +616,7 @@ function dadosTrato(d: TratoInput) {
     alocacoes: escopoTalhoes && d.alocacoes.length > 0
       ? (d.alocacoes as unknown as Prisma.InputJsonValue)
       : undefined,
+    insumos: d.insumos.length > 0 ? (d.insumos as unknown as Prisma.InputJsonValue) : undefined,
     safra: d.safra,
     tipo: d.tipo,
     escopo: d.escopo,

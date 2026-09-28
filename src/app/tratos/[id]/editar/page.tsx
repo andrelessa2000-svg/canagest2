@@ -70,6 +70,7 @@ export default async function EditarTratoPage({
             talhaoId: trato.talhaoId ?? "",
             talhoesIds: (trato.talhoesIds as string[] | null) ?? [],
             alocacoes: trato.alocacoes,
+            insumos: trato.insumos,
             safra: trato.safra ?? "",
             tipo: trato.tipo,
             escopo: trato.escopo,

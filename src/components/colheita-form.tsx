@@ -23,6 +23,7 @@ import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { CelulaMetrica } from "./stat-cells";
 import { SelectorRegistro } from "./selector-registro";
+import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
@@ -51,6 +52,7 @@ type Campos = {
   precoTonAdubo: string;
   tarefasAdubo: string;
   observacao: string;
+  insumosComuns?: Insumo[];
 };
 
 function n(v: string): number {
@@ -194,6 +196,7 @@ export function ColheitaForm({
     inicial?.herbicidas ?? [],
   );
   const [insumos, setInsumos] = useState<Item[]>(inicial?.insumos ?? []);
+  const [insumosComuns, setInsumosComuns] = useState<Insumo[]>(inicial?.insumosComuns ? insumosDeJson(inicial.insumosComuns) : []);
   const [despesasUsina, setDespesasUsina] = useState<Item[]>(
     inicial?.despesasUsina ?? [],
   );
@@ -756,6 +759,16 @@ export function ColheitaForm({
         />
       </section>
 
+      {/* Insumos comuns (vinculados a talhões) */}
+      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
+        <SeletorInsumos
+          id="insumos-colheita"
+          talhoes={talhoesFazenda}
+          value={insumosComuns}
+          onChange={setInsumosComuns}
+        />
+      </section>
+
       {/* Despesas com a usina */}
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
         <ListaItens
@@ -781,6 +794,8 @@ export function ColheitaForm({
           />
         </Campo>
       </section>
+
+      <input type="hidden" name="insumosComuns" value={JSON.stringify(insumosParaJson(insumosComuns))} />
 
       {/* Resultado */}
       <section className="grid gap-3">

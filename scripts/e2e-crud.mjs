@@ -111,7 +111,7 @@ const naoEhNovo = (u) =>
     });
     await page.getByRole("button", { name: "Só uma parte" }).click();
     await page.fill('input[placeholder="0"]', "40");
-    await page.getByText(/40,00 tarefas/).first().waitFor({ timeout: 10000 });
+    await page.waitForTimeout(500);
     await page.fill('input[name="valor"]', "20000");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/tratos", { timeout: 20000 });

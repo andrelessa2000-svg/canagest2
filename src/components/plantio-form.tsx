@@ -8,6 +8,7 @@ import { fmtMoney, fmtTarefas, parseDecimal, toDateInputValue } from "@/lib/form
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
+import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
 import {
   SeletorPorcoes,
   alocacoesDeJson,
@@ -39,6 +40,7 @@ type Inicial = {
   talhaoId?: string;
   talhoesIds?: string[];
   alocacoes?: unknown;
+  insumos?: unknown;
   escopo?: string;
   tarefas?: string;
   safra?: string;
@@ -76,6 +78,7 @@ export function PlantioForm({
         })),
   );
   const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
+  const [insumos, setInsumos] = useState<Insumo[]>(inicial?.insumos ? insumosDeJson(inicial.insumos) : []);
   const [valor, setValor] = useState(inicial?.valor ?? "");
   const [calculadora, setCalculadora] = useState(false);
 
@@ -182,6 +185,7 @@ export function PlantioForm({
 
       <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
       <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
+      <input type="hidden" name="insumos" value={JSON.stringify(insumosParaJson(insumos))} />
       <input
         type="hidden"
         name="tarefas"
@@ -364,6 +368,16 @@ export function PlantioForm({
             </div>
           </div>
         )}
+
+        <div className="sm:col-span-2">
+          <SeletorInsumos
+            id="insumos-plantio"
+            talhoes={talhoesFazenda}
+            value={insumos}
+            onChange={setInsumos}
+            alocacoes={porcoes.filter((p) => p.completo || p.tarefas)}
+          />
+        </div>
 
         <Campo
           label="Área (ha, opcional)"

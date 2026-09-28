@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { ColheitaForm } from "@/components/colheita-form";
 import { userIdAtual } from "@/lib/auth";
 import { safrasDoUsuario } from "@/lib/safras-usuario";
+import { type Insumo } from "@/components/seletor-insumos";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,7 @@ export default async function EditarColheitaPage({
               nome: i.nome ?? "",
               valor: i.valor === undefined ? "" : numero(i.valor),
             })),
+            insumosComuns: (colheita.insumosComuns as unknown as Insumo[]) ?? [],
             despesasUsina: (
               (colheita.despesasUsina as unknown as { nome?: string; valor?: number }[]) ??
               []

@@ -165,6 +165,9 @@ model Colheita {
   // Outros insumos — itens dinamicos [{ nome, valor }] (calcario, po de rocha, biologico, vinhaça...)
   insumos Json?
 
+  // Insumos comuns unificados: [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }]
+  insumosComuns Json?
+
   // Despesas com a usina — itens dinamicos [{ nome, valor }]
   despesasUsina Json?
 
@@ -186,8 +189,10 @@ model Plantio {
   talhaoId   String?
   talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
   talhoesIds Json?
-  // Porcoes [{ talhaoId, tarefas, completo }] — mistura de talhoes inteiros e partes
+  // Porcoes [{ talhaoId, tarefas, completo }] - mistura de talhoes inteiros e partes
   alocacoes  Json?
+  // Insumos comuns: [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }]
+  insumos    Json?
   escopo     String   @default("fazenda")
   tarefas    Float?
   safra      String?
@@ -224,6 +229,8 @@ model Trato {
   valor      Float
   projecao   Boolean  @default(false)
   produtos   Json?
+  // Insumos comuns unificados: [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }]
+  insumos    Json?
   observacao String?
   criadaEm   DateTime @default(now())
 

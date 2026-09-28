@@ -134,6 +134,7 @@ export const colheitaSchema = z.object({
 
   herbicidas: itensJson(),
   insumos: itensJson(),
+  insumosComuns: insumosJson(),
   despesasUsina: itensJson(),
 
   observacao: optionalField(300),
@@ -150,6 +151,7 @@ export const plantioSchema = z.object({
   talhaoId: z.string().optional(),
   talhoesIds: itensStringJson(),
   alocacoes: alocacoesJson(),
+  insumos: insumosJson(),
   escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }),
   tarefas: numeroOpcional("Tarefas"),
   safra: safraSchema,
@@ -182,6 +184,43 @@ export function alocacoesJson() {
             const tarefas = completo ? null : Number(a.tarefas) || 0;
             return { talhaoId: String(a.talhaoId), tarefas, completo };
           });
+      } catch {
+        return [];
+      }
+    });
+}
+
+export type InsumoValidado = {
+  talhaoId?: string;
+  nome: string;
+  quantidade: number;
+  unidade: string;
+  valorUnitario: number;
+  valorTotal: number;
+};
+
+export function insumosJson() {
+  return z
+    .string()
+    .optional()
+    .transform((v): InsumoValidado[] => {
+      if (!v || v.trim() === "") return [];
+      try {
+        const arr = JSON.parse(v);
+        if (!Array.isArray(arr)) return [];
+        return arr
+          .filter(
+            (i): i is Record<string, unknown> =>
+              !!i && typeof i === "object" && typeof (i as { nome?: unknown }).nome === "string",
+          )
+          .map((i) => ({
+            talhaoId: i.talhaoId ? String(i.talhaoId) : undefined,
+            nome: String(i.nome),
+            quantidade: Number(i.quantidade) || 0,
+            unidade: String(i.unidade ?? "L"),
+            valorUnitario: Number(i.valorUnitario) || 0,
+            valorTotal: Number(i.valorTotal) || 0,
+          }));
       } catch {
         return [];
       }
@@ -291,6 +330,7 @@ export const tratoSchema = z.object({
   talhaoId: z.string().optional(),
   talhoesIds: itensStringJson(),
   alocacoes: alocacoesJson(),
+  insumos: insumosJson(),
   safra: safraSchema,
   tipo: z.enum(TIPOS_TRATO, { error: "Selecione o tipo de trato" }),
   escopo: z.enum(ESCOPOS_TRATO, { error: "Selecione o escopo" }),
