@@ -42,11 +42,27 @@ export default async function PlantioPage({
   const nomeTalhao = new Map(talhoesTodos.map((t) => [t.id, t.nome]));
 
   const nomesDe = (p: (typeof plantios)[number]): string => {
+    const alocacoes = Array.isArray(p.alocacoes) ? p.alocacoes : [];
+    const nomes = alocacoes
+      .map((a) => {
+        const talhaoId = (a as { talhaoId?: string }).talhaoId ?? "";
+        const nome = nomeTalhao.get(talhaoId) ?? "";
+        if (!nome) return "";
+        const completo =
+          (a as { completo?: boolean }).completo === true ||
+          (a as { tarefas?: number | null }).tarefas === null;
+        return completo ? nome : `${nome} (parte)`;
+      })
+      .filter(Boolean);
+    if (nomes.length > 0) {
+      if (nomes.length > 3) return `${nomes.slice(0, 3).join(", ")} e ${nomes.length - 3} mais`;
+      return nomes.join(", ");
+    }
     const ids =
       (p.talhoesIds as string[] | null) ?? (p.talhaoId ? [p.talhaoId] : []);
-    const nomes = ids.map((id) => nomeTalhao.get(id) ?? "").filter(Boolean);
-    if (nomes.length > 3) return `${nomes.slice(0, 3).join(", ")} e ${nomes.length - 3} mais`;
-    return nomes.join(", ");
+    const legados = ids.map((id) => nomeTalhao.get(id) ?? "").filter(Boolean);
+    if (legados.length > 3) return `${legados.slice(0, 3).join(", ")} e ${legados.length - 3} mais`;
+    return legados.join(", ");
   };
 
   const total = plantios.reduce((acc, p) => acc + p.valor, 0);

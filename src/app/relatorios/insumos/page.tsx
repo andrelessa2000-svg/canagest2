@@ -20,6 +20,43 @@ type Filtros = {
 
 type Prod = { nome?: string; unidade?: string; quantidade?: number | string };
 
+type Registro = {
+  valor: number;
+  tarefas?: number | null;
+  talhaoId?: string | null;
+  talhoesIds?: unknown;
+  alocacoes?: unknown;
+};
+
+/** Fração do registro que pertence ao talhão filtrado (0 = fora do talhão). */
+function fracaoDoTalhao(r: Registro, talhao: string, areas: Map<string, number>): number {
+  if (!talhao) return 1;
+  if (r.talhaoId === talhao) return 1;
+  const alocacoes = Array.isArray(r.alocacoes) ? r.alocacoes : [];
+  const doTalhao = alocacoes.filter(
+    (a) => a && typeof a === "object" && (a as { talhaoId?: string }).talhaoId === talhao,
+  );
+  if (doTalhao.length > 0) {
+    const totalTarefas = alocacoes.reduce(
+      (s, a) => s + (Number((a as { tarefas?: number }).tarefas) || 0),
+      0,
+    );
+    const tarefasTalhao = doTalhao.reduce(
+      (s, a) => s + (Number((a as { tarefas?: number }).tarefas) || 0),
+      0,
+    );
+    if (totalTarefas > 0) return tarefasTalhao / totalTarefas;
+    return doTalhao.length / alocacoes.length;
+  }
+  const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as string[]) : [];
+  if (ids.includes(talhao)) {
+    if (ids.length === 1) return 1;
+    const areaTotal = ids.reduce((s, id) => s + (areas.get(id) ?? 0), 0);
+    return areaTotal > 0 ? (areas.get(talhao) ?? 0) / areaTotal : 1 / ids.length;
+  }
+  return 0;
+}
+
 export default async function InsumosReportPage({
   searchParams,
 }: {
@@ -31,7 +68,11 @@ export default async function InsumosReportPage({
     userId: await userIdAtual(),
     ...(safra ? { safra } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
-    ...(talhao ? { talhaoId: talhao } : {}),
+    ...(talhao
+      ? {
+          OR: [{ talhaoId: talhao }, { talhoesIds: { array_contains: [talhao] } }],
+        }
+      : {}),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
   };
 
@@ -60,14 +101,17 @@ export default async function InsumosReportPage({
     }),
     prisma.talhao.findMany({
       where: { userId: await userIdAtual() },
-      select: { id: true, nome: true, fazendaId: true },
+      select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     safrasDoUsuario(),
   ]);
 
-  const totalPlantio = plantios.reduce((a, p) => a + p.valor, 0);
-  const totalTratos = tratos.reduce((a, t) => a + t.valor, 0);
+  const areasPorTalhao = new Map(talhoesRaw.map((t) => [t.id, t.areaHa]));
+  const frac = (r: Registro) => fracaoDoTalhao(r, talhao ?? "", areasPorTalhao);
+
+  const totalPlantio = plantios.reduce((a, p) => a + p.valor * frac(p), 0);
+  const totalTratos = tratos.reduce((a, t) => a + t.valor * frac(t), 0);
   const totalGeneral = totalPlantio + totalTratos;
 
   const plantioPorFazenda = new Map<
@@ -81,8 +125,8 @@ export default async function InsumosReportPage({
       area: 0,
       n: 0,
     };
-    f.valor += p.valor;
-    f.area += p.areaHa ?? 0;
+    f.valor += p.valor * frac(p);
+    f.area += (p.areaHa ?? 0) * frac(p);
     f.n += 1;
     plantioPorFazenda.set(p.fazendaId, f);
   }
@@ -93,7 +137,7 @@ export default async function InsumosReportPage({
   >();
   for (const t of tratos) {
     const f = tratosPorFazenda.get(t.fazendaId) ?? { fazenda: t.fazenda.nome, valor: 0, n: 0 };
-    f.valor += t.valor;
+    f.valor += t.valor * frac(t);
     f.n += 1;
     tratosPorFazenda.set(t.fazendaId, f);
   }
@@ -101,12 +145,14 @@ export default async function InsumosReportPage({
   // Produtos aplicados (agrupados por nome + unidade)
   const produtos = new Map<string, { nome: string; unidade: string; quantidade: number; registros: number }>();
   for (const t of tratos) {
+    const f = frac(t);
+    if (f === 0) continue;
     const lista = (t.produtos ?? []) as Prod[];
     for (const p of lista) {
       const nome = (p.nome ?? "").trim();
       if (!nome) continue;
       const unidade = (p.unidade ?? "").trim() || "un";
-      const q = Number(p.quantidade) || 0;
+      const q = (Number(p.quantidade) || 0) * f;
       const key = `${nome}·${unidade}`;
       const item = produtos.get(key) ?? { nome, unidade, quantidade: 0, registros: 0 };
       item.quantidade += q;
@@ -200,6 +246,12 @@ export default async function InsumosReportPage({
           </Link>
         </div>
       </form>
+
+      {talhao && (
+        <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
+          Valores de registros que cobrem vários talhões são rateados pela parte do talhão no registro.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-3">
         <CelulaMetrica rotulo="Gastos plantio" valor={fmtMoney(totalPlantio)} legenda={`${plantios.length} registros`} />

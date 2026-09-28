@@ -186,6 +186,8 @@ model Plantio {
   talhaoId   String?
   talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
   talhoesIds Json?
+  // Porcoes [{ talhaoId, tarefas, completo }] — mistura de talhoes inteiros e partes
+  alocacoes  Json?
   escopo     String   @default("fazenda")
   tarefas    Float?
   safra      String?
@@ -211,6 +213,9 @@ model Trato {
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
   talhao     Talhao?  @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  talhoesIds Json?
+  // Porcoes [{ talhaoId, tarefas, completo }] - mistura de talhoes inteiros e partes
+  alocacoes  Json?
   safra      String?
   tipo       String
   escopo     String

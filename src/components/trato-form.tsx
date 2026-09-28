@@ -4,10 +4,16 @@ import { useActionState, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_TRATO_LABEL } from "@/lib/validators";
-import { fmtCount, fmtMoney, parseDecimal, TAREFAS_POR_HA, toDateInputValue } from "@/lib/format";
+import { fmtCount, fmtMoney, fmtTarefas, parseDecimal, TAREFAS_POR_HA, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
+import {
+  SeletorPorcoes,
+  alocacoesDeJson,
+  alocacoesParaJson,
+  type Alocacao,
+} from "./seletor-porcoes";
 import { CelulaMetrica } from "./stat-cells";
 
 const nf3 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
@@ -26,6 +32,8 @@ function num(v: string): number {
 type Inicial = {
   fazendaId?: string;
   talhaoId?: string;
+  talhoesIds?: string[];
+  alocacoes?: unknown;
   safra?: string;
   tipo?: string;
   escopo?: string;
@@ -53,7 +61,23 @@ export function TratoForm({
   const [state, action] = useActionState(acao, undefined);
   const [fazendaId, setFazendaId] = useState(inicial?.fazendaId ?? "");
   const [escopo, setEscopo] = useState(inicial?.escopo ?? "fazenda");
-  const [talhaoId, setTalhaoId] = useState(inicial?.talhaoId ?? "");
+  const [porcoes, setPorcoes] = useState<Alocacao[]>(
+    inicial?.alocacoes
+      ? alocacoesDeJson(inicial.alocacoes)
+      : inicial?.talhaoId
+        ? [
+            {
+              talhaoId: inicial.talhaoId,
+              tarefas: inicial?.tarefas ?? "",
+              completo: inicial?.escopo !== "parte",
+            },
+          ]
+        : (inicial?.talhoesIds ?? []).map((id) => ({
+            talhaoId: id,
+            tarefas: inicial?.tarefas && inicial.talhoesIds?.length === 1 ? inicial.tarefas : "",
+            completo: inicial?.escopo !== "parte",
+          })),
+  );
   const [tipo, setTipo] = useState(inicial?.tipo ?? "adubacao");
   const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
   const [produtos, setProdutos] = useState<Produto[]>(inicial?.produtos ?? []);
@@ -107,7 +131,10 @@ export function TratoForm({
     ? talhoes.filter((t) => t.fazendaId === fazendaId)
     : [];
   const fazendaAtual = fazendas.find((f) => f.id === fazendaId);
-  const talhaoAtual = talhoes.find((t) => t.id === talhaoId);
+
+  const { alocacoes, talhoesIds, tarefasTotais } = alocacoesParaJson(porcoes, talhoesFazenda);
+  const escopoTalhoes = escopo === "talhao" || escopo === "parte";
+  const talhaoUnico = porcoes.length === 1 ? porcoes[0].talhaoId : "";
 
   function setProduto(idx: number, campo: keyof Produto, val: string) {
     setProdutos(produtos.map((p, k) => (k === idx ? { ...p, [campo]: val } : p)));
@@ -116,6 +143,15 @@ export function TratoForm({
   return (
     <form action={action} className="grid gap-5 pb-4">
       <AlertaFormulario mensagem={state && !state.ok ? state.error : undefined} />
+
+      <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
+      <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
+      <input type="hidden" name="talhaoId" value={escopoTalhoes ? talhaoUnico : ""} />
+      <input
+        type="hidden"
+        name="tarefas"
+        value={escopoTalhoes ? String(tarefasTotais) : (inicial?.tarefas ?? "")}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo label="Fazenda" htmlFor="fazendaId">
@@ -127,7 +163,7 @@ export function TratoForm({
             value={fazendaId}
             onChange={(e) => {
               setFazendaId(e.target.value);
-              setTalhaoId("");
+              setPorcoes([]);
             }}
           >
             <option value="" disabled>
@@ -179,48 +215,12 @@ export function TratoForm({
           </select>
         </Campo>
 
-        {escopo === "talhao" || escopo === "parte" ? (
-          <Campo label="Talhão" htmlFor="talhaoId">
-            <select
-              id="talhaoId"
-              name="talhaoId"
-              className="field-input"
-              required
-              value={talhaoId}
-              onChange={(e) => setTalhaoId(e.target.value)}
-              disabled={!fazendaId}
-            >
-              <option value="" disabled>
-                Selecione…
-              </option>
-              {talhoesFazenda.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
-        ) : null}
-
-        {escopo === "parte" ? (
-          <Campo label="Tarefas" htmlFor="tarefas" hint="Porção tratada do talhão.">
-            <input
-              id="tarefas"
-              name="tarefas"
-              className="field-input tnum"
-              inputMode="decimal"
-              defaultValue={inicial?.tarefas ?? ""}
-              required
-            />
-          </Campo>
-        ) : null}
-
         <Campo
           label="Data"
           htmlFor="data"
           hint={
             escopo === "fazenda" && fazendaAtual
-              ? `${fazendaAtual.nome} · ${Math.round(fazendaAtual.areaHa * 3.3)} tarefas (base do rateio)`
+              ? `${fazendaAtual.nome} · ${fmtTarefas(fazendaAtual.areaHa)} (base do rateio)`
               : undefined
           }
         >
@@ -444,11 +444,17 @@ export function TratoForm({
           <input type="hidden" name="projecao" value={projecao ? "on" : ""} />
         </div>
 
-        {escopo === "talhao" && talhaoAtual && (
-          <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
-            {talhaoAtual.nome} · {Math.round(talhaoAtual.areaHa * 3.3)} tarefas
-          </p>
-        )}
+        {escopoTalhoes && (
+        <div className="sm:col-span-2">
+          <p className="field-label">Talhões tratados</p>
+          <SeletorPorcoes
+            id="porcoes-trato"
+            talhoes={talhoesFazenda}
+            value={porcoes}
+            onChange={setPorcoes}
+          />
+        </div>
+      )}
 
         <div className="sm:col-span-2">
           <Campo label="Observações" htmlFor="observacao">

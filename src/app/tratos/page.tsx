@@ -33,6 +33,32 @@ export default async function TratosPage({
     orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
   });
 
+  const nomeTalhao = new Map(
+    (
+      await prisma.talhao.findMany({
+        where: { userId: await userIdAtual() },
+        select: { id: true, nome: true },
+      })
+    ).map((t) => [t.id, t.nome]),
+  );
+
+  const rotuloPorcoes = (t: (typeof tratos)[number]): string | null => {
+    const alocacoes = Array.isArray(t.alocacoes) ? t.alocacoes : [];
+    if (alocacoes.length === 0) return null;
+    const nomes = alocacoes
+      .map((a) => {
+        const item = a as { talhaoId: string; completo?: boolean; tarefas?: number | null };
+        const nome = nomeTalhao.get(item.talhaoId) ?? "";
+        if (!nome) return "";
+        const completo = item.completo === true || item.tarefas === null;
+        return completo ? nome : `${nome} (parte)`;
+      })
+      .filter(Boolean);
+    if (nomes.length === 0) return null;
+    if (nomes.length > 3) return `${nomes.slice(0, 3).join(", ")} e ${nomes.length - 3} mais`;
+    return nomes.join(", ");
+  };
+
   const total = tratos.reduce((acc, t) => acc + t.valor, 0);
 
   const regs = [
@@ -104,11 +130,18 @@ export default async function TratosPage({
                           )}
                         </>
                       )}
-                      {t.talhao && (
+                      {rotuloPorcoes(t) ? (
                         <>
                           <span aria-hidden>·</span>
-                          <span>Talhão {t.talhao.nome}</span>
+                          <span>{rotuloPorcoes(t)}</span>
                         </>
+                      ) : (
+                        t.talhao && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>Talhão {t.talhao.nome}</span>
+                          </>
+                        )
                       )}
                       {t.tarefas && (
                         <>

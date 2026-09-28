@@ -68,6 +68,8 @@ export default async function EditarTratoPage({
           inicial={{
             fazendaId: trato.fazendaId,
             talhaoId: trato.talhaoId ?? "",
+            talhoesIds: (trato.talhoesIds as string[] | null) ?? [],
+            alocacoes: trato.alocacoes,
             safra: trato.safra ?? "",
             tipo: trato.tipo,
             escopo: trato.escopo,

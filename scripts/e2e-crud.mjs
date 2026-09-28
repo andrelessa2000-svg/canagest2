@@ -83,6 +83,61 @@ const naoEhNovo = (u) =>
     await page.getByText(/99 tarefas/).first().waitFor({ timeout: 15000 });
     passos.push("Talhão criado (99 tarefas = 29,94 ha com 3,3058 tarefas/ha), página de detalhe aberta");
 
+    passos.push("3a. Plantio com porções");
+    await page.goto(`${BASE}/plantio/nova`, { waitUntil: "networkidle" });
+    await page.selectOption('select[name="fazendaId"]', { label: NOME_FAZENDA });
+    await page.selectOption('select[name="escopo"]', "talhao");
+    await page.selectOption("select[id$='-escolher']", {
+      label: `${NOME_TALHAO} · 99 tarefas`,
+    });
+    await page.getByRole("button", { name: "Talhão todo" }).click();
+    await page.getByText(/Todo o talhão/).first().waitFor({ timeout: 10000 });
+    await page.getByText(/99,00 tarefas/).first().waitFor({ timeout: 10000 });
+    await page.fill('input[name="valor"]', "166000");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/plantio", { timeout: 20000 });
+    const linhaPlantio = page.locator("li").filter({ hasText: NOME_TALHAO });
+    await linhaPlantio.waitFor({ timeout: 15000 });
+    if ((await linhaPlantio.filter({ hasText: "parte" }).count()) > 0)
+      falha("Talhão inteiro marcado como parte");
+    passos.push("Plantio salvo com talhão inteiro (sem marcação de parte)");
+
+    passos.push("3b. Trato com parte do talhão");
+    await page.goto(`${BASE}/tratos/nova`, { waitUntil: "networkidle" });
+    await page.selectOption('select[name="fazendaId"]', { label: NOME_FAZENDA });
+    await page.selectOption('select[name="escopo"]', "talhao");
+    await page.selectOption("select[id$='-escolher']", {
+      label: `${NOME_TALHAO} · 99 tarefas`,
+    });
+    await page.getByRole("button", { name: "Só uma parte" }).click();
+    await page.fill('input[placeholder="0"]', "40");
+    await page.getByText(/40,00 tarefas/).first().waitFor({ timeout: 10000 });
+    await page.fill('input[name="valor"]', "20000");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/tratos", { timeout: 20000 });
+    const linhaTrato = page.locator("li").filter({ hasText: NOME_TALHAO });
+    await linhaTrato.waitFor({ timeout: 15000 });
+    await linhaTrato.getByText(/\(parte\)/).first().waitFor({ timeout: 10000 });
+    passos.push("Trato salvo como parte do talhão (40 tarefas) e exibido na lista");
+
+    passos.push("3c. Editar plantio preserva as porções");
+    await page.goto(`${BASE}/plantio`, { waitUntil: "networkidle" });
+    await page
+      .locator("li")
+      .filter({ hasText: NOME_TALHAO })
+      .locator('a[aria-label="Editar plantio"]')
+      .click();
+    await page.waitForURL(/\/plantio\/[a-z0-9-]+\/editar$/, { timeout: 15000 });
+    await page.getByText(/Todo o talhão/).first().waitFor({ timeout: 10000 });
+    await page.getByText(/99,00 tarefas/).first().waitFor({ timeout: 10000 });
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/plantio", { timeout: 20000 });
+    const linhaDepois = page.locator("li").filter({ hasText: NOME_TALHAO });
+    await linhaDepois.waitFor({ timeout: 15000 });
+    if ((await linhaDepois.filter({ hasText: "parte" }).count()) > 0)
+      falha("Edição perdeu a marcação de talhão inteiro");
+    passos.push("Edição do plantio preservou a porção");
+
     passos.push("4. Registrar colheita");
     await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });
     await page.fill('input[name="nome"]', "Usina Pindorama");

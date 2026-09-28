@@ -489,6 +489,7 @@ function camposPlantio(formData: FormData) {
     fazendaId: campo(formData, "fazendaId"),
     talhaoId: campo(formData, "talhaoId") || undefined,
     talhoesIds: campo(formData, "talhoesIds"),
+    alocacoes: campo(formData, "alocacoes"),
     escopo: campo(formData, "escopo"),
     tarefas: campo(formData, "tarefas"),
     safra: campo(formData, "safra"),
@@ -502,10 +503,14 @@ function camposPlantio(formData: FormData) {
 }
 
 function dadosPlantio(d: PlantioInput) {
+  const escopoTalhoes = d.escopo === "talhao" || d.escopo === "parte";
   return {
     fazendaId: d.fazendaId,
-    talhaoId: d.talhoesIds[0] ?? d.talhaoId ?? null,
+    talhaoId: escopoTalhoes ? (d.alocacoes[0]?.talhaoId ?? d.talhaoId ?? null) : d.talhaoId ?? null,
     talhoesIds: d.talhoesIds as unknown as Prisma.InputJsonValue,
+    alocacoes: escopoTalhoes && d.alocacoes.length > 0
+      ? (d.alocacoes as unknown as Prisma.InputJsonValue)
+      : undefined,
     escopo: d.escopo,
     tarefas: d.tarefas,
     safra: d.safra,
@@ -581,6 +586,8 @@ function camposTrato(formData: FormData) {
   return {
     fazendaId: campo(formData, "fazendaId"),
     talhaoId: campo(formData, "talhaoId") || undefined,
+    talhoesIds: campo(formData, "talhoesIds"),
+    alocacoes: campo(formData, "alocacoes"),
     safra: campo(formData, "safra"),
     tipo: campo(formData, "tipo"),
     escopo: campo(formData, "escopo"),
@@ -594,9 +601,14 @@ function camposTrato(formData: FormData) {
 }
 
 function dadosTrato(d: TratoInput) {
+  const escopoTalhoes = d.escopo === "talhao" || d.escopo === "parte";
   return {
     fazendaId: d.fazendaId,
-    talhaoId: d.talhaoId || null,
+    talhaoId: escopoTalhoes ? (d.alocacoes[0]?.talhaoId ?? d.talhaoId ?? null) : d.talhaoId ?? null,
+    talhoesIds: d.talhoesIds as unknown as Prisma.InputJsonValue,
+    alocacoes: escopoTalhoes && d.alocacoes.length > 0
+      ? (d.alocacoes as unknown as Prisma.InputJsonValue)
+      : undefined,
     safra: d.safra,
     tipo: d.tipo,
     escopo: d.escopo,

@@ -10,7 +10,6 @@ import {
   fmtProd,
   fmtToneladas,
   fmtCount,
-  TAREFAS_POR_HA,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
 import {

@@ -149,6 +149,7 @@ export const plantioSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),
   talhaoId: z.string().optional(),
   talhoesIds: itensStringJson(),
+  alocacoes: alocacoesJson(),
   escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }),
   tarefas: numeroOpcional("Tarefas"),
   safra: safraSchema,
@@ -159,6 +160,33 @@ export const plantioSchema = z.object({
   areaHa: numeroOpcional("Área"),
   observacao: optionalField(300),
 });
+
+export type AlocacaoValidada = { talhaoId: string; tarefas: number | null; completo: boolean };
+
+export function alocacoesJson() {
+  return z
+    .string()
+    .optional()
+    .transform((v): AlocacaoValidada[] => {
+      if (!v || v.trim() === "") return [];
+      try {
+        const arr = JSON.parse(v);
+        if (!Array.isArray(arr)) return [];
+        return arr
+          .filter(
+            (a): a is Record<string, unknown> =>
+              !!a && typeof a === "object" && typeof (a as { talhaoId?: unknown }).talhaoId === "string",
+          )
+          .map((a) => {
+            const completo = a.completo === true || a.tarefas === null || a.tarefas === undefined;
+            const tarefas = completo ? null : Number(a.tarefas) || 0;
+            return { talhaoId: String(a.talhaoId), tarefas, completo };
+          });
+      } catch {
+        return [];
+      }
+    });
+}
 
 function itensStringJson() {
   return z
@@ -261,6 +289,8 @@ const produtosJson = () =>
 export const tratoSchema = z.object({
   fazendaId: z.string().min(1, "Selecione a fazenda"),
   talhaoId: z.string().optional(),
+  talhoesIds: itensStringJson(),
+  alocacoes: alocacoesJson(),
   safra: safraSchema,
   tipo: z.enum(TIPOS_TRATO, { error: "Selecione o tipo de trato" }),
   escopo: z.enum(ESCOPOS_TRATO, { error: "Selecione o escopo" }),

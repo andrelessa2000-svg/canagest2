@@ -4,10 +4,16 @@ import { useActionState, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { fmtMoney, parseDecimal, toDateInputValue } from "@/lib/format";
+import { fmtMoney, fmtTarefas, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
+import {
+  SeletorPorcoes,
+  alocacoesDeJson,
+  alocacoesParaJson,
+  type Alocacao,
+} from "./seletor-porcoes";
 
 function num(v: string): number {
   const p = parseDecimal(v);
@@ -32,6 +38,7 @@ type Inicial = {
   fazendaId?: string;
   talhaoId?: string;
   talhoesIds?: string[];
+  alocacoes?: unknown;
   escopo?: string;
   tarefas?: string;
   safra?: string;
@@ -59,7 +66,15 @@ export function PlantioForm({
   const [state, action] = useActionState(acao, undefined);
   const [fazendaId, setFazendaId] = useState(inicial?.fazendaId ?? "");
   const [escopo, setEscopo] = useState(inicial?.escopo ?? "fazenda");
-  const [talhoesSel, setTalhoesSel] = useState<string[]>(inicial?.talhoesIds ?? []);
+  const [porcoes, setPorcoes] = useState<Alocacao[]>(
+    inicial?.alocacoes
+      ? alocacoesDeJson(inicial.alocacoes)
+      : (inicial?.talhoesIds ?? []).map((id) => ({
+          talhaoId: id,
+          tarefas: inicial?.tarefas && inicial.talhoesIds?.length === 1 ? inicial.tarefas : "",
+          completo: inicial?.escopo !== "parte",
+        })),
+  );
   const [projecao, setProjecao] = useState(inicial?.projecao ?? false);
   const [valor, setValor] = useState(inicial?.valor ?? "");
   const [calculadora, setCalculadora] = useState(false);
@@ -87,13 +102,8 @@ export function PlantioForm({
     : [];
   const fazendaAtual = fazendas.find((f) => f.id === fazendaId);
 
-  function toggleTalhao(id: string) {
-    setTalhoesSel(
-      talhoesSel.includes(id)
-        ? talhoesSel.filter((x) => x !== id)
-        : [...talhoesSel, id],
-    );
-  }
+  const { alocacoes, talhoesIds, tarefasTotais } = alocacoesParaJson(porcoes, talhoesFazenda);
+  const escopoTalhoes = escopo === "talhao" || escopo === "parte";
 
   return (
     <form action={action} className="grid gap-5 pb-4">
@@ -107,9 +117,9 @@ export function PlantioForm({
             className="field-input"
             required
             value={fazendaId}
-            onChange={(e) => {
+              onChange={(e) => {
               setFazendaId(e.target.value);
-              setTalhoesSel([]);
+              setPorcoes([]);
             }}
           >
             <option value="" disabled>
@@ -144,81 +154,39 @@ export function PlantioForm({
         </Campo>
       </div>
 
-      {escopo === "talhao" && (
-        <div className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-4">
-          <p className="text-xs text-ink-3">
-            Marque os talhões onde foi/será feito o plantio:
+      {(escopo === "talhao" || escopo === "parte") && (
+        <div className="grid gap-3">
+          <p className="text-sm font-medium text-ink-2">
+            {escopo === "talhao"
+              ? "Talhões do plantio:"
+              : "Parte do talhão onde se planta:"}
           </p>
           {talhoesFazenda.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-2">Selecione primeiro a fazenda.</p>
+            <p className="text-sm text-ink-2">Selecione primeiro a fazenda.</p>
           ) : (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {talhoesFazenda.map((t) => (
-                <label
-                  key={t.id}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
-                    talhoesSel.includes(t.id)
-                      ? "border-accent bg-accent-soft text-ink"
-                      : "border-line bg-surface text-ink-2"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-[var(--accent)]"
-                    checked={talhoesSel.includes(t.id)}
-                    onChange={() => toggleTalhao(t.id)}
-                  />
-                  {t.nome}
-                  <span className="text-xs text-ink-3">
-                    {Math.round(t.areaHa * 3.3)} tarefas
-                  </span>
-                </label>
-              ))}
-            </div>
+            <SeletorPorcoes
+              id="porcoes-plantio"
+              talhoes={talhoesFazenda}
+              value={porcoes}
+              onChange={setPorcoes}
+            />
           )}
         </div>
       )}
 
-      {escopo === "parte" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo label="Talhão" htmlFor="talhaoId">
-            <select
-              id="talhaoId"
-              name="talhaoId"
-              className="field-input"
-              value={talhoesSel[0] ?? ""}
-              onChange={(e) => setTalhoesSel([e.target.value])}
-              disabled={!fazendaId}
-            >
-              <option value="" disabled>
-                Selecione…
-              </option>
-              {talhoesFazenda.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo label="Tarefas" htmlFor="tarefas" hint="Porção do talhão onde se planta.">
-            <input
-              id="tarefas"
-              name="tarefas"
-              className="field-input tnum"
-              inputMode="decimal"
-              defaultValue={inicial?.tarefas ?? ""}
-              required
-            />
-          </Campo>
-        </div>
-      )}
-
-      <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesSel)} />
       {escopo === "fazenda" && fazendaAtual && (
         <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
-          {fazendaAtual.nome} · {Math.round(fazendaAtual.areaHa * 3.3)} tarefas
+          {fazendaAtual.nome} · {fmtTarefas(fazendaAtual.areaHa)} — registro em toda a fazenda
         </p>
       )}
+
+      <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
+      <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
+      <input
+        type="hidden"
+        name="tarefas"
+        value={escopoTalhoes ? String(tarefasTotais) : (inicial?.tarefas ?? "")}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <CampoSafra defaultValue={inicial?.safra} usadas={safras} id="safra-plantio" />

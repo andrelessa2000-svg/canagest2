@@ -66,6 +66,7 @@ export default async function EditarPlantioPage({
             fazendaId: plantio.fazendaId,
             escopo: plantio.escopo,
             talhoesIds: talhoesIdsInicial,
+            alocacoes: plantio.alocacoes,
             tarefas: numero(plantio.tarefas),
             safra: plantio.safra ?? "",
             tipo: plantio.tipo,
