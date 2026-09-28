@@ -76,7 +76,14 @@ type BaseArea = {
   m2: number;
 };
 
-function areaDesde(entrada: string, tipo: string, unidade: string, comp: string, larg: string): BaseArea {
+function areaDesde(
+  entrada: string,
+  tipo: string,
+  unidade: string,
+  comp: string,
+  larg: string,
+  sulcos?: { n: string; espaciado: string },
+): BaseArea {
   const v = num(entrada);
   const c = num(comp);
   const l = num(larg);
@@ -101,6 +108,11 @@ function areaDesde(entrada: string, tipo: string, unidade: string, comp: string,
     case "medidas":
       m2 = c * factor * (l * factor);
       break;
+    case "sulcos": {
+      const compM = c * factor;
+      m2 = compM * num(sulcos?.n ?? "") * num(sulcos?.espaciado ?? "1,1");
+      break;
+    }
   }
   const tarefas = m2 / TAREFA_M2;
   return { tarefas, m2 };
@@ -112,8 +124,13 @@ function AbaArea() {
   const [unidade, setUnidade] = useState("metros");
   const [comp, setComp] = useState("");
   const [larg, setLarg] = useState("");
+  const [nSulcos, setNSulcos] = useState("");
+  const [espaciado, setEspaciado] = useState("1,1");
 
-  const { tarefas, m2 } = areaDesde(valor, tipo, unidade, comp, larg);
+  const { tarefas, m2 } = areaDesde(valor, tipo, unidade, comp, larg, {
+    n: nSulcos,
+    espaciado,
+  });
 
   return (
     <div className="grid gap-4">
@@ -132,9 +149,59 @@ function AbaArea() {
             <option value="braças-corridas">Braças corridas</option>
             <option value="m2">Metros quadrados (m²)</option>
             <option value="medidas">Medidas (comprimento × largura)</option>
+            <option value="sulcos">Por sulcos (comprimento × nº sulcos)</option>
           </select>
         </Campo>
-        {tipo === "medidas" ? (
+        {tipo === "sulcos" ? (
+          <>
+            <Campo
+              label="Unidade do comprimento"
+              htmlFor="unidadeSulcos"
+              hint="1 sulco de 1.250 braças corridas = 1 tarefa"
+            >
+              <select
+                id="unidadeSulcos"
+                className="field-input"
+                value={unidade}
+                onChange={(e) => setUnidade(e.target.value)}
+              >
+                <option value="metros">Metros</option>
+                <option value="braças">Braças corridas</option>
+              </select>
+            </Campo>
+            <Campo label="Comprimento" htmlFor="compSulco">
+              <input
+                id="compSulco"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={comp}
+                onChange={(e) => setComp(e.target.value)}
+              />
+            </Campo>
+            <Campo label="Nº de sulcos" htmlFor="nSulcos">
+              <input
+                id="nSulcos"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={nSulcos}
+                onChange={(e) => setNSulcos(e.target.value)}
+              />
+            </Campo>
+            <Campo
+              label="Espaciamento entre sulcos (m)"
+              htmlFor="espaciado"
+              hint="Media braça = 1,1 m (padrón da cana)"
+            >
+              <input
+                id="espaciado"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={espaciado}
+                onChange={(e) => setEspaciado(e.target.value)}
+              />
+            </Campo>
+          </>
+        ) : tipo === "medidas" ? (
           <>
             <Campo label="Unidade das medidas" htmlFor="unidadeMedidas">
               <select

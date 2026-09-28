@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 type Filtros = {
   safra?: string;
   fazenda?: string;
+  talhao?: string;
   tipo?: string;
   reg?: string;
 };
@@ -23,16 +24,17 @@ export default async function InsumosReportPage({
 }: {
   searchParams: Promise<Filtros>;
 }) {
-  const { safra, fazenda, tipo, reg } = await searchParams;
+  const { safra, fazenda, talhao, tipo, reg } = await searchParams;
 
   const whereBase = {
     userId: await userIdAtual(),
     ...(safra ? { safra } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
+    ...(talhao ? { talhaoId: talhao } : {}),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
   };
 
-  const [plantios, tratos, fazendasRaw, safrasRaw] = await Promise.all([
+  const [plantios, tratos, fazendasRaw, talhoesRaw, safrasRaw] = await Promise.all([
     tipo && tipo !== "plantio"
       ? []
       : prisma.plantio.findMany({
@@ -53,6 +55,11 @@ export default async function InsumosReportPage({
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
       select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.talhao.findMany({
+      where: { userId: await userIdAtual() },
+      select: { id: true, nome: true, fazendaId: true },
       orderBy: { nome: "asc" },
     }),
     prisma.plantio.findMany({
@@ -158,6 +165,19 @@ export default async function InsumosReportPage({
                 {f.nome}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">Talhão</span>
+          <select name="talhao" defaultValue={talhao ?? ""} className="field-input">
+            <option value="">Todos</option>
+            {talhoesRaw
+              .filter((t) => !fazenda || t.fazendaId === fazenda)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nome}
+                </option>
+              ))}
           </select>
         </label>
         <label className="grid gap-1">
