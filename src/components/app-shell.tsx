@@ -56,7 +56,7 @@ export function AppShell({
             <Brand />
 
             <nav
-              className="hidden items-center gap-1 md:flex overflow-x-auto"
+              className="hidden items-center gap-1 md:flex overflow-x-auto flex-1 min-w-0"
               aria-label="Navegação principal"
               style={{ scrollbarWidth: "none" }}
             >
