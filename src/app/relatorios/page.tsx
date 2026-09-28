@@ -101,6 +101,8 @@ export default async function RelatoriosPage() {
       id: c.id,
       data: c.data,
       ano: c.data.getFullYear(),
+      safra: c.safra ?? "Sin safra",
+      projecao: c.projecao,
       toneladas: c.toneladas,
       areaTarefas,
       areaHa: areaTarefas / TAREFAS_POR_HA,
@@ -234,6 +236,38 @@ export default async function RelatoriosPage() {
     porUsina.set(l.usinaNome, u);
   }
   const usinasResumo = [...porUsina.values()].sort((a, b) => b.receita - a.receita);
+
+  // Análisis por safra (productividad vs lucro)
+  const porSafra = new Map<
+    string,
+    { safra: string; area: number; tons: number; receita: number; custos: number; lucro: number; n: number }
+  >();
+  for (const l of linhas) {
+    const f = porSafra.get(l.safra) ?? {
+      safra: l.safra,
+      area: 0,
+      tons: 0,
+      receita: 0,
+      custos: 0,
+      lucro: 0,
+      n: 0,
+    };
+    f.area += l.areaTarefas;
+    f.tons += l.toneladas;
+    f.receita += l.r.receita;
+    f.custos += l.r.totalDespesas;
+    f.lucro += l.r.lucro;
+    f.n += 1;
+    porSafra.set(l.safra, f);
+  }
+  const safraResumo = [...porSafra.values()]
+    .map((f) => ({
+      ...f,
+      tHa: f.area > 0 ? f.tons / (f.area / TAREFAS_POR_HA) : 0,
+      costoT: f.tons > 0 ? f.custos / f.tons : 0,
+      lucroT: f.tons > 0 ? f.lucro / f.tons : 0,
+    }))
+    .sort((a, b) => a.safra.localeCompare(b.safra));
 
   // Relatório em cascata
   const cascata = await cargarCascata();
@@ -594,6 +628,53 @@ export default async function RelatoriosPage() {
                   >
                     {fmtMoney(u.lucro)}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Análisis por safra */}
+      <section className="mt-10 grid gap-3">
+        <h2 className="font-display text-xl text-ink">Análisis por safra — productividad vs lucro</h2>
+        <p className="text-sm leading-relaxed text-ink-2">
+          O objetivo: ver se a safra rendeu e dejó lucro. Por safra: área colhida, toneladas,{" "}
+          <span className="font-semibold text-ink">t/ha</span>, custo por tonelada, receita,{" "}
+          <span className="font-semibold text-ink">lucro líquido</span> e{" "}
+          <span className="font-semibold text-ink">lucro por tonelada</span>.
+        </p>
+        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                <th className="px-3 py-2 font-semibold">Safra</th>
+                <th className="px-3 py-2 text-right font-semibold">Área (tarefas)</th>
+                <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                <th className="px-3 py-2 text-right font-semibold">t/ha</th>
+                <th className="px-3 py-2 text-right font-semibold">Custo/t</th>
+                <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro</th>
+                <th className="px-3 py-2 text-right font-semibold">Lucro/t</th>
+              </tr>
+            </thead>
+            <tbody>
+              {safraResumo.map((f) => (
+                <tr key={f.safra} className="border-b border-line">
+                  <td className="px-3 py-2 font-medium text-ink">{f.safra}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtCount(Math.round(f.area))}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtToneladas(f.tons)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{nf1.format(f.tHa)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.costoT)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
+                  <td
+                    className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                      f.lucro < 0 ? "text-danger-strong" : "text-accent"
+                    }`}
+                  >
+                    {fmtMoney(f.lucro)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.lucroT)}</td>
                 </tr>
               ))}
             </tbody>
