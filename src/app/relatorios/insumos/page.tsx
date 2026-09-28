@@ -5,6 +5,7 @@ import { fmtCount, fmtMoney } from "@/lib/format";
 import { TIPOS_TRATO_LABEL } from "@/lib/validators";
 import { PageHeader } from "@/components/page-header";
 import { CelulaMetrica } from "@/components/stat-cells";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function InsumosReportPage({
   const { safra, fazenda, tipo, reg } = await searchParams;
 
   const whereBase = {
+    userId: await userIdAtual(),
     ...(safra ? { safra } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
@@ -48,9 +50,13 @@ export default async function InsumosReportPage({
           include: { fazenda: { select: { nome: true } } },
           orderBy: [{ data: "desc" }],
         }),
-    prisma.fazenda.findMany({ select: { id: true, nome: true }, orderBy: { nome: "asc" } }),
+    prisma.fazenda.findMany({
+      where: { userId: await userIdAtual() },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
     prisma.plantio.findMany({
-      where: { safra: { not: null } },
+      where: { userId: await userIdAtual(), safra: { not: null } },
       select: { safra: true },
       distinct: ["safra"],
       orderBy: { safra: "asc" },

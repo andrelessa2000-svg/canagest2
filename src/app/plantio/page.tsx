@@ -7,6 +7,7 @@ import { concretizarPlantio, excluirPlantio } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,24 @@ export default async function PlantioPage({
   const { reg } = await searchParams;
   const [plantios, talhoesTodos] = await Promise.all([
     prisma.plantio.findMany({
-      where:
-        reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {},
+      where: {
+        userId: await userIdAtual(),
+        ...(reg === "proj"
+          ? { projecao: true }
+          : reg === "real"
+            ? { projecao: false }
+            : {}),
+      },
       include: {
         fazenda: { select: { nome: true } },
         talhao: { select: { nome: true } },
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
-    prisma.talhao.findMany({ select: { id: true, nome: true } }),
+    prisma.talhao.findMany({
+      where: { userId: await userIdAtual() },
+      select: { id: true, nome: true },
+    }),
   ]);
 
   const nomeTalhao = new Map(talhoesTodos.map((t) => [t.id, t.nome]));

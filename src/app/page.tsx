@@ -13,6 +13,7 @@ import {
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
 import { calcularColheita } from "@/lib/colheita";
+import { userIdAtual } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells";
@@ -20,13 +21,16 @@ import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const userId = await userIdAtual();
   const [fazendas, colheitasRecentes, totalColhido, colheitasFin] =
     await Promise.all([
       prisma.fazenda.findMany({
+        where: { userId },
         include: { talhoes: true },
         orderBy: { nome: "asc" },
       }),
       prisma.colheita.findMany({
+        where: { userId, projecao: false },
         include: {
           fazenda: {
             select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -36,8 +40,12 @@ export default async function DashboardPage() {
         orderBy: { data: "desc" },
         take: 5,
       }),
-      prisma.colheita.aggregate({ _sum: { toneladas: true } }),
+      prisma.colheita.aggregate({
+        where: { userId, projecao: false },
+        _sum: { toneladas: true },
+      }),
       prisma.colheita.findMany({
+        where: { userId, projecao: false },
         select: {
           toneladas: true,
           tipo: true,

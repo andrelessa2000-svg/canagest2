@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { InvestimentoForm } from "@/components/investimento-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -30,36 +31,39 @@ export default async function FinanceiroPage() {
   const ano = new Date().getFullYear();
   const safraAtual = safraDe(ano);
   const safraProxima = safraDe(ano + 1);
+  const userId = await userIdAtual();
 
   const [cascata, fazendas, safrasRaw, projeccTratos, projeccPlantios, investimentos, colheitasProj] =
     await Promise.all([
       cargarCascata(),
       prisma.fazenda.findMany({
+        where: { userId },
         select: { id: true, nome: true, ativa: true },
         orderBy: { nome: "asc" },
       }),
       prisma.colheita.findMany({
-        where: { safra: { not: null } },
+        where: { userId, safra: { not: null } },
         select: { safra: true },
         distinct: ["safra"],
         orderBy: { safra: "asc" },
       }),
       prisma.trato.findMany({
-        where: { projecao: true },
+        where: { userId, projecao: true },
         include: { fazenda: { select: { nome: true, ativa: true } } },
         orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
       }),
       prisma.plantio.findMany({
-        where: { projecao: true },
+        where: { userId, projecao: true },
         include: { fazenda: { select: { nome: true, ativa: true } } },
         orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
       }),
       prisma.investimento.findMany({
+        where: { userId },
         include: { fazenda: { select: { nome: true, ativa: true } } },
         orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
       }),
       prisma.colheita.findMany({
-        where: { projecao: true },
+        where: { userId, projecao: true },
         include: {
           fazenda: {
             select: { id: true, nome: true, ativa: true, talhoes: { select: { areaHa: true } } },

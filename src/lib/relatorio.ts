@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { calcularColheita, type ItemDespesa } from "./colheita";
+import { userIdAtual } from "./auth";
 
 export type FilaCascata = {
   fazendaId: string;
@@ -29,8 +30,10 @@ export type Cascata = {
 };
 
 export async function cargarCascata(): Promise<Cascata> {
+  const userId = await userIdAtual();
   const [colheitas, tratos, plantios, investimentos, fazendasEstado] = await Promise.all([
     prisma.colheita.findMany({
+      where: { userId },
       include: {
         fazenda: {
           select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -39,15 +42,19 @@ export async function cargarCascata(): Promise<Cascata> {
       },
     }),
     prisma.trato.findMany({
+      where: { userId },
       select: { fazendaId: true, valor: true, projecao: true },
     }),
     prisma.plantio.findMany({
+      where: { userId },
       select: { fazendaId: true, valor: true, projecao: true },
     }),
     prisma.investimento.findMany({
+      where: { userId },
       select: { fazendaId: true, valor: true },
     }),
     prisma.fazenda.findMany({
+      where: { userId },
       select: { id: true, ativa: true },
     }),
   ]);

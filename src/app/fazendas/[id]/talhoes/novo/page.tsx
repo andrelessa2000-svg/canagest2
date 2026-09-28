@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { criarTalhao } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { TalhaoForm } from "@/components/talhao-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function NovoTalhaoPage({
 }) {
   const { id } = await params;
   const fazenda = await prisma.fazenda.findUnique({
-    where: { id },
+    where: { id, userId: await userIdAtual() },
     select: { id: true, nome: true },
   });
   if (!fazenda) notFound();

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Pencil } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { userIdAtual } from "@/lib/auth";
 import {
   fmtDate,
   fmtKgAtr,
@@ -65,7 +66,7 @@ export default async function ColheitaPage({
   const { id } = await params;
 
   const c = await prisma.colheita.findUnique({
-    where: { id },
+    where: { id, userId: await userIdAtual() },
     include: {
       fazenda: {
         select: {
@@ -112,6 +113,7 @@ export default async function ColheitaPage({
   const talhoesColhidosInfo =
     (c.talhoesColhidos as { id: string; areaHa: number }[] | null) ?? [];
   const talhoesTodos = await prisma.talhao.findMany({
+    where: { userId: await userIdAtual() },
     select: { id: true, nome: true, areaHa: true },
   });
   const sel = talhoesTodos

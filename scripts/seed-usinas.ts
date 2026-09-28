@@ -16,11 +16,15 @@ const usinas = [
 ];
 
 async function main() {
+  const primeiro = await prisma.user.findFirst({ orderBy: { criadoEm: "asc" } });
+  if (!primeiro) {
+    throw new Error("Nenhun usuario para associar as usinas. Registre-se antes.");
+  }
   for (const def of usinas) {
     const u = await prisma.usina.upsert({
-      where: { nome: def.nome },
+      where: { userId_nome: { userId: primeiro.id, nome: def.nome } },
       update: { modelo: def.modelo },
-      create: def,
+      create: { ...def, userId: primeiro.id },
     });
     console.log(`Usina ok: ${u.nome} (${u.modelo})`);
   }

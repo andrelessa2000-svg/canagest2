@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica } from "@/components/stat-cells";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function ColheitasPage({
   const { fazenda, usina, tipo, de, ate, reg } = await searchParams;
 
   const where = {
+    userId: await userIdAtual(),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(usina ? { usinaId: usina } : {}),
@@ -53,10 +55,12 @@ export default async function ColheitasPage({
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
     prisma.fazenda.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),

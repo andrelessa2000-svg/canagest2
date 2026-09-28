@@ -84,6 +84,12 @@ const naoEhNovo = (u) =>
     passos.push("Talhão criado (99 tarefas = 30 ha), página de detalhe aberta");
 
     passos.push("4. Registrar colheita");
+    await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });
+    await page.fill('input[name="nome"]', "Usina Pindorama");
+    await page.selectOption('select[name="modelo"]', "pindorama");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/usinas", { timeout: 20000 });
+    passos.push("4a. Usina Pindorama (re)criada");
     await page.goto(`${BASE}/colheitas/nova`, { waitUntil: "networkidle" });
     await page.selectOption('select[name="fazendaId"]', { label: NOME_FAZENDA });
     await page.selectOption('select[name="usinaId"]', { label: "Usina Pindorama (Pindorama)" });

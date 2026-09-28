@@ -27,13 +27,20 @@ function rand(n: number, casas = 2) {
 }
 
 async function main() {
+  const demo = await prisma.user.upsert({
+    where: { email: "demo@canagest.local" },
+    update: {},
+    create: { email: "demo@canagest.local", name: "Usuário Demo" },
+  });
+  const userId = demo.id;
+
   const usinas = [];
   for (const def of modelosUsina) {
     usinas.push(
       await prisma.usina.upsert({
-        where: { nome: def.nome },
+        where: { userId_nome: { userId, nome: def.nome } },
         update: { modelo: def.modelo },
-        create: def,
+        create: { ...def, userId },
       }),
     );
   }
@@ -47,6 +54,7 @@ async function main() {
   for (const def of fazendas) {
     const fazenda = await prisma.fazenda.create({
       data: {
+        userId,
         nome: def.nome,
       },
     });
@@ -57,6 +65,7 @@ async function main() {
       const tarefas = Math.round(areaHa * 3.3 * 100) / 100;
       await prisma.talhao.create({
         data: {
+          userId,
           fazendaId: fazenda.id,
           nome: `T-${String(t).padStart(2, "0")}`,
           areaHa,
@@ -87,6 +96,7 @@ async function main() {
 
         await prisma.colheita.create({
           data: {
+            userId,
             fazendaId: fazenda.id,
             usinaId: usina.id,
             data: new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000),

@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { parseDecimal } from "./format";
+import { userIdAtual } from "./auth";
+
+async function usuarioId(): Promise<string> {
+  const id = await userIdAtual();
+  if (!id) throw new Error("Não autenticado");
+  return id;
+}
 import {
   colheitaSchema,
   fazendaSchema,
@@ -47,6 +54,7 @@ export async function criarFazenda(
   try {
     await prisma.fazenda.create({
       data: {
+        userId: await usuarioId(),
         nome: parsed.data.nome,
         ativa: parsed.data.ativa,
       },
@@ -77,7 +85,7 @@ export async function atualizarFazenda(
 
   try {
     await prisma.fazenda.update({
-      where: { id },
+      where: { id, userId: await usuarioId() },
       data: {
         nome: parsed.data.nome,
         ativa: parsed.data.ativa,
@@ -96,7 +104,7 @@ export async function atualizarFazenda(
 
 export async function excluirFazenda(id: string): Promise<void> {
   try {
-    await prisma.fazenda.delete({ where: { id } });
+    await prisma.fazenda.delete({ where: { id, userId: await usuarioId() } });
   } catch (e) {
     console.error(e);
     throw e;
@@ -126,6 +134,7 @@ export async function criarTalhao(
   try {
     const talhao = await prisma.talhao.create({
       data: {
+        userId: await usuarioId(),
         fazendaId,
         nome: parsed.data.nome,
         areaHa: parsed.data.areaHa,
@@ -148,7 +157,9 @@ export async function atualizarTalhao(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const original = await prisma.talhao.findUnique({ where: { id } });
+  const original = await prisma.talhao.findUnique({
+    where: { id, userId: await usuarioId() },
+  });
   if (!original) {
     return { ok: false, error: "Talhão não encontrado." };
   }
@@ -166,7 +177,7 @@ export async function atualizarTalhao(
 
   try {
     await prisma.talhao.update({
-      where: { id },
+      where: { id, userId: await usuarioId() },
       data: {
         nome: parsed.data.nome,
         areaHa: parsed.data.areaHa,
@@ -186,12 +197,14 @@ export async function atualizarTalhao(
 export async function excluirTalhao(id: string): Promise<void> {
   let fazendaId: string;
   try {
-    const talhao = await prisma.talhao.findUnique({ where: { id } });
+    const talhao = await prisma.talhao.findUnique({
+      where: { id, userId: await usuarioId() },
+    });
     if (!talhao) {
       throw new Error("Talhão não encontrado.");
     }
     fazendaId = talhao.fazendaId;
-    await prisma.talhao.delete({ where: { id } });
+    await prisma.talhao.delete({ where: { id, userId: talhao.userId } });
   } catch (e) {
     console.error(e);
     throw e;
@@ -218,6 +231,7 @@ export async function criarUsina(
   try {
     await prisma.usina.create({
       data: {
+        userId: await usuarioId(),
         nome: parsed.data.nome,
         modelo: parsed.data.modelo,
       },
@@ -248,7 +262,7 @@ export async function atualizarUsina(
 
   try {
     await prisma.usina.update({
-      where: { id },
+      where: { id, userId: await usuarioId() },
       data: {
         nome: parsed.data.nome,
         modelo: parsed.data.modelo,
@@ -266,7 +280,7 @@ export async function atualizarUsina(
 
 export async function excluirUsina(id: string): Promise<ActionState> {
   try {
-    await prisma.usina.delete({ where: { id } });
+    await prisma.usina.delete({ where: { id, userId: await usuarioId() } });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -358,7 +372,7 @@ async function validarUsina(
   d: ColheitaInput,
 ): Promise<string | null> {
   const usina = await prisma.usina.findUnique({
-    where: { id: usinaId },
+    where: { id: usinaId, userId: await usuarioId() },
     select: { modelo: true },
   });
   if (!usina) return "Usina não encontrada.";
@@ -383,7 +397,7 @@ export async function criarColheita(
   let criada!: { id: string; fazendaId: string };
   try {
     const c = await prisma.colheita.create({
-      data: dadosColheita(parsed.data),
+      data: { userId: await usuarioId(), ...dadosColheita(parsed.data) },
     });
     criada = { id: c.id, fazendaId: c.fazendaId };
   } catch (e) {
@@ -415,7 +429,7 @@ export async function atualizarColheita(
 
   try {
     const c = await prisma.colheita.update({
-      where: { id },
+      where: { id, userId: await usuarioId() },
       data: dadosColheita(parsed.data),
     });
     revalidatePath("/");
@@ -446,7 +460,7 @@ export async function excluirColheitaRedirecionando(id: string): Promise<void> {
 }
 
 async function removerColheita(id: string): Promise<void> {
-  await prisma.colheita.delete({ where: { id } });
+  await prisma.colheita.delete({ where: { id, userId: await usuarioId() } });
   revalidatePath("/");
   revalidatePath("/colheitas");
   revalidatePath("/talhoes", "layout");
@@ -455,7 +469,10 @@ async function removerColheita(id: string): Promise<void> {
 
 export async function concretizarColheita(id: string): Promise<void> {
   try {
-    await prisma.colheita.update({ where: { id }, data: { projecao: false } });
+    await prisma.colheita.update({
+      where: { id, userId: await usuarioId() },
+      data: { projecao: false },
+    });
   } catch (e) {
     console.error(e);
     throw e;
@@ -508,7 +525,9 @@ export async function criarPlantio(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.plantio.create({ data: dadosPlantio(parsed.data) });
+    await prisma.plantio.create({
+      data: { userId: await usuarioId(), ...dadosPlantio(parsed.data) },
+    });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -529,7 +548,10 @@ export async function atualizarPlantio(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.plantio.update({ where: { id }, data: dadosPlantio(parsed.data) });
+    await prisma.plantio.update({
+      where: { id, userId: await usuarioId() },
+      data: dadosPlantio(parsed.data),
+    });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -542,7 +564,7 @@ export async function atualizarPlantio(
 
 export async function excluirPlantio(id: string): Promise<ActionState> {
   try {
-    await prisma.plantio.delete({ where: { id } });
+    await prisma.plantio.delete({ where: { id, userId: await usuarioId() } });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -594,7 +616,9 @@ export async function criarTrato(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.trato.create({ data: dadosTrato(parsed.data) });
+    await prisma.trato.create({
+      data: { userId: await usuarioId(), ...dadosTrato(parsed.data) },
+    });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -615,7 +639,10 @@ export async function atualizarTrato(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.trato.update({ where: { id }, data: dadosTrato(parsed.data) });
+    await prisma.trato.update({
+      where: { id, userId: await usuarioId() },
+      data: dadosTrato(parsed.data),
+    });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -628,7 +655,7 @@ export async function atualizarTrato(
 
 export async function excluirTrato(id: string): Promise<ActionState> {
   try {
-    await prisma.trato.delete({ where: { id } });
+    await prisma.trato.delete({ where: { id, userId: await usuarioId() } });
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -641,7 +668,10 @@ export async function excluirTrato(id: string): Promise<ActionState> {
 
 export async function concretizarPlantio(id: string): Promise<void> {
   try {
-    await prisma.plantio.update({ where: { id }, data: { projecao: false } });
+    await prisma.plantio.update({
+      where: { id, userId: await usuarioId() },
+      data: { projecao: false },
+    });
   } catch (e) {
     console.error(e);
     throw e;
@@ -653,7 +683,10 @@ export async function concretizarPlantio(id: string): Promise<void> {
 
 export async function concretizarTrato(id: string): Promise<void> {
   try {
-    await prisma.trato.update({ where: { id }, data: { projecao: false } });
+    await prisma.trato.update({
+      where: { id, userId: await usuarioId() },
+      data: { projecao: false },
+    });
   } catch (e) {
     console.error(e);
     throw e;
@@ -684,6 +717,7 @@ export async function criarInvestimento(
   try {
     await prisma.investimento.create({
       data: {
+        userId: await usuarioId(),
         fazendaId,
         safra: safra || null,
         nome,
@@ -704,7 +738,9 @@ export async function criarInvestimento(
 
 export async function excluirInvestimento(id: string): Promise<ActionState> {
   try {
-    await prisma.investimento.delete({ where: { id } });
+    await prisma.investimento.delete({
+      where: { id, userId: await usuarioId() },
+    });
   } catch (e) {
     console.error(e);
     return falha(e);

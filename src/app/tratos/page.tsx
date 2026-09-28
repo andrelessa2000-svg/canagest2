@@ -7,6 +7,7 @@ import { concretizarTrato, excluirTrato } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,14 @@ export default async function TratosPage({
 }) {
   const { reg } = await searchParams;
   const tratos = await prisma.trato.findMany({
-    where:
-      reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {},
+    where: {
+      userId: await userIdAtual(),
+      ...(reg === "proj"
+        ? { projecao: true }
+        : reg === "real"
+          ? { projecao: false }
+          : {}),
+    },
     include: {
       fazenda: { select: { nome: true } },
       talhao: { select: { nome: true } },

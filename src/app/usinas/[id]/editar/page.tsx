@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { atualizarUsina } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { UsinaForm } from "@/components/usina-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,9 @@ export default async function EditarUsinaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usina = await prisma.usina.findUnique({ where: { id } });
+  const usina = await prisma.usina.findUnique({
+    where: { id, userId: await userIdAtual() },
+  });
   if (!usina) notFound();
 
   return (

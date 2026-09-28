@@ -6,6 +6,7 @@ import { atualizarTrato } from "@/lib/actions";
 import { toDateInputValue } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { TratoForm } from "@/components/trato-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +24,17 @@ export default async function EditarTratoPage({
   const [trato, fazendas, talhoes, safrasRaw] = await Promise.all([
     prisma.trato.findUnique({ where: { id } }),
     prisma.fazenda.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
       orderBy: { nome: "asc" },
     }),
     prisma.talhao.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({
-      where: { safra: { not: null } },
+      where: { userId: await userIdAtual(), safra: { not: null } },
       select: { safra: true },
       distinct: ["safra"],
       orderBy: { safra: "asc" },

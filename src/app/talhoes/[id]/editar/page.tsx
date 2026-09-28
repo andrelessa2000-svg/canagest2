@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { atualizarTalhao } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { TalhaoForm } from "@/components/talhao-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function EditarTalhaoPage({
 }) {
   const { id } = await params;
   const talhao = await prisma.talhao.findUnique({
-    where: { id },
+    where: { id, userId: await userIdAtual() },
     include: { fazenda: { select: { nome: true } } },
   });
   if (!talhao) notFound();

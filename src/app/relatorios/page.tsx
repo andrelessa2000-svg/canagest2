@@ -10,6 +10,7 @@ import {
 } from "@/lib/format";
 import { calcularColheita } from "@/lib/colheita";
 import { cargarCascata } from "@/lib/relatorio";
+import { userIdAtual } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PrintButton } from "@/components/print-button";
@@ -31,8 +32,10 @@ function categoriaDespesas(rotulo: string, valor: number, cor: string) {
 }
 
 export default async function RelatoriosPage() {
+  const userId = await userIdAtual();
   const [colheitas, fazendas] = await Promise.all([
     prisma.colheita.findMany({
+      where: { userId },
       include: {
         fazenda: {
           select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
@@ -42,6 +45,7 @@ export default async function RelatoriosPage() {
       orderBy: { data: "asc" },
     }),
     prisma.fazenda.findMany({
+      where: { userId },
       select: {
         id: true,
         nome: true,

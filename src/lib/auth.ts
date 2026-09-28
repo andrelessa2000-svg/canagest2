@@ -10,6 +10,7 @@ const googleHabilitado = Boolean(
 );
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+
   adapter: PrismaAdapter(prisma),
   trustHost: true,
   session: { strategy: "jwt" },
@@ -49,3 +50,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: { signIn: "/login" },
 });
+
+export async function userIdAtual(): Promise<string> {
+  const { headers } = await import("next/headers");
+  const cookie = (await headers()).get("cookie") ?? "";
+  const secureCookie = cookie.includes("__Secure-authjs.session-token");
+  const { getToken } = await import("next-auth/jwt");
+  const token = await getToken({
+    req: { headers: { cookie } },
+    secret: process.env.AUTH_SECRET,
+    secureCookie,
+  });
+  if (!token?.sub) throw new Error("Não autenticado");
+  return token.sub;
+}

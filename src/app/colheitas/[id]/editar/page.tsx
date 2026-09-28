@@ -6,6 +6,7 @@ import { atualizarColheita } from "@/lib/actions";
 import { toDateInputValue, fmtDate } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { ColheitaForm } from "@/components/colheita-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,21 +23,26 @@ export default async function EditarColheitaPage({
   const { id } = await params;
 
   const [colheita, fazendasRaw, usinas, talhoes, safrasRaw] = await Promise.all([
-    prisma.colheita.findUnique({ where: { id } }),
+    prisma.colheita.findUnique({
+      where: { id, userId: await userIdAtual() },
+    }),
     prisma.fazenda.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
       orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true, modelo: true },
       orderBy: { nome: "asc" },
     }),
     prisma.talhao.findMany({
+      where: { userId: await userIdAtual() },
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     prisma.colheita.findMany({
-      where: { safra: { not: null } },
+      where: { userId: await userIdAtual(), safra: { not: null } },
       select: { safra: true },
       distinct: ["safra"],
       orderBy: { safra: "asc" },

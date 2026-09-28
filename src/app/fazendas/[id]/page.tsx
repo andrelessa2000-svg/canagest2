@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,11 @@ export default async function FazendaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const userId = await userIdAtual();
 
   const [fazenda, colheitas, resumen] = await Promise.all([
     prisma.fazenda.findUnique({
-      where: { id },
+      where: { id, userId },
       include: {
         talhoes: {
           orderBy: { nome: "asc" },
@@ -37,13 +39,13 @@ export default async function FazendaPage({
       },
     }),
     prisma.colheita.findMany({
-      where: { fazendaId: id },
+      where: { userId, fazendaId: id },
       include: { usina: { select: { nome: true } } },
       orderBy: { data: "desc" },
       take: 5,
     }),
     prisma.colheita.aggregate({
-      where: { fazendaId: id },
+      where: { userId, fazendaId: id },
       _sum: { toneladas: true },
       _count: true,
     }),

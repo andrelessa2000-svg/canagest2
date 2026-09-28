@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { atualizarFazenda } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { FazendaForm } from "@/components/fazenda-form";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,9 @@ export default async function EditarFazendaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const fazenda = await prisma.fazenda.findUnique({ where: { id } });
+  const fazenda = await prisma.fazenda.findUnique({
+    where: { id, userId: await userIdAtual() },
+  });
   if (!fazenda) notFound();
 
   return (

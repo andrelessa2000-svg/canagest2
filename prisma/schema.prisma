@@ -19,6 +19,13 @@ model User {
   accounts Account[]
   sessions Session[]
   passwordResets PasswordResetToken[]
+  fazendas     Fazenda[]
+  talhoes      Talhao[]
+  usinas       Usina[]
+  colheitas    Colheita[]
+  plantios     Plantio[]
+  tratos       Trato[]
+  investimentos Investimento[]
 }
 
 model Account {
@@ -68,6 +75,8 @@ model PasswordResetToken {
 
 model Fazenda {
   id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   nome        String
   ativa       Boolean   @default(true)
   criadaEm    DateTime  @default(now())
@@ -78,11 +87,13 @@ model Fazenda {
   tratos      Trato[]
   investimentos Investimento[]
 
-  @@index([nome])
+  @@index([userId, nome])
 }
 
 model Talhao {
   id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazendaId String
   fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   nome      String
@@ -92,21 +103,27 @@ model Talhao {
   tratos    Trato[]
 
   @@unique([fazendaId, nome])
+  @@index([userId])
   @@index([fazendaId])
 }
 
 model Usina {
   id        String     @id @default(cuid())
-  nome      String     @unique
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome      String
   modelo    String
   criadaEm  DateTime   @default(now())
   colheitas Colheita[]
 
-  @@index([nome])
+  @@unique([userId, nome])
+  @@index([userId, nome])
 }
 
 model Colheita {
   id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazendaId String
   fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   usinaId   String
@@ -161,6 +178,8 @@ model Colheita {
 
 model Plantio {
   id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazendaId  String
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
@@ -177,12 +196,15 @@ model Plantio {
   observacao String?
   criadaEm   DateTime @default(now())
 
+  @@index([userId, data])
   @@index([fazendaId, data])
   @@index([talhaoId])
 }
 
 model Trato {
   id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazendaId  String
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   talhaoId   String?
@@ -198,12 +220,15 @@ model Trato {
   observacao String?
   criadaEm   DateTime @default(now())
 
+  @@index([userId, data])
   @@index([fazendaId, data])
   @@index([talhaoId])
 }
 
 model Investimento {
   id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazendaId  String
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
   safra      String?

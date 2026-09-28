@@ -7,6 +7,7 @@ import { excluirTalhao } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { CelulaMetrica, GradeMetricas } from "@/components/stat-cells";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function TalhaoPage({
   const { id } = await params;
 
   const talhao = await prisma.talhao.findUnique({
-    where: { id },
+    where: { id, userId: await userIdAtual() },
     include: {
       fazenda: { select: { id: true, nome: true } },
     },

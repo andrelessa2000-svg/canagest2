@@ -7,11 +7,13 @@ import { excluirUsina } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsinasPage() {
   const usinas = await prisma.usina.findMany({
+    where: { userId: await userIdAtual() },
     include: { _count: { select: { colheitas: true } } },
     orderBy: { nome: "asc" },
   });

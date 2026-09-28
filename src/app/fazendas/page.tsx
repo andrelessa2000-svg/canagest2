@@ -5,6 +5,7 @@ import { fmtCount, fmtHa, fmtTarefas } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { LinhaLink } from "@/components/stat-cells";
+import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,14 @@ export default async function FazendasPage({
   searchParams: Promise<{ estado?: string }>;
 }) {
   const { estado } = await searchParams;
+  const userId = await userIdAtual();
 
   const where =
-    estado === "inactivas" ? { ativa: false } : estado === "ativas" ? { ativa: true } : {};
+    estado === "inactivas"
+      ? { userId, ativa: false }
+      : estado === "ativas"
+        ? { userId, ativa: true }
+        : { userId };
 
   const fazendas = await prisma.fazenda.findMany({
     where,
