@@ -18,7 +18,7 @@ export default async function FazendasPage({
   const userId = await userIdAtual();
 
   const where =
-    estado === "inactivas"
+    estado === "inativas"
       ? { userId, ativa: false }
       : estado === "ativas"
         ? { userId, ativa: true }
@@ -38,7 +38,7 @@ export default async function FazendasPage({
   const filtros = [
     { id: "", rotulo: "Todas" },
     { id: "ativas", rotulo: "Ativas" },
-    { id: "inactivas", rotulo: "Inactivas" },
+    { id: "inativas", rotulo: "Inativas" },
   ];
 
   return (
@@ -72,13 +72,13 @@ export default async function FazendasPage({
         <EmptyState
           icone={Sprout}
           titulo={
-            estado === "inactivas"
-              ? "Nenhuma fazenda inactiva"
+            estado === "inativas"
+              ? "Nenhuma fazenda inativa"
               : "Nenhuma fazenda ainda"
           }
           descricao={
-            estado === "inactivas"
-              ? "Quando venda/entregue uma fazenda, desmarque 'Ativa' e ela aparecerá aqui (archivada)."
+            estado === "inativas"
+              ? "Quando venda/entregue uma fazenda, desmarque 'Ativa' e ela aparecerá aqui (arquivada)."
               : "Cadastre a primeira fazenda para começar a estruturar seus talhões."
           }
           ctaTexto={estado ? undefined : "Cadastrar fazenda"}

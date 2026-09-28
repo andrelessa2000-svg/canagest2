@@ -256,7 +256,9 @@ export function SeletorInsumos({
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-sm text-ink-2">Total insumos: <strong className="tnum text-ink">{fmtMoney(total)}</strong></p>
+          <div aria-live="polite" aria-atomic="true" className="mt-2">
+            <p className="text-sm text-ink-2">Total insumos: <strong className="tnum text-ink">{fmtMoney(total)}</strong></p>
+          </div>
         </>
       )}
     </div>

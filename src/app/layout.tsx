@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { PwaRegister } from "@/components/pwa-register";
 import { auth } from "@/lib/auth";
+import { ThemeProvider } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  colorScheme: "light",
+  colorScheme: "light dark",
 };
 
 export default async function RootLayout({
@@ -72,7 +73,9 @@ export default async function RootLayout({
     >
       <body>
         <PwaRegister />
-        <AppShell usuario={usuario}>{children}</AppShell>
+        <ThemeProvider>
+          <AppShell usuario={usuario}>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

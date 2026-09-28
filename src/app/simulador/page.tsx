@@ -223,7 +223,7 @@ export default function SimuladorPage() {
             </div>
           </section>
 
-          <section className="rounded-[10px] border border-accent bg-accent-soft/30 p-5">
+          <section className="rounded-[10px] border border-accent bg-accent-soft/30 p-5" aria-live="polite" aria-atomic="true" aria-label="Resumo consolidado do simulador">
             <h3 className="font-display text-lg text-accent-strong mb-3 flex items-center gap-2">
               <Target className="size-5" /> Resumo consolidado
             </h3>

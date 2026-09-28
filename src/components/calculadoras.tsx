@@ -35,14 +35,23 @@ export function Calculadoras() {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap gap-1" role="tablist">
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Calculadoras disponíveis">
         {paneles.map((p) => (
           <button
             key={p.id}
+            id={`tab-${p.id}`}
             type="button"
             role="tab"
             aria-selected={activo === p.id}
+            aria-controls={`panel-${p.id}`}
+            tabIndex={activo === p.id ? 0 : -1}
             onClick={() => setActivo(p.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setActivo(p.id);
+              }
+            }}
             className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
               activo === p.id
                 ? "bg-accent text-surface"
@@ -55,10 +64,26 @@ export function Calculadoras() {
       </div>
 
       <div className="ledger-panel p-5 sm:p-6">
-        {activo === "area" && <AbaArea />}
-        {activo === "adubo" && <AbaAdubo />}
-        {activo === "herbicida" && <AbaHerbicida />}
-        {activo === "muda" && <AbaMuda />}
+        {activo === "area" && (
+          <div id="panel-area" role="tabpanel" aria-labelledby="tab-area" tabIndex={0}>
+            <AbaArea />
+          </div>
+        )}
+        {activo === "adubo" && (
+          <div id="panel-adubo" role="tabpanel" aria-labelledby="tab-adubo" tabIndex={0}>
+            <AbaAdubo />
+          </div>
+        )}
+        {activo === "herbicida" && (
+          <div id="panel-herbicida" role="tabpanel" aria-labelledby="tab-herbicida" tabIndex={0}>
+            <AbaHerbicida />
+          </div>
+        )}
+        {activo === "muda" && (
+          <div id="panel-muda" role="tabpanel" aria-labelledby="tab-muda" tabIndex={0}>
+            <AbaMuda />
+          </div>
+        )}
       </div>
     </div>
   );

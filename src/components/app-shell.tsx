@@ -18,6 +18,7 @@ import { Brand } from "./brand";
 import { BotaoSair } from "./botao-sair";
 import { InstallAppButton } from "./install-app-button";
 import { OfflineBanner } from "./offline-banner";
+import { ThemeToggle } from "./theme-toggle";
 
 const itens = [
   { href: "/", rotulo: "Início", icone: Home },
@@ -49,6 +50,12 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 btn btn-primary"
+      >
+        Pular para o conteúdo principal
+      </a>
       <div className="sticky top-0 z-40">
         <OfflineBanner />
         <header className="border-b border-line bg-base/90 backdrop-blur">
@@ -56,28 +63,34 @@ export function AppShell({
             <Brand />
 
             <nav
-              className="hidden items-center gap-1 md:flex overflow-x-auto flex-1 min-w-0"
+              className="hidden items-center gap-1 md:flex overflow-x-auto flex-1 min-w-0 relative"
               aria-label="Navegação principal"
               style={{ scrollbarWidth: "none" }}
             >
-              {itens.map(({ href, rotulo }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="nav-link whitespace-nowrap shrink-0"
-                  data-active={ativo(pathname, href)}
-                  aria-current={ativo(pathname, href) ? "page" : undefined}
-                >
-                  {rotulo}
-                </Link>
-              ))}
+              <div className="flex items-center gap-1 pb-1" role="navigation">
+                {itens.map(({ href, rotulo }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="nav-link whitespace-nowrap shrink-0"
+                    data-active={ativo(pathname, href)}
+                    aria-current={ativo(pathname, href) ? "page" : undefined}
+                  >
+                    {rotulo}
+                  </Link>
+                ))}
+              </div>
+              <div
+                className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-r from-transparent via-base/10 to-base"
+                aria-hidden="true"
+              />
             </nav>
 
             <div className="flex items-center gap-2">
               {usuario ? (
                 <>
                   <Link
-                    href="/cuenta"
+                    href="/conta"
                     className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-sm font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-surface-muted"
                     aria-label="Minha conta"
                   >
@@ -101,13 +114,14 @@ export function AppShell({
                   Entrar
                 </Link>
               )}
+              <ThemeToggle />
               <InstallAppButton />
             </div>
           </div>
         </header>
       </div>
 
-      <main className="mx-auto w-full max-w-5xl px-4 pt-6 pb-28 sm:px-6 md:pt-10 md:pb-20">
+      <main id="main-content" className="mx-auto w-full max-w-5xl px-4 pt-6 pb-28 sm:px-6 md:pt-10 md:pb-20">
         {children}
       </main>
 
