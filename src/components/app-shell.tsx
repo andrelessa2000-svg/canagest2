@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   BarChart3,
   Calculator,
+  ChevronDown,
   Factory,
   Home,
   Leaf,
@@ -19,23 +21,30 @@ import { BotaoSair } from "./botao-sair";
 import { InstallAppButton } from "./install-app-button";
 import { OfflineBanner } from "./offline-banner";
 
-const itens = [
+const itensPrincipais = [
   { href: "/", rotulo: "Início", icone: Home },
   { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
   { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
   { href: "/plantio", rotulo: "Plantio", icone: Leaf },
   { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
-  { href: "/simulador", rotulo: "Simulador", icone: Calculator },
-  { href: "/analise-talhoes", rotulo: "Análise talhões", icone: BarChart3 },
   { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
   { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
+];
+
+const itensFerramentas = [
+  { href: "/simulador", rotulo: "Simulador", icone: Calculator },
+  { href: "/analise-talhoes", rotulo: "Análise talhões", icone: BarChart3 },
   { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
 ];
 
 function ativo(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function ferramentaAtiva(pathname: string): boolean {
+  return itensFerramentas.some((item) => ativo(pathname, item.href));
 }
 
 export function AppShell({
@@ -46,6 +55,7 @@ export function AppShell({
   usuario?: { nome?: string | null; email?: string | null; image?: string | null } | null;
 }) {
   const pathname = usePathname();
+  const [ferramentasAberto, setFerramentasAberto] = useState(false);
 
   return (
     <div className="min-h-dvh">
@@ -61,28 +71,70 @@ export function AppShell({
           <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
             <Brand />
 
-            <nav
-              className="hidden items-center gap-1 md:flex overflow-x-auto flex-1 min-w-0 relative"
-              aria-label="Navegação principal"
-              style={{ scrollbarWidth: "none" }}
-            >
-              <div className="flex items-center gap-1 pb-1" role="navigation">
-                {itens.map(({ href, rotulo }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="nav-link whitespace-nowrap shrink-0"
-                    data-active={ativo(pathname, href)}
-                    aria-current={ativo(pathname, href) ? "page" : undefined}
+            <nav className="hidden items-center gap-1 md:flex" aria-label="Navegação principal">
+              {itensPrincipais.map(({ href, rotulo }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="nav-link whitespace-nowrap shrink-0"
+                  data-active={ativo(pathname, href)}
+                  aria-current={ativo(pathname, href) ? "page" : undefined}
+                >
+                  {rotulo}
+                </Link>
+              ))}
+
+              <div className="relative" role="menubar">
+                <button
+                  type="button"
+                  className={`nav-link whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                    ferramentaAtiva(pathname) ? "bg-accent-soft text-accent-strong font-semibold" : ""
+                  }`}
+                  aria-haspopup="true"
+                  aria-expanded={ferramentasAberto}
+                  aria-label="Ferramentas"
+                  onClick={() => setFerramentasAberto(!ferramentasAberto)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFerramentasAberto(!ferramentasAberto);
+                    }
+                    if (e.key === "Escape") {
+                      setFerramentasAberto(false);
+                    }
+                  }}
+                >
+                  Ferramentas
+                  <ChevronDown
+                    className={`size-4 transition-transform ${ferramentasAberto ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {ferramentasAberto && (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-lg border border-line bg-surface shadow-lg py-1"
+                    role="menu"
                   >
-                    {rotulo}
-                  </Link>
-                ))}
+                    {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        role="menuitem"
+                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                          ativo(pathname, href)
+                            ? "bg-accent-soft text-accent-strong font-semibold"
+                            : "text-ink-2 hover:bg-surface-muted hover:text-ink"
+                        }`}
+                        onClick={() => setFerramentasAberto(false)}
+                      >
+                        <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
+                        {rotulo}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div
-                className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-r from-transparent via-base/10 to-base"
-                aria-hidden="true"
-              />
             </nav>
 
             <div className="flex items-center gap-2">
@@ -131,7 +183,7 @@ export function AppShell({
           className="flex items-center gap-1 overflow-x-auto px-2 py-1"
           style={{ scrollbarWidth: "none" }}
         >
-          {itens.map(({ href, rotulo, icone: Icone }) => {
+          {itensPrincipais.map(({ href, rotulo, icone: Icone }) => {
             const current = ativo(pathname, href);
             return (
               <Link
@@ -157,6 +209,40 @@ export function AppShell({
               </Link>
             );
           })}
+          <div className="relative">
+            <button
+              type="button"
+              className={`flex min-w-14 shrink-0 flex-col items-center gap-1 py-2 text-[0.68rem] font-medium transition-colors ${
+                ferramentaAtiva(pathname) ? "text-accent-strong" : "text-ink-3"
+              }`}
+              onClick={() => setFerramentasAberto(!ferramentasAberto)}
+              aria-haspopup="true"
+              aria-expanded={ferramentasAberto}
+              aria-label="Ferramentas"
+            >
+              <Calculator className="size-5" strokeWidth={ferramentaAtiva(pathname) ? 2.4 : 2} />
+              <span className="text-[0.6rem]">Ferramentas</span>
+            </button>
+            {ferramentasAberto && (
+              <div className="absolute bottom-full right-0 mb-1 z-50 min-w-[160px] rounded-lg border border-line bg-surface shadow-lg py-1">
+                {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${
+                      ativo(pathname, href)
+                        ? "bg-accent-soft text-accent-strong font-semibold"
+                        : "text-ink-2 hover:bg-surface-muted hover:text-ink"
+                    }`}
+                    onClick={() => setFerramentasAberto(false)}
+                  >
+                    <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
+                    {rotulo}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
