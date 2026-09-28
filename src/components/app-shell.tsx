@@ -18,7 +18,6 @@ import { Brand } from "./brand";
 import { BotaoSair } from "./botao-sair";
 import { InstallAppButton } from "./install-app-button";
 import { OfflineBanner } from "./offline-banner";
-import { ThemeToggle } from "./theme-toggle";
 
 const itens = [
   { href: "/", rotulo: "Início", icone: Home },
@@ -114,7 +113,6 @@ export function AppShell({
                   Entrar
                 </Link>
               )}
-              <ThemeToggle />
               <InstallAppButton />
             </div>
           </div>

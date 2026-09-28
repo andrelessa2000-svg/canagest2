@@ -20,23 +20,6 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-[data-theme="dark"] {
-  --base: #161d18;
-  --surface: #1d2820;
-  --surface-muted: #26332a;
-  --ink: #f0f5f1;
-  --ink-2: #b8c9bf;
-  --ink-3: #8d9d92;
-  --line: #2d3d31;
-  --line-strong: #3d5242;
-  --accent: #4ab86a;
-  --accent-strong: #6cd98a;
-  --accent-soft: #1a3323;
-  --danger: #d47a5a;
-  --danger-strong: #e89a7a;
-  --danger-soft: #3a1f17;
-}
-
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
