@@ -70,6 +70,7 @@ const BRAZA_M = 2.2;
 const TAREFA_M2 = 625 * BRAZA_M * BRAZA_M; // 3.025 m²
 const TAREFA_BRACAS_CORRIDAS = 1250;
 const HA_M2 = 10000;
+const METROS_POR_BRAZA_CORRIDA = 2;
 
 type BaseArea = {
   tarefas: number;
@@ -82,7 +83,7 @@ function areaDesde(
   unidade: string,
   comp: string,
   larg: string,
-  sulcos?: { n: string; espaciado: string },
+  nSulcos?: string,
 ): BaseArea {
   const v = num(entrada);
   const c = num(comp);
@@ -109,8 +110,10 @@ function areaDesde(
       m2 = c * factor * (l * factor);
       break;
     case "sulcos": {
-      const compM = c * factor;
-      m2 = compM * num(sulcos?.n ?? "") * num(sulcos?.espaciado ?? "1,1");
+      const bracas =
+        unidade === "braças" ? c : c / METROS_POR_BRAZA_CORRIDA;
+      m2 =
+        (bracas / TAREFA_BRACAS_CORRIDAS) * num(nSulcos ?? "") * TAREFA_M2;
       break;
     }
   }
@@ -125,12 +128,15 @@ function AbaArea() {
   const [comp, setComp] = useState("");
   const [larg, setLarg] = useState("");
   const [nSulcos, setNSulcos] = useState("");
-  const [espaciado, setEspaciado] = useState("1,1");
 
-  const { tarefas, m2 } = areaDesde(valor, tipo, unidade, comp, larg, {
-    n: nSulcos,
-    espaciado,
-  });
+  const { tarefas, m2 } = areaDesde(valor, tipo, unidade, comp, larg, nSulcos);
+
+  const comprimentoEmMetros =
+    num(comp) * (unidade === "braças" ? METROS_POR_BRAZA_CORRIDA : 1);
+  const espacamentoMedio =
+    tipo === "sulcos" && comprimentoEmMetros > 0 && num(nSulcos) > 0
+      ? m2 / (comprimentoEmMetros * num(nSulcos))
+      : 0;
 
   return (
     <div className="grid gap-4">
@@ -157,7 +163,7 @@ function AbaArea() {
             <Campo
               label="Unidade do comprimento"
               htmlFor="unidadeSulcos"
-              hint="1 sulco de 1.250 braças corridas = 1 tarefa"
+              hint="1.250 braças corridas = 1 tarefa (1 braça corrida = 2 m)"
             >
               <select
                 id="unidadeSulcos"
@@ -185,19 +191,6 @@ function AbaArea() {
                 inputMode="decimal"
                 value={nSulcos}
                 onChange={(e) => setNSulcos(e.target.value)}
-              />
-            </Campo>
-            <Campo
-              label="Espaciamento entre sulcos (m)"
-              htmlFor="espaciado"
-              hint="Media braça = 1,1 m (padrón da cana)"
-            >
-              <input
-                id="espaciado"
-                className="field-input tnum"
-                inputMode="decimal"
-                value={espaciado}
-                onChange={(e) => setEspaciado(e.target.value)}
               />
             </Campo>
           </>
@@ -256,6 +249,12 @@ function AbaArea() {
         {linha("Braças quadradas", `${nf0.format(tarefas * 625)} braças²`)}
         {linha("Braças corridas", `${nf0.format(tarefas * TAREFA_BRACAS_CORRIDAS)}`)}
         {linha("Metros quadrados", `${nf0.format(m2)} m²`)}
+        {tipo === "sulcos" && espacamentoMedio > 0 && (
+          <>
+            {linha("Comprimento total dos sulcos", `${nf0.format(comprimentoEmMetros * num(nSulcos))} m`)}
+            {linha("Espaçamento médio entre sulcos", `${nf2.format(espacamentoMedio)} m`)}
+          </>
+        )}
       </dl>
     </div>
   );
