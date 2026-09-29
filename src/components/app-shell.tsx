@@ -126,6 +126,7 @@ export function AppShell({
 
                 {ferramentasAberto && (
                   <div
+                    ref={dropdownRef}
                     className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-lg border border-line bg-surface shadow-lg py-1"
                     role="menu"
                   >
