@@ -430,12 +430,12 @@ function AbaHerbicida() {
 
 function AbaMuda() {
   const [area, setArea] = useState("");
-  const [espaciamiento, setEspaciamiento] = useState("1,5");
+  const [espacamento, setEspacamento] = useState("1,5");
   const [gemasMetro, setGemasMetro] = useState("12");
   const [gemasTonelada, setGemasTonelada] = useState("");
 
   const m2 = num(area) * HA_M2;
-  const metros = num(espaciamiento) > 0 ? m2 / num(espaciamiento) : 0;
+  const metros = num(espacamento) > 0 ? m2 / num(espacamento) : 0;
   const gemas = metros * num(gemasMetro);
   const toneladas = gemasTonelada ? gemas / num(gemasTonelada) : 0;
 
@@ -446,8 +446,8 @@ function AbaMuda() {
         <Campo label="Área (ha)" htmlFor="mudaArea">
           <input id="mudaArea" className="field-input tnum" inputMode="decimal" value={area} onChange={(e) => setArea(e.target.value)} />
         </Campo>
-        <Campo label="Espaciamento entre sulcos (m)" htmlFor="mudaEsp">
-          <input id="mudaEsp" className="field-input tnum" inputMode="decimal" value={espaciamiento} onChange={(e) => setEspaciamiento(e.target.value)} />
+        <Campo label="Espaçamento entre sulcos (m)" htmlFor="mudaEsp">
+          <input id="mudaEsp" className="field-input tnum" inputMode="decimal" value={espacamento} onChange={(e) => setEspacamento(e.target.value)} />
         </Campo>
         <Campo label="Gemas por metro de sulco" htmlFor="mudaGemas">
           <input id="mudaGemas" className="field-input tnum" inputMode="decimal" value={gemasMetro} onChange={(e) => setGemasMetro(e.target.value)} />

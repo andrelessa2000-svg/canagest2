@@ -131,9 +131,9 @@ export default async function FinanceiroPage() {
   }
   const receitaProximaSafra = [...receitaProjPorFazenda.values()].reduce((a, v) => a + v, 0);
 
-  const caixaProyectado = caixa - gastosProximaSafra + receitaProximaSafra;
+  const caixaProjetado = caixa - gastosProximaSafra + receitaProximaSafra;
 
-  const projecciones: {
+  const projeções: {
     id: string;
     nome: string;
     fazenda: string;
@@ -179,7 +179,7 @@ export default async function FinanceiroPage() {
     })),
   ].sort((a, b) => b.data.getTime() - a.data.getTime());
 
-  const totalProjecc = projecciones.reduce((a, p) => a + p.valor, 0);
+  const totalProjecc = projeções.reduce((a, p) => a + p.valor, 0);
 
   if (t.receita === 0 && totalProjecc === 0) {
     return (
@@ -187,12 +187,12 @@ export default async function FinanceiroPage() {
         <PageHeader
           rotulo="financeiro"
           titulo="Financeiro"
-          descricao={`Caixa e proyecciones — safra atual ${safraAtual}, próxima ${safraProxima}.`}
+          descricao={`Caixa e projeções — safra atual ${safraAtual}, próxima ${safraProxima}.`}
         />
         <EmptyState
           icone={Wallet}
           titulo="Nada para mostrar ainda"
-          descricao="Registre colheitas e proyecciones futuras para ver o resultado financeiro do canavial."
+          descricao="Registre colheitas e projeções futuras para ver o resultado financeiro do canavial."
           ctaTexto="Registrar colheita"
           ctaHref="/colheitas/nova"
         />
@@ -211,7 +211,7 @@ export default async function FinanceiroPage() {
         caixa: real?.lucroNeto ?? 0,
         gastosProj,
         receitaProj,
-        caixaProyectado: (real?.lucroNeto ?? 0) - gastosProj + receitaProj,
+        caixaProjetado: (real?.lucroNeto ?? 0) - gastosProj + receitaProj,
       };
     })
     .sort((a, b) => b.caixa - a.caixa);
@@ -221,7 +221,7 @@ export default async function FinanceiroPage() {
       <PageHeader
         rotulo="financeiro"
         titulo="Financeiro"
-        descricao={`Caixa e proyecciones por safra. Safra atual: ${safraAtual} · próxima: ${safraProxima}. O caixa descuenta só as proyecciones da próxima safra.`}
+        descricao={`Caixa e projeções por safra. Safra atual: ${safraAtual} · próxima: ${safraProxima}. O caixa desconta só as projeções da próxima safra.`}
       />
 
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
@@ -239,12 +239,12 @@ export default async function FinanceiroPage() {
         <CelulaMetrica
           rotulo={`Receita prevista ${safraProxima}`}
           valor={fmtMoney(receitaProximaSafra)}
-          legenda="colheita proyectada"
+          legenda="colheita projetada"
         />
         <CelulaMetrica
-          rotulo="Caixa proyectado"
-          valor={fmtMoney(caixaProyectado)}
-          legenda={`${safraProxima} · após proyecciones`}
+          rotulo="Caixa projetado"
+          valor={fmtMoney(caixaProjetado)}
+          legenda={`${safraProxima} · após projeções`}
           destaque
         />
       </div>
@@ -259,7 +259,7 @@ export default async function FinanceiroPage() {
                 <th className="px-3 py-2 text-right font-semibold">Caixa atual</th>
                 <th className="px-3 py-2 text-right font-semibold">Gastos previstos</th>
                 <th className="px-3 py-2 text-right font-semibold">Receita prevista</th>
-                <th className="px-3 py-2 text-right font-semibold">Caixa proyectado</th>
+                <th className="px-3 py-2 text-right font-semibold">Caixa projetado</th>
               </tr>
             </thead>
             <tbody>
@@ -271,10 +271,10 @@ export default async function FinanceiroPage() {
                   <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.receitaProj)}</td>
                   <td
                     className={`px-3 py-2 text-right font-bold tabular-nums ${
-                      f.caixaProyectado < 0 ? "text-danger-strong" : "text-accent"
+                      f.caixaProjetado < 0 ? "text-danger-strong" : "text-accent"
                     }`}
                   >
-                    {fmtMoney(f.caixaProyectado)}
+                    {fmtMoney(f.caixaProjetado)}
                   </td>
                 </tr>
               ))}
@@ -282,23 +282,23 @@ export default async function FinanceiroPage() {
           </table>
         </div>
         <p className="px-1 text-xs text-ink-3">
-          Fazendas inativas (vendidas/entregadas) ficam fora do caixa; suas proyecciones não descontam.
+          Fazendas inativas (vendidas/entregues) ficam fora do caixa; suas projeções não descontam.
         </p>
       </section>
 
       <section className="mt-8 grid gap-4">
-        <h2 className="font-display text-xl text-ink">Proyecciones e investimentos futuros</h2>
+        <h2 className="font-display text-xl text-ink">Projeções e investimentos futuros</h2>
         <p className="text-sm text-ink-2">
-          Descuenta do caixa só o que pertence à próxima safra ({safraProxima}). Quando um trato/plantio
+          Desconta do caixa só o que pertence à próxima safra ({safraProxima}). Quando um trato/plantio
           aconteça, clique Concretizar; se não aconteça, exclua o registro.
         </p>
         <div className="rounded-[10px] border border-line bg-surface p-5">
           <InvestimentoForm fazendas={fazendas} safras={safras} />
         </div>
 
-        {projecciones.length > 0 && (
+        {projeções.length > 0 && (
           <ul className="divide-y divide-line rounded-[10px] border border-line bg-surface px-3">
-            {projecciones.map((i) => (
+            {projeções.map((i) => (
               <li key={`${i.tipo}-${i.id}`} className="-mx-2 flex items-center gap-2 px-2 py-3">
                 <span className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">{i.nome}</span>
@@ -317,11 +317,11 @@ export default async function FinanceiroPage() {
                     </span>
                     {i.ativa && esProxima(i.safra) ? (
                       <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
-                        Descuenta do caixa
+                        Desconta do caixa
                       </span>
                     ) : !i.ativa ? (
                       <span className="rounded-md bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
-                        Fazenda inactiva
+                        Fazenda inativa
                       </span>
                     ) : null}
                   </span>

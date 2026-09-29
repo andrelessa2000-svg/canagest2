@@ -7,7 +7,7 @@ import { BotaoSair } from "@/components/botao-sair";
 
 export const dynamic = "force-dynamic";
 
-export default async function CuentaPage() {
+export default async function ContaPage() {
   let session;
   try {
     session = await auth();
@@ -27,7 +27,7 @@ export default async function CuentaPage() {
   return (
     <>
       <PageHeader
-        rotulo="cuenta"
+        rotulo="conta"
         titulo="Minha conta"
         descricao="Dados de perfil e acesso ao CanaGest."
       />
