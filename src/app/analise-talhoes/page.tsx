@@ -50,10 +50,13 @@ type RegistroTalhao = {
   insumos?: unknown;
   despesasUsina?: unknown;
   usina?: { modelo: string } | null;
+  talhoesColhidos?: unknown;
 };
 
 function fracaoDoTalhao(r: RegistroTalhao, talhao: string, areas: Map<string, number>): number {
   if (!talhao) return 1;
+
+  // Plantio/Trato: usam talhaoId, talhoesIds, alocacoes
   if (r.talhaoId === talhao) return 1;
   const alocacoes = Array.isArray(r.alocacoes) ? r.alocacoes : [];
   const doTalhao = alocacoes.filter(
@@ -77,6 +80,22 @@ function fracaoDoTalhao(r: RegistroTalhao, talhao: string, areas: Map<string, nu
     const areaTotal = ids.reduce((s, id) => s + (areas.get(id) ?? 0), 0);
     return areaTotal > 0 ? (areas.get(talhao) ?? 0) / areaTotal : 1 / ids.length;
   }
+
+  // Colheita: usa talhoesColhidos [{ id, areaHa }]
+  const talhoesColhidos = Array.isArray(r.talhoesColhidos) ? r.talhoesColhidos : [];
+  const colhidoDoTalhao = talhoesColhidos.find(
+    (tc) => tc && typeof tc === "object" && (tc as { id?: string }).id === talhao,
+  );
+  if (colhidoDoTalhao) {
+    const areaTotal = talhoesColhidos.reduce(
+      (s, tc) => s + (Number((tc as { areaHa?: number }).areaHa) || 0),
+      0,
+    );
+    const areaTalhao = Number((colhidoDoTalhao as { areaHa?: number }).areaHa) || 0;
+    if (areaTotal > 0) return areaTalhao / areaTotal;
+    return 1 / talhoesColhidos.length;
+  }
+
   return 0;
 }
 
@@ -92,26 +111,37 @@ export default async function AnaliseTalhoesPage({
     userId: usuarioId,
     ...(safra ? { safra } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
-    ...(talhao ? { OR: [{ talhaoId: talhao }, { talhoesIds: { array_contains: [talhao] } }] } : {}),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
+  };
+
+  const whereBaseComTalhao: Record<string, unknown> = {
+    ...whereBase,
+    ...(talhao ? { OR: [{ talhaoId: talhao }, { talhoesIds: { array_contains: [talhao] } }] } : {}),
   };
 
   const dataIniObj = dataIni ? new Date(`${dataIni}T00:00:00`) : null;
   const dataFimObj = dataFim ? new Date(`${dataFim}T23:59:59`) : null;
   if (dataIniObj || dataFimObj) {
     whereBase.data = {};
-    if (dataIniObj) whereBase.data = { ...(whereBase.data as object), gte: dataIniObj };
-    if (dataFimObj) whereBase.data = { ...(whereBase.data as object), lte: dataFimObj };
+    whereBaseComTalhao.data = {};
+    if (dataIniObj) {
+      whereBase.data = { ...(whereBase.data as object), gte: dataIniObj };
+      whereBaseComTalhao.data = { ...(whereBaseComTalhao.data as object), gte: dataIniObj };
+    }
+    if (dataFimObj) {
+      whereBase.data = { ...(whereBase.data as object), lte: dataFimObj };
+      whereBaseComTalhao.data = { ...(whereBaseComTalhao.data as object), lte: dataFimObj };
+    }
   }
 
   const [plantios, tratos, colheitas, fazendasRaw, talhoesRaw, safras] = await Promise.all([
     prisma.plantio.findMany({
-      where: whereBase,
+      where: whereBaseComTalhao,
       include: { fazenda: { select: { nome: true } }, talhao: { select: { nome: true } } },
       orderBy: [{ data: "desc" }],
     }),
     prisma.trato.findMany({
-      where: whereBase,
+      where: whereBaseComTalhao,
       include: { fazenda: { select: { nome: true } }, talhao: { select: { nome: true } } },
       orderBy: [{ data: "desc" }],
     }),
@@ -181,8 +211,19 @@ export default async function AnaliseTalhoesPage({
   function add(r: RegistroTalhao, tipo: "plantio" | "trato" | "colheita") {
     const f = frac(r);
     if (f === 0) return;
-    const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as string[]) : [];
-    const alvoIds = ids.length > 0 ? ids : (r.talhaoId ? [r.talhaoId] : []);
+
+    let alvoIds: string[];
+
+    if (tipo === "colheita") {
+      const talhoesColhidos = Array.isArray(r.talhoesColhidos) ? r.talhoesColhidos : [];
+      alvoIds = talhoesColhidos
+        .map((tc) => (tc && typeof tc === "object" ? (tc as { id?: string }).id : null))
+        .filter((id): id is string => !!id);
+    } else {
+      const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as string[]) : [];
+      alvoIds = ids.length > 0 ? ids : (r.talhaoId ? [r.talhaoId] : []);
+    }
+
     for (const tid of alvoIds) {
       const t = talhoesRaw.find((x) => x.id === tid);
       if (!t) continue;
