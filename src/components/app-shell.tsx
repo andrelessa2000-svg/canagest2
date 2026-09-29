@@ -56,11 +56,17 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [ferramentasAberto, setFerramentasAberto] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownDesktopRef = useRef<HTMLDivElement>(null);
+  const dropdownMobileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const desktopDropdown = dropdownDesktopRef.current;
+      const mobileDropdown = dropdownMobileRef.current;
+      const clickedOutsideDesktop = desktopDropdown && !desktopDropdown.contains(event.target as Node);
+      const clickedOutsideMobile = mobileDropdown && !mobileDropdown.contains(event.target as Node);
+      
+      if ((ferramentasAberto && clickedOutsideDesktop) || (ferramentasAberto && clickedOutsideMobile)) {
         setFerramentasAberto(false);
       }
     }
@@ -72,9 +78,12 @@ export function AppShell({
 
   // Fechar dropdown quando a rota mudar (navegação via Link)
   useEffect(() => {
-    if (ferramentasAberto) {
-      setFerramentasAberto(false);
-    }
+    const timer = setTimeout(() => {
+      if (ferramentasAberto) {
+        setFerramentasAberto(false);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   return (
@@ -133,7 +142,7 @@ export function AppShell({
 
                 {ferramentasAberto && (
                   <div
-                    ref={dropdownRef}
+                    ref={dropdownDesktopRef}
                     className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-lg border border-line bg-surface shadow-lg py-1"
                     role="menu"
                   >
@@ -245,7 +254,7 @@ export function AppShell({
             </button>
 {ferramentasAberto && (
                 <div
-                  ref={dropdownRef}
+                  ref={dropdownMobileRef}
                   className="absolute bottom-full right-0 mb-1 z-50 min-w-[160px] rounded-lg border border-line bg-surface shadow-lg py-1"
                 >
                 {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
