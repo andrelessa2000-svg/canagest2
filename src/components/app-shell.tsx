@@ -70,6 +70,13 @@ export function AppShell({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [ferramentasAberto]);
 
+  // Fechar dropdown quando a rota mudar (navegação via Link)
+  useEffect(() => {
+    if (ferramentasAberto) {
+      setFerramentasAberto(false);
+    }
+  }, [pathname]);
+
   return (
     <div className="min-h-dvh">
       <a
@@ -140,7 +147,6 @@ export function AppShell({
                             ? "bg-accent-soft text-accent-strong font-semibold"
                             : "text-ink-2 hover:bg-surface-muted hover:text-ink"
                         }`}
-                        onClick={() => setFerramentasAberto(false)}
                       >
                         <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
                         {rotulo}
@@ -251,7 +257,6 @@ export function AppShell({
                         ? "bg-accent-soft text-accent-strong font-semibold"
                         : "text-ink-2 hover:bg-surface-muted hover:text-ink"
                     }`}
-                    onClick={() => setFerramentasAberto(false)}
                   >
                     <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
                     {rotulo}
