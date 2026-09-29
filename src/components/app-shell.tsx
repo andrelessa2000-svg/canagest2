@@ -63,10 +63,13 @@ export function AppShell({
     function handleClickOutside(event: MouseEvent) {
       const desktopDropdown = dropdownDesktopRef.current;
       const mobileDropdown = dropdownMobileRef.current;
-      const clickedOutsideDesktop = desktopDropdown && !desktopDropdown.contains(event.target as Node);
-      const clickedOutsideMobile = mobileDropdown && !mobileDropdown.contains(event.target as Node);
       
-      if ((ferramentasAberto && clickedOutsideDesktop) || (ferramentasAberto && clickedOutsideMobile)) {
+      // Fecha apenas se clicou fora de TODOS os dropdowns
+      const clickedInsideDesktop = desktopDropdown && desktopDropdown.contains(event.target as Node);
+      const clickedInsideMobile = mobileDropdown && mobileDropdown.contains(event.target as Node);
+      const clickedInsideAnyDropdown = clickedInsideDesktop || clickedInsideMobile;
+      
+      if (ferramentasAberto && !clickedInsideAnyDropdown) {
         setFerramentasAberto(false);
       }
     }
