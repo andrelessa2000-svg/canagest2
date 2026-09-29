@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { fmtMoney, parseDecimal } from "@/lib/format";
 import { Campo } from "./forms";
 

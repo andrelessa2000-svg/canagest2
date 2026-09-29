@@ -1,12 +1,16 @@
-import Link from "next/link";
-import { ChevronLeft, Filter, Calendar, Download } from "lucide-react";
+﻿import Link from "next/link";
+import { Filter, Layers } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtMoney, fmtCount } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { CelulaMetrica } from "@/components/stat-cells";
+import { EmptyState } from "@/components/empty-state";
 import { userIdAtual } from "@/lib/auth";
 import { safrasDoUsuario } from "@/lib/safras-usuario";
-import { calcularColheita, type EntradaCalculo } from "@/lib/colheita";
+import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
+import { areaColhidaHa } from "@/lib/rateio";
+import { agregarPorTalhao, type Agregado } from "@/lib/analise";
+import { TAREFAS_POR_HA } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -19,85 +23,8 @@ type Filtros = {
   reg?: string;
 };
 
-type RegistroTalhao = {
-  id: string;
-  data: Date;
-  tipo: string;
-  valor?: number;
-  tarefas?: number | null;
-  talhaoId?: string | null;
-  talhoesIds?: unknown;
-  alocacoes?: unknown;
-  safra?: string | null;
-  projecao: boolean;
-  fazenda: { nome: string };
-  talhao?: { nome: string } | null;
-  // Colheita específicos
-  toneladas?: number;
-  precoCana?: number | null;
-  ctc?: number;
-  agio?: number | null;
-  atrPorTonelada?: number | null;
-  precoKgAtr?: number | null;
-  areaColhida?: number | null;
-  arrendar?: boolean;
-  tonsPorTarefa?: number | null;
-  tarefasArrendadas?: number | null;
-  adubo?: boolean;
-  precoTonAdubo?: number | null;
-  tarefasAdubo?: number | null;
-  herbicidas?: unknown;
-  insumos?: unknown;
-  despesasUsina?: unknown;
-  usina?: { modelo: string } | null;
-  talhoesColhidos?: unknown;
-};
-
-function fracaoDoTalhao(r: RegistroTalhao, talhao: string, areas: Map<string, number>): number {
-  if (!talhao) return 1;
-
-  // Plantio/Trato: usam talhaoId, talhoesIds, alocacoes
-  if (r.talhaoId === talhao) return 1;
-  const alocacoes = Array.isArray(r.alocacoes) ? r.alocacoes : [];
-  const doTalhao = alocacoes.filter(
-    (a) => a && typeof a === "object" && (a as { talhaoId?: string }).talhaoId === talhao,
-  );
-  if (doTalhao.length > 0) {
-    const totalTarefas = alocacoes.reduce(
-      (s, a) => s + (Number((a as { tarefas?: number }).tarefas) || 0),
-      0,
-    );
-    const tarefasTalhao = doTalhao.reduce(
-      (s, a) => s + (Number((a as { tarefas?: number }).tarefas) || 0),
-      0,
-    );
-    if (totalTarefas > 0) return tarefasTalhao / totalTarefas;
-    return doTalhao.length / alocacoes.length;
-  }
-  const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as string[]) : [];
-  if (ids.includes(talhao)) {
-    if (ids.length === 1) return 1;
-    const areaTotal = ids.reduce((s, id) => s + (areas.get(id) ?? 0), 0);
-    return areaTotal > 0 ? (areas.get(talhao) ?? 0) / areaTotal : 1 / ids.length;
-  }
-
-  // Colheita: usa talhoesColhidos [{ id, areaHa }]
-  const talhoesColhidos = Array.isArray(r.talhoesColhidos) ? r.talhoesColhidos : [];
-  const colhidoDoTalhao = talhoesColhidos.find(
-    (tc) => tc && typeof tc === "object" && (tc as { id?: string }).id === talhao,
-  );
-  if (colhidoDoTalhao) {
-    const areaTotal = talhoesColhidos.reduce(
-      (s, tc) => s + (Number((tc as { areaHa?: number }).areaHa) || 0),
-      0,
-    );
-    const areaTalhao = Number((colhidoDoTalhao as { areaHa?: number }).areaHa) || 0;
-    if (areaTotal > 0) return areaTalhao / areaTotal;
-    return 1 / talhoesColhidos.length;
-  }
-
-  return 0;
-}
+const MENSAGEM_VAZIO =
+  "Ajuste os filtros ou cadastre plantios, tratos e colheitas para ver o resultado por talhão.";
 
 export default async function AnaliseTalhoesPage({
   searchParams,
@@ -105,222 +32,102 @@ export default async function AnaliseTalhoesPage({
   searchParams: Promise<Filtros>;
 }) {
   const { safra, fazenda, talhao, dataIni, dataFim, reg } = await searchParams;
-  const usuarioId = await userIdAtual();
+  const userId = await userIdAtual();
 
-  const whereBase: Record<string, unknown> = {
-    userId: usuarioId,
+  // O filtro de talhão é aplicado depois do rateio: assim registros de
+  // "fazenda inteira" e colheitas antigas sem talhões também entram na conta.
+  const where: Record<string, unknown> = {
+    userId,
     ...(safra ? { safra } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
   };
+  const intervalo: { gte?: Date; lte?: Date } = {};
+  if (dataIni) intervalo.gte = new Date(`${dataIni}T00:00:00`);
+  if (dataFim) intervalo.lte = new Date(`${dataFim}T23:59:59`);
+  if (intervalo.gte || intervalo.lte) where.data = intervalo;
 
-  const whereBaseComTalhao: Record<string, unknown> = {
-    ...whereBase,
-    ...(talhao ? { OR: [{ talhaoId: talhao }, { talhoesIds: { array_contains: [talhao] } }] } : {}),
-  };
-
-  const dataIniObj = dataIni ? new Date(`${dataIni}T00:00:00`) : null;
-  const dataFimObj = dataFim ? new Date(`${dataFim}T23:59:59`) : null;
-  if (dataIniObj || dataFimObj) {
-    whereBase.data = {};
-    whereBaseComTalhao.data = {};
-    if (dataIniObj) {
-      whereBase.data = { ...(whereBase.data as object), gte: dataIniObj };
-      whereBaseComTalhao.data = { ...(whereBaseComTalhao.data as object), gte: dataIniObj };
-    }
-    if (dataFimObj) {
-      whereBase.data = { ...(whereBase.data as object), lte: dataFimObj };
-      whereBaseComTalhao.data = { ...(whereBaseComTalhao.data as object), lte: dataFimObj };
-    }
-  }
-
-  const [plantios, tratos, colheitas, fazendasRaw, talhoesRaw, safras] = await Promise.all([
-    prisma.plantio.findMany({
-      where: whereBaseComTalhao,
-      include: { fazenda: { select: { nome: true } }, talhao: { select: { nome: true } } },
-      orderBy: [{ data: "desc" }],
-    }),
-    prisma.trato.findMany({
-      where: whereBaseComTalhao,
-      include: { fazenda: { select: { nome: true } }, talhao: { select: { nome: true } } },
-      orderBy: [{ data: "desc" }],
-    }),
-    prisma.colheita.findMany({
-      where: whereBase,
-      orderBy: [{ data: "desc" }],
-      select: {
-        id: true,
-        data: true,
-        tipo: true,
-        safra: true,
-        projecao: true,
-        talhoesColhidos: true,
-        toneladas: true,
-        precoCana: true,
-        agio: true,
-        atrPorTonelada: true,
-        precoKgAtr: true,
-        ctc: true,
-        areaColhida: true,
-        arrendar: true,
-        tonsPorTarefa: true,
-        tarefasArrendadas: true,
-        adubo: true,
-        precoTonAdubo: true,
-        tarefasAdubo: true,
-        herbicidas: true,
-        insumos: true,
-        despesasUsina: true,
-        fazendaId: true,
-        usinaId: true,
-        usina: { select: { modelo: true } },
-        fazenda: { select: { nome: true } },
-      },
-    }),
+  const [plantios, tratos, colheitas, fazendas, talhoes, safras] = await Promise.all([
+    prisma.plantio.findMany({ where }),
+    prisma.trato.findMany({ where }),
+    prisma.colheita.findMany({ where, include: { usina: { select: { modelo: true } } } }),
     prisma.fazenda.findMany({
-      where: { userId: usuarioId },
+      where: { userId },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
     prisma.talhao.findMany({
-      where: { userId: usuarioId },
+      where: { userId },
       select: { id: true, nome: true, fazendaId: true, areaHa: true },
       orderBy: { nome: "asc" },
     }),
     safrasDoUsuario(),
   ]);
 
-  const areasPorTalhao = new Map(talhoesRaw.map((t) => [t.id, t.areaHa]));
-  const frac = (r: RegistroTalhao) => fracaoDoTalhao(r, talhao ?? "", areasPorTalhao);
+  const colheitasCalculadas = colheitas.map((c) => {
+    const ha = areaColhidaHa(c, c.fazendaId, talhoes);
+    const r = calcularColheita({
+      modelo: c.usina.modelo,
+      tipo: c.tipo,
+      toneladas: c.toneladas,
+      precoCana: c.precoCana,
+      agio: c.agio,
+      atrPorTonelada: c.atrPorTonelada,
+      precoKgAtr: c.precoKgAtr,
+      ctc: c.ctc,
+      areaColhida: ha * TAREFAS_POR_HA,
+      arrendar: c.arrendar,
+      tonsPorTarefa: c.tonsPorTarefa,
+      tarefasArrendadas: c.tarefasArrendadas,
+      adubo: c.adubo,
+      precoTonAdubo: c.precoTonAdubo,
+      tarefasAdubo: c.tarefasAdubo ?? ha * TAREFAS_POR_HA,
+      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
+      insumos: (c.insumos ?? []) as ItemDespesa[],
+      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+    });
+    return {
+      fazendaId: c.fazendaId,
+      talhoesColhidos: c.talhoesColhidos,
+      toneladas: c.toneladas,
+      areaHa: ha,
+      receita: r.receita,
+      despesas: r.totalDespesas,
+    };
+  });
 
-  type Agregado = {
-    talhaoId: string;
-    talhaoNome: string;
-    fazendaNome: string;
-    plantioValor: number;
-    plantioArea: number;
-    tratoValor: number;
-    colheitaValor: number;
-    colheitaToneladas: number;
-    receita: number;
-    nRegistros: number;
+  const lista = agregarPorTalhao({
+    talhoes,
+    nomeFazenda: new Map(fazendas.map((f) => [f.id, f.nome])),
+    plantios,
+    tratos,
+    colheitas: colheitasCalculadas,
+    talhaoFiltro: talhao || undefined,
+  });
+  const custo = (a: Agregado) => a.plantio + a.tratos + a.colheitaCusto;
+  const lucro = (a: Agregado) => a.receita - custo(a);
+  const soma = (f: (a: Agregado) => number) => lista.reduce((s, a) => s + f(a), 0);
+  const tot = {
+    plantio: soma((a) => a.plantio),
+    tratos: soma((a) => a.tratos),
+    colheita: soma((a) => a.colheitaCusto),
+    toneladas: soma((a) => a.toneladas),
+    ha: soma((a) => a.haColhidos),
+    receita: soma((a) => a.receita),
   };
-
-  const map = new Map<string, Agregado>();
-
-  function add(r: RegistroTalhao, tipo: "plantio" | "trato" | "colheita") {
-    const f = frac(r);
-    if (f === 0) return;
-
-    let alvoIds: string[];
-
-    if (tipo === "colheita") {
-      const talhoesColhidos = Array.isArray(r.talhoesColhidos) ? r.talhoesColhidos : [];
-      alvoIds = talhoesColhidos
-        .map((tc) => (tc && typeof tc === "object" ? (tc as { id?: string }).id : null))
-        .filter((id): id is string => !!id);
-    } else {
-      const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as string[]) : [];
-      alvoIds = ids.length > 0 ? ids : (r.talhaoId ? [r.talhaoId] : []);
-    }
-
-    for (const tid of alvoIds) {
-      const t = talhoesRaw.find((x) => x.id === tid);
-      if (!t) continue;
-      const key = tid;
-      const ag = map.get(key) ?? {
-        talhaoId: tid,
-        talhaoNome: t.nome,
-        fazendaNome: r.fazenda.nome,
-        plantioValor: 0,
-        plantioArea: 0,
-        tratoValor: 0,
-        colheitaValor: 0,
-        colheitaToneladas: 0,
-        receita: 0,
-        nRegistros: 0,
-      };
-      if (tipo === "plantio") {
-        ag.plantioValor += (r.valor || 0) * f;
-        ag.plantioArea += (Number((r as { areaHa?: number }).areaHa) || 0) * f;
-      } else if (tipo === "trato") {
-        ag.tratoValor += (r.valor || 0) * f;
-      } else if (tipo === "colheita") {
-        const modelo = (r.usina?.modelo ?? "pindorama") as "pindorama" | "coruripe";
-        const entrada: EntradaCalculo = {
-          modelo,
-          tipo: r.tipo ?? undefined,
-          toneladas: r.toneladas ?? 0,
-          precoCana: r.precoCana ?? undefined,
-          agio: r.agio ?? undefined,
-          atrPorTonelada: r.atrPorTonelada ?? undefined,
-          precoKgAtr: r.precoKgAtr ?? undefined,
-          ctc: r.ctc ?? undefined,
-          areaColhida: r.areaColhida ?? undefined,
-          arrendar: r.arrendar ?? false,
-          tonsPorTarefa: r.tonsPorTarefa ?? undefined,
-          tarefasArrendadas: r.tarefasArrendadas ?? undefined,
-          adubo: r.adubo ?? false,
-          precoTonAdubo: r.precoTonAdubo ?? undefined,
-          tarefasAdubo: r.tarefasAdubo ?? undefined,
-          herbicidas: Array.isArray(r.herbicidas)
-            ? r.herbicidas.map((i: { nome?: unknown; valor?: unknown }) => ({
-                nome: String(i.nome ?? ""),
-                valor: Number(i.valor) || 0,
-              }))
-            : [],
-          insumos: Array.isArray(r.insumos)
-            ? r.insumos.map((i: { nome?: unknown; valor?: unknown }) => ({
-                nome: String(i.nome ?? ""),
-                valor: Number(i.valor) || 0,
-              }))
-            : [],
-          despesasUsina: Array.isArray(r.despesasUsina)
-            ? r.despesasUsina.map((i: { nome?: unknown; valor?: unknown }) => ({
-                nome: String(i.nome ?? ""),
-                valor: Number(i.valor) || 0,
-              }))
-            : [],
-        };
-        const resultado = calcularColheita(entrada);
-        ag.colheitaValor += resultado.totalDespesas * f;
-        ag.colheitaToneladas += (r.toneladas || 0) * f;
-        ag.receita += resultado.receita * f;
-      }
-      ag.nRegistros += 1;
-      map.set(key, ag);
-    }
-  }
-
-  for (const p of plantios) add(p, "plantio");
-  for (const t of tratos) add(t, "trato");
-  for (const c of colheitas) add(c, "colheita");
-
-  const lista = [...map.values()].sort((a, b) => a.fazendaNome.localeCompare(b.fazendaNome) || a.talhaoNome.localeCompare(b.talhaoNome));
-
-  const totalPlantio = lista.reduce((s, a) => s + a.plantioValor, 0);
-  const totalTrato = lista.reduce((s, a) => s + a.tratoValor, 0);
-  const totalColheitaCusto = lista.reduce((s, a) => s + a.colheitaValor, 0);
-  const totalToneladas = lista.reduce((s, a) => s + a.colheitaToneladas, 0);
-  const totalReceita = lista.reduce((s, a) => s + a.receita, 0);
-  const totalLucro = totalReceita - totalPlantio - totalTrato - totalColheitaCusto;
+  const totalLucro = tot.receita - tot.plantio - tot.tratos - tot.colheita;
+  const prod = (ton: number, ha: number) => (ha > 0 ? `${(ton / ha).toFixed(1).replace(".", ",")} t/ha` : "—");
 
   return (
     <>
-      <Link
-        href="/relatorios"
-        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-ink-3 hover:text-ink"
-      >
-        <ChevronLeft className="size-4" /> Relatórios
-      </Link>
       <PageHeader
-        rotulo="relatório · análise por talhão"
+        rotulo="Ferramentas"
         titulo="Análise por talhão"
-        descricao="Custos de plantio/trato, produção, receita e lucro por talhão — com rateio por fração nas alocações."
+        descricao="Custo, produção e lucro de cada talhão. Registros que cobrem vários talhões são divididos pela área (ou pelas tarefas informadas); nada é contado em duplicidade."
       />
 
-      <form method="GET" className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="grid gap-1">
+      <form method="GET" className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <label className="grid gap-1.5">
           <span className="field-label">Safra</span>
           <select name="safra" defaultValue={safra ?? ""} className="field-input">
             <option value="">Todas</option>
@@ -331,22 +138,22 @@ export default async function AnaliseTalhoesPage({
             ))}
           </select>
         </label>
-        <label className="grid gap-1">
+        <label className="grid gap-1.5">
           <span className="field-label">Fazenda</span>
           <select name="fazenda" defaultValue={fazenda ?? ""} className="field-input">
             <option value="">Todas</option>
-            {fazendasRaw.map((f) => (
+            {fazendas.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nome}
               </option>
             ))}
           </select>
         </label>
-        <label className="grid gap-1">
+        <label className="grid gap-1.5">
           <span className="field-label">Talhão</span>
           <select name="talhao" defaultValue={talhao ?? ""} className="field-input">
             <option value="">Todos</option>
-            {talhoesRaw
+            {talhoes
               .filter((t) => !fazenda || t.fazendaId === fazenda)
               .map((t) => (
                 <option key={t.id} value={t.id}>
@@ -355,15 +162,15 @@ export default async function AnaliseTalhoesPage({
               ))}
           </select>
         </label>
-        <label className="grid gap-1">
-          <span className="field-label">Data início</span>
+        <label className="grid gap-1.5">
+          <span className="field-label">De</span>
           <input type="date" name="dataIni" defaultValue={dataIni ?? ""} className="field-input" />
         </label>
-        <label className="grid gap-1">
-          <span className="field-label">Data fim</span>
+        <label className="grid gap-1.5">
+          <span className="field-label">Até</span>
           <input type="date" name="dataFim" defaultValue={dataFim ?? ""} className="field-input" />
         </label>
-        <label className="grid gap-1 lg:col-span-2">
+        <label className="grid gap-1.5">
           <span className="field-label">Registro</span>
           <select name="reg" defaultValue={reg ?? ""} className="field-input">
             <option value="">Todos</option>
@@ -371,87 +178,76 @@ export default async function AnaliseTalhoesPage({
             <option value="proj">Projeções</option>
           </select>
         </label>
-        <div className="flex flex-wrap items-end gap-2 lg:col-span-5">
-          <button type="submit" className="btn btn-secondary">
-            <Filter className="size-4" /> Filtrar
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-6">
+          <button type="submit" className="btn btn-primary">
+            <Filter className="size-4" /> Aplicar filtros
           </button>
           <Link href="/analise-talhoes" className="btn btn-ghost">
             Limpar
           </Link>
-          <button type="button" className="btn btn-ghost ml-auto" aria-label="Exportar CSV">
-            <Download className="size-4" /> CSV
-          </button>
         </div>
       </form>
 
-      {talhao && (
-        <p className="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
-          Valores de registros que cobrem vários talhões são rateados pela fração do talhão no registro.
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-6 mb-4">
-        <CelulaMetrica rotulo="Plantio" valor={fmtMoney(totalPlantio)} legenda={`${plantios.length} reg.`} />
-        <CelulaMetrica rotulo="Tratos" valor={fmtMoney(totalTrato)} legenda={`${tratos.length} reg.`} />
-        <CelulaMetrica rotulo="Colheita (custo)" valor={fmtMoney(totalColheitaCusto)} legenda={`${colheitas.length} reg.`} />
-        <CelulaMetrica rotulo="Toneladas" valor={fmtCount(totalToneladas)} legenda="t" />
-        <CelulaMetrica rotulo="Receita" valor={fmtMoney(totalReceita)} />
+      <div className="metric-grid mb-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <CelulaMetrica rotulo="Plantio" valor={fmtMoney(tot.plantio)} />
+        <CelulaMetrica rotulo="Tratos" valor={fmtMoney(tot.tratos)} />
+        <CelulaMetrica rotulo="Colheita (custo)" valor={fmtMoney(tot.colheita)} />
+        <CelulaMetrica rotulo="Produção" valor={`${fmtCount(tot.toneladas)} t`} legenda={prod(tot.toneladas, tot.ha)} />
+        <CelulaMetrica rotulo="Receita" valor={fmtMoney(tot.receita)} />
         <CelulaMetrica rotulo="Lucro" valor={fmtMoney(totalLucro)} destaque />
       </div>
 
       {lista.length === 0 ? (
-        <div className="rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-8 text-center">
-          <Calendar className="size-12 text-ink-3 mx-auto mb-3" />
-          <h3 className="font-display text-lg text-ink mb-1">Nenhum dado no filtro</h3>
-          <p className="text-ink-2">Ajuste os filtros ou cadastre plantios, tratos e colheitas para este talhão.</p>
-        </div>
+        <EmptyState icone={Layers} titulo="Nada para mostrar" descricao={MENSAGEM_VAZIO} />
       ) : (
-        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-          <table className="w-full text-sm">
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-line bg-surface-muted text-left text-ink-3">
-                <th className="p-3 font-medium">Talhão</th>
-                <th className="p-3 font-medium">Fazenda</th>
-                <th className="p-3 font-medium tnum">Plantio</th>
-                <th className="p-3 font-medium tnum">Área plantio (ha)</th>
-                <th className="p-3 font-medium tnum">Tratos</th>
-                <th className="p-3 font-medium tnum">Colheita custo</th>
-                <th className="p-3 font-medium tnum">Toneladas</th>
-                <th className="p-3 font-medium tnum">Receita</th>
-                <th className="p-3 font-medium tnum">Lucro</th>
-                <th className="p-3 font-medium tnum">Registros</th>
+              <tr>
+                <th>Talhão</th>
+                <th>Fazenda</th>
+                <th className="num">Plantio</th>
+                <th className="num">Tratos</th>
+                <th className="num">Colheita</th>
+                <th className="num">Produção</th>
+                <th className="num">t/ha</th>
+                <th className="num">Receita</th>
+                <th className="num">Lucro</th>
+                <th className="num">Lucro/ha</th>
               </tr>
             </thead>
             <tbody>
               {lista.map((a) => {
-                const lucro = a.receita - a.plantioValor - a.tratoValor - a.colheitaValor;
+                const l = lucro(a);
                 return (
-                  <tr key={a.talhaoId} className="border-b border-line/50 hover:bg-surface-muted/50">
-                    <td className="p-3 font-medium text-ink">{a.talhaoNome}</td>
-                    <td className="p-3 text-ink-2">{a.fazendaNome}</td>
-                    <td className="p-3 tnum">{fmtMoney(a.plantioValor)}</td>
-                    <td className="p-3 tnum">{a.plantioArea.toFixed(2).replace(".", ",")}</td>
-                    <td className="p-3 tnum">{fmtMoney(a.tratoValor)}</td>
-                    <td className="p-3 tnum">{fmtMoney(a.colheitaValor)}</td>
-                    <td className="p-3 tnum">{fmtCount(a.colheitaToneladas)}</td>
-                    <td className="p-3 tnum">{fmtMoney(a.receita)}</td>
-                    <td className="p-3 tnum font-semibold">{fmtMoney(lucro)}</td>
-                    <td className="p-3 tnum text-ink-2">{a.nRegistros}</td>
+                  <tr key={a.talhaoId}>
+                    <td className="font-semibold text-ink">{a.talhaoNome}</td>
+                    <td className="text-ink-2">{a.fazendaNome}</td>
+                    <td className="num">{fmtMoney(a.plantio)}</td>
+                    <td className="num">{fmtMoney(a.tratos)}</td>
+                    <td className="num">{fmtMoney(a.colheitaCusto)}</td>
+                    <td className="num">{fmtCount(a.toneladas)} t</td>
+                    <td className="num">{prod(a.toneladas, a.haColhidos)}</td>
+                    <td className="num">{fmtMoney(a.receita)}</td>
+                    <td className={`num font-semibold ${l < 0 ? "text-danger-strong" : "text-accent-strong"}`}>
+                      {fmtMoney(l)}
+                    </td>
+                    <td className="num">{a.areaHa > 0 ? fmtMoney(l / a.areaHa) : "—"}</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-line bg-surface-muted font-semibold">
-                <td className="p-3" colSpan={2}>TOTAL</td>
-                <td className="p-3 tnum">{fmtMoney(totalPlantio)}</td>
-                <td className="p-3 tnum">{lista.reduce((s, a) => s + a.plantioArea, 0).toFixed(2).replace(".", ",")}</td>
-                <td className="p-3 tnum">{fmtMoney(totalTrato)}</td>
-                <td className="p-3 tnum">{fmtMoney(totalColheitaCusto)}</td>
-                <td className="p-3 tnum">{fmtCount(totalToneladas)}</td>
-                <td className="p-3 tnum">{fmtMoney(totalReceita)}</td>
-                <td className="p-3 tnum">{fmtMoney(totalLucro)}</td>
-                <td className="p-3 tnum">{lista.reduce((s, a) => s + a.nRegistros, 0)}</td>
+              <tr>
+                <td colSpan={2}>Total</td>
+                <td className="num">{fmtMoney(tot.plantio)}</td>
+                <td className="num">{fmtMoney(tot.tratos)}</td>
+                <td className="num">{fmtMoney(tot.colheita)}</td>
+                <td className="num">{fmtCount(tot.toneladas)} t</td>
+                <td className="num">{prod(tot.toneladas, tot.ha)}</td>
+                <td className="num">{fmtMoney(tot.receita)}</td>
+                <td className="num">{fmtMoney(totalLucro)}</td>
+                <td className="num">—</td>
               </tr>
             </tfoot>
           </table>

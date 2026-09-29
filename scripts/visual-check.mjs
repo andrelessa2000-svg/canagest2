@@ -22,6 +22,9 @@ const ROTAS = [
   { url: "/calculadoras", nome: "calculadoras" },
   { url: "/plantio", nome: "plantio" },
   { url: "/tratos", nome: "tratos" },
+  { url: "/simulador", nome: "simulador" },
+  { url: "/analise-talhoes", nome: "analise-talhoes" },
+  { url: "/financeiro", nome: "financeiro" },
 ];
 
 const problemas = [];

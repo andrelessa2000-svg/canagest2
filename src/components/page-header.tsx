@@ -10,16 +10,14 @@ export function PageHeader({
   acao?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid gap-1.5">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
+      <div className="grid min-w-0 gap-1">
         {rotulo && <p className="eyebrow">{rotulo}</p>}
-        <h1 className="font-display text-[2rem] leading-[1.05] tracking-tight text-ink sm:text-4xl">
+        <h1 className="font-display text-[1.728rem] leading-tight text-ink sm:text-[2.074rem]">
           {titulo}
         </h1>
         {descricao && (
-          <p className="max-w-lg text-sm leading-relaxed text-ink-2 sm:text-[0.95rem]">
-            {descricao}
-          </p>
+          <p className="max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">{descricao}</p>
         )}
       </div>
       {acao && <div className="flex items-center gap-2">{acao}</div>}

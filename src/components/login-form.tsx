@@ -4,13 +4,26 @@ import { useEffect, useState } from "react";
 import { getCsrfToken, signIn } from "next-auth/react";
 import { Campo } from "./forms";
 
+// Uma única requisição de CSRF por carregamento da página. Em desenvolvimento o
+// React executa o efeito duas vezes; duas requisições simultâneas gravam cookies
+// diferentes e o token do formulário podia não bater com o cookie (MissingCSRF).
+let csrfEmAndamento: Promise<string | undefined> | null = null;
+function obterCsrf() {
+  if (!csrfEmAndamento) {
+    csrfEmAndamento = getCsrfToken().catch(() => undefined);
+    // Some do cache logo depois, para um login posterior buscar um token novo.
+    setTimeout(() => {
+      csrfEmAndamento = null;
+    }, 2000);
+  }
+  return csrfEmAndamento;
+}
+
 export function LoginForm({ googleHabilitado }: { googleHabilitado: boolean }) {
   const [csrf, setCsrf] = useState("");
 
   useEffect(() => {
-    getCsrfToken()
-      .then((t) => setCsrf(t ?? ""))
-      .catch(() => setCsrf(""));
+    obterCsrf().then((t) => setCsrf(t ?? ""));
   }, []);
 
   return (

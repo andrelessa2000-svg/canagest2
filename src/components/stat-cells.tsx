@@ -2,11 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function GradeMetricas({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line md:grid-cols-4">
-      {children}
-    </div>
-  );
+  return <div className="metric-grid grid-cols-2 md:grid-cols-4">{children}</div>;
 }
 
 export function CelulaMetrica({
@@ -21,23 +17,17 @@ export function CelulaMetrica({
   destaque?: boolean;
 }) {
   return (
-    <div className={destaque ? "bg-accent px-4 py-5" : "bg-surface px-4 py-5"}>
-      <p className={destaque ? "eyebrow text-surface/70" : "eyebrow text-ink-3"}>
-        {rotulo}
-      </p>
+    <div className={`min-w-0 px-4 py-4 ${destaque ? "bg-accent" : "bg-surface"}`}>
+      <p className={destaque ? "eyebrow !text-white/85" : "eyebrow"}>{rotulo}</p>
       <p
-        className={`mt-1.5 font-mono text-2xl leading-none tracking-tight tabular-nums sm:text-[1.75rem] ${
-          destaque ? "text-surface" : "text-ink"
+        className={`mt-1 break-words text-[1.2rem] font-bold leading-tight tracking-tight tnum lg:text-[1.44rem] ${
+          destaque ? "text-white" : "text-ink"
         }`}
       >
         {valor}
       </p>
       {legenda && (
-        <p
-          className={`mt-2 text-xs ${destaque ? "text-surface/75" : "text-ink-3"}`}
-        >
-          {legenda}
-        </p>
+        <p className={`mt-1 text-xs ${destaque ? "text-white/85" : "text-ink-3"}`}>{legenda}</p>
       )}
     </div>
   );
@@ -62,18 +52,16 @@ export function LinhaLink({
         href={href}
         className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-surface-muted"
       >
-        <span className="grid gap-0.5">
-          <span className="text-sm font-medium text-ink">{principal}</span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className="truncate text-[0.9375rem] font-semibold text-ink">{principal}</span>
           {secundario && (
             <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
               {secundario}
             </span>
           )}
         </span>
-        <span className="flex items-center gap-3">
-          {destaque && (
-            <span className="tnum text-sm font-semibold text-ink">{destaque}</span>
-          )}
+        <span className="flex shrink-0 items-center gap-3">
+          {destaque && <span className="tnum text-[0.9375rem] font-bold text-ink">{destaque}</span>}
           {nota && <span className="hidden text-xs text-ink-3 sm:block">{nota}</span>}
         </span>
       </Link>

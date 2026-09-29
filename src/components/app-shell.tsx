@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   Calculator,
-  ChevronDown,
   Factory,
   Home,
+  Layers,
+  LayoutGrid,
   Leaf,
+  SlidersHorizontal,
   SprayCan,
   Sprout,
   Tractor,
   Wallet,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { Brand } from "./brand";
@@ -21,21 +25,50 @@ import { BotaoSair } from "./botao-sair";
 import { InstallAppButton } from "./install-app-button";
 import { OfflineBanner } from "./offline-banner";
 
-const itensPrincipais = [
+type Item = { href: string; rotulo: string; icone: LucideIcon };
+
+const grupos: { titulo: string; itens: Item[] }[] = [
+  {
+    titulo: "Visão geral",
+    itens: [{ href: "/", rotulo: "Início", icone: Home }],
+  },
+  {
+    titulo: "Cadastro",
+    itens: [
+      { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
+      { href: "/usinas", rotulo: "Usinas", icone: Factory },
+    ],
+  },
+  {
+    titulo: "Operação",
+    itens: [
+      { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
+      { href: "/plantio", rotulo: "Plantio", icone: Leaf },
+      { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
+    ],
+  },
+  {
+    titulo: "Gestão",
+    itens: [
+      { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
+      { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
+    ],
+  },
+  {
+    titulo: "Ferramentas",
+    itens: [
+      { href: "/simulador", rotulo: "Simulador", icone: SlidersHorizontal },
+      { href: "/analise-talhoes", rotulo: "Análise por talhão", icone: Layers },
+      { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
+    ],
+  },
+];
+
+const principaisMobile: Item[] = [
   { href: "/", rotulo: "Início", icone: Home },
-  { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
-  { href: "/usinas", rotulo: "Usinas", icone: Factory },
   { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
   { href: "/plantio", rotulo: "Plantio", icone: Leaf },
   { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
-  { href: "/financeiro", rotulo: "Financeiro", icone: Wallet },
-  { href: "/relatorios", rotulo: "Relatórios", icone: BarChart3 },
-];
-
-const itensFerramentas = [
-  { href: "/simulador", rotulo: "Simulador", icone: Calculator },
-  { href: "/analise-talhoes", rotulo: "Análise talhões", icone: BarChart3 },
-  { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
 ];
 
 function ativo(pathname: string, href: string): boolean {
@@ -43,8 +76,20 @@ function ativo(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function ferramentaAtiva(pathname: string): boolean {
-  return itensFerramentas.some((item) => ativo(pathname, item.href));
+type Usuario = { nome?: string | null; email?: string | null; image?: string | null } | null;
+
+function Avatar({ usuario }: { usuario: NonNullable<Usuario> }) {
+  if (usuario.image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={usuario.image} alt="" className="size-9 rounded-full object-cover" />
+    );
+  }
+  return (
+    <span className="grid size-9 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent-strong">
+      {(usuario.nome ?? usuario.email ?? "?").trim().slice(0, 1).toUpperCase()}
+    </span>
+  );
 }
 
 export function AppShell({
@@ -52,233 +97,218 @@ export function AppShell({
   usuario,
 }: {
   children: React.ReactNode;
-  usuario?: { nome?: string | null; email?: string | null; image?: string | null } | null;
+  usuario?: Usuario;
 }) {
   const pathname = usePathname();
-  const [ferramentasAberto, setFerramentasAberto] = useState(false);
-  const dropdownDesktopRef = useRef<HTMLDivElement>(null);
-  const dropdownMobileRef = useRef<HTMLDivElement>(null);
+  // O painel "Mais" guarda a rota em que foi aberto: ao navegar, fecha sozinho.
+  const [maisAbertoEm, setMaisAbertoEm] = useState<string | null>(null);
+  const maisAberto = maisAbertoEm === pathname;
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const desktopDropdown = dropdownDesktopRef.current;
-      const mobileDropdown = dropdownMobileRef.current;
-      
-      // Fecha apenas se clicou fora de TODOS os dropdowns
-      const clickedInsideDesktop = desktopDropdown && desktopDropdown.contains(event.target as Node);
-      const clickedInsideMobile = mobileDropdown && mobileDropdown.contains(event.target as Node);
-      const clickedInsideAnyDropdown = clickedInsideDesktop || clickedInsideMobile;
-      
-      if (ferramentasAberto && !clickedInsideAnyDropdown) {
-        setFerramentasAberto(false);
-      }
-    }
-    if (ferramentasAberto) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [ferramentasAberto]);
+    if (!maisAberto) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMaisAbertoEm(null);
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [maisAberto]);
 
-  // Fechar dropdown quando a rota mudar (navegação via Link)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (ferramentasAberto) {
-        setFerramentasAberto(false);
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [pathname]);
+  const moduloAtivoNoMais = grupos
+    .flatMap((g) => g.itens)
+    .some((i) => ativo(pathname, i.href) && !principaisMobile.some((p) => p.href === i.href));
 
   return (
     <div className="min-h-dvh">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 btn btn-primary"
+        className="btn btn-primary sr-only z-[60] focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
       >
         Pular para o conteúdo principal
       </a>
-      <div className="sticky top-0 z-40">
-        <OfflineBanner />
-        <header className="border-b border-line bg-base/90 backdrop-blur">
-          <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-            <Brand />
 
-            <nav className="hidden items-center gap-1 md:flex" aria-label="Navegação principal">
-              {itensPrincipais.map(({ href, rotulo }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="nav-link whitespace-nowrap shrink-0"
-                  data-active={ativo(pathname, href)}
-                  aria-current={ativo(pathname, href) ? "page" : undefined}
-                >
-                  {rotulo}
-                </Link>
-              ))}
+      {/* ---------- Menu lateral (desktop) ---------- */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-r border-line bg-surface lg:flex">
+        <div className="px-4 pb-4 pt-5">
+          <Brand />
+        </div>
 
-              <div className="relative" role="menubar">
-                <button
-                  type="button"
-                  className={`nav-link whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
-                    ferramentaAtiva(pathname) ? "bg-accent-soft text-accent-strong font-semibold" : ""
-                  }`}
-                  aria-haspopup="true"
-                  aria-expanded={ferramentasAberto}
-                  aria-label="Ferramentas"
-                  onClick={() => setFerramentasAberto(!ferramentasAberto)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setFerramentasAberto(!ferramentasAberto);
-                    }
-                    if (e.key === "Escape") {
-                      setFerramentasAberto(false);
-                    }
-                  }}
-                >
-                  Ferramentas
-                  <ChevronDown
-                    className={`size-4 transition-transform ${ferramentasAberto ? "rotate-180" : ""}`}
-                    aria-hidden="true"
-                  />
-                </button>
-
-                {ferramentasAberto && (
-                  <div
-                    ref={dropdownDesktopRef}
-                    className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-lg border border-line bg-surface shadow-lg py-1"
-                    role="menu"
-                  >
-                    {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
+        <nav aria-label="Navegação principal" className="grid flex-1 content-start gap-5 overflow-y-auto px-3 pb-4">
+          {grupos.map((g) => (
+            <div key={g.titulo}>
+              <p className="nav-group-title">{g.titulo}</p>
+              <ul className="grid gap-0.5">
+                {g.itens.map(({ href, rotulo, icone: Icone }) => {
+                  const atual = ativo(pathname, href);
+                  return (
+                    <li key={href}>
                       <Link
-                        key={href}
                         href={href}
-                        role="menuitem"
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
-                          ativo(pathname, href)
-                            ? "bg-accent-soft text-accent-strong font-semibold"
-                            : "text-ink-2 hover:bg-surface-muted hover:text-ink"
-                        }`}
+                        className="nav-link"
+                        data-active={atual}
+                        aria-current={atual ? "page" : undefined}
                       >
-                        <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
+                        <Icone className="size-[1.15rem] shrink-0" strokeWidth={atual ? 2.4 : 2} aria-hidden="true" />
                         {rotulo}
                       </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </nav>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
 
+        <div className="grid gap-2 border-t border-line p-3">
+          {usuario ? (
+            <>
+              <Link
+                href="/conta"
+                className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-muted"
+                aria-label="Minha conta"
+              >
+                <Avatar usuario={usuario} />
+                <span className="grid min-w-0 leading-tight">
+                  <span className="truncate text-sm font-semibold text-ink">{usuario.nome ?? "Minha conta"}</span>
+                  <span className="truncate text-xs text-ink-3">{usuario.email}</span>
+                </span>
+              </Link>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <BotaoSair />
+                </div>
+                <InstallAppButton />
+              </div>
+            </>
+          ) : (
+            <Link href="/login" className="btn btn-primary">
+              Entrar
+            </Link>
+          )}
+        </div>
+      </aside>
+
+      <div className="lg:pl-[var(--sidebar-w)]">
+        <OfflineBanner />
+
+        {/* ---------- Barra superior (celular/tablet) ---------- */}
+        <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur lg:hidden">
+          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+            <Brand />
             <div className="flex items-center gap-2">
+              <InstallAppButton />
               {usuario ? (
-                <>
-                  <Link
-                    href="/conta"
-                    className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-sm font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-surface-muted"
-                    aria-label="Minha conta"
-                  >
-                    {usuario.image ? (
-                      <img
-                        src={usuario.image}
-                        alt=""
-                        className="size-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
-                        {(usuario.nome ?? usuario.email ?? "?").trim().slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="max-w-28 truncate">{usuario.nome ?? usuario.email}</span>
-                  </Link>
-                  <BotaoSair compacto />
-                </>
+                <Link href="/conta" aria-label="Minha conta">
+                  <Avatar usuario={usuario} />
+                </Link>
               ) : (
-                <Link href="/login" className="btn btn-ghost">
+                <Link href="/login" className="btn btn-primary">
                   Entrar
                 </Link>
               )}
-              <InstallAppButton />
             </div>
           </div>
         </header>
+
+        <main
+          id="main-content"
+          className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-16 lg:pt-10"
+        >
+          {children}
+        </main>
       </div>
 
-      <main id="main-content" className="mx-auto w-full max-w-5xl px-4 pt-6 pb-28 sm:px-6 md:pt-10 md:pb-20">
-        {children}
-      </main>
-
+      {/* ---------- Barra inferior (celular/tablet) ---------- */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur md:hidden"
         aria-label="Navegação inferior"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <div
-          className="flex items-center gap-1 overflow-x-auto px-2 py-1"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {itensPrincipais.map(({ href, rotulo, icone: Icone }) => {
-            const current = ativo(pathname, href);
+        <ul className="mx-auto grid max-w-xl grid-cols-5">
+          {principaisMobile.map(({ href, rotulo, icone: Icone }) => {
+            const atual = ativo(pathname, href);
             return (
-              <Link
-                key={href}
-                href={href}
-                className="flex min-w-14 shrink-0 flex-col items-center gap-1 py-2 text-[0.68rem] font-medium transition-colors"
-                data-active={current}
-                aria-current={current ? "page" : undefined}
-                style={{
-                  color: current ? "var(--accent-strong)" : "var(--ink-3)",
-                }}
-              >
-                <Icone
-                  className="size-5"
-                  strokeWidth={current ? 2.4 : 2}
-                  style={
-                    current
-                      ? { color: "var(--accent)" }
-                      : undefined
-                  }
-                />
-                {rotulo}
-              </Link>
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={atual ? "page" : undefined}
+                  className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors ${
+                    atual ? "text-accent-strong" : "text-ink-3"
+                  }`}
+                >
+                  <Icone className="size-[1.3rem]" strokeWidth={atual ? 2.4 : 2} aria-hidden="true" />
+                  {rotulo}
+                </Link>
+              </li>
             );
           })}
-          <div className="relative">
+          <li>
             <button
               type="button"
-              className={`flex min-w-14 shrink-0 flex-col items-center gap-1 py-2 text-[0.68rem] font-medium transition-colors ${
-                ferramentaAtiva(pathname) ? "text-accent-strong" : "text-ink-3"
+              aria-label="Mais módulos"
+              aria-haspopup="dialog"
+              aria-expanded={maisAberto}
+              onClick={() => setMaisAbertoEm(maisAberto ? null : pathname)}
+              className={`flex min-h-16 w-full flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors ${
+                maisAberto || moduloAtivoNoMais ? "text-accent-strong" : "text-ink-3"
               }`}
-              onClick={() => setFerramentasAberto(!ferramentasAberto)}
-              aria-haspopup="true"
-              aria-expanded={ferramentasAberto}
-              aria-label="Ferramentas"
             >
-              <Calculator className="size-5" strokeWidth={ferramentaAtiva(pathname) ? 2.4 : 2} />
-              <span className="text-[0.6rem]">Ferramentas</span>
+              <LayoutGrid className="size-[1.3rem]" strokeWidth={moduloAtivoNoMais ? 2.4 : 2} aria-hidden="true" />
+              Mais
             </button>
-{ferramentasAberto && (
-                <div
-                  ref={dropdownMobileRef}
-                  className="absolute bottom-full right-0 mb-1 z-50 min-w-[160px] rounded-lg border border-line bg-surface shadow-lg py-1"
-                >
-                {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${
-                      ativo(pathname, href)
-                        ? "bg-accent-soft text-accent-strong font-semibold"
-                        : "text-ink-2 hover:bg-surface-muted hover:text-ink"
-                    }`}
-                  >
-                    <Icone className="size-4" strokeWidth={ativo(pathname, href) ? 2.4 : 2} />
-                    {rotulo}
-                  </Link>
-                ))}
-              </div>
-            )}
+          </li>
+        </ul>
+      </nav>
+
+      {maisAberto && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Todos os módulos">
+          <button
+            type="button"
+            aria-label="Fechar"
+            className="absolute inset-0 bg-ink/45"
+            onClick={() => setMaisAbertoEm(null)}
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[var(--radius)] bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-float)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg text-ink">Todos os módulos</h2>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setMaisAbertoEm(null)}
+                className="btn btn-ghost !min-h-10 !px-2"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="grid gap-5">
+              {grupos.map((g) => (
+                <section key={g.titulo}>
+                  <p className="nav-group-title !px-0">{g.titulo}</p>
+                  <ul className="grid grid-cols-3 gap-2">
+                    {g.itens.map(({ href, rotulo, icone: Icone }) => {
+                      const atual = ativo(pathname, href);
+                      return (
+                        <li key={href}>
+                          <Link
+                            href={href}
+                            aria-current={atual ? "page" : undefined}
+                            className={`flex h-full flex-col items-center gap-2 rounded-[var(--radius)] border p-3 text-center text-xs font-semibold transition-colors ${
+                              atual
+                                ? "border-accent bg-accent-soft text-accent-strong"
+                                : "border-line bg-surface text-ink-2 hover:bg-surface-muted"
+                            }`}
+                          >
+                            <Icone className="size-6" strokeWidth={atual ? 2.4 : 2} aria-hidden="true" />
+                            {rotulo}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           </div>
         </div>
-      </nav>
+      )}
 
       <Toaster
         position="top-center"
@@ -288,7 +318,7 @@ export function AppShell({
             color: "var(--ink)",
             border: "1px solid var(--line-strong)",
             borderRadius: "var(--radius)",
-            fontSize: "0.875rem",
+            fontSize: "0.9375rem",
           },
         }}
       />

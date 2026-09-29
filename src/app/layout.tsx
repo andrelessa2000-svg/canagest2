@@ -1,22 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Lora } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { PwaRegister } from "@/components/pwa-register";
 import { auth } from "@/lib/auth";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const lora = Lora({
-  variable: "--font-lora",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
   display: "swap",
 });
@@ -68,7 +58,7 @@ export default async function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} antialiased`}
+      className={`${manrope.variable} antialiased`}
     >
       <body>
         <PwaRegister />

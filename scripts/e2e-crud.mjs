@@ -31,6 +31,43 @@ const naoEhNovo = (u) =>
     await page.waitForURL((u) => u.pathname === "/", { timeout: 20000 });
     passos.push("Autenticado (dashboard)");
 
+    passos.push("0d. Navegação mobile: Mais → Simulador");
+    await page.getByRole("button", { name: "Mais módulos" }).click();
+    const painel = page.getByRole("dialog", { name: "Todos os módulos" });
+    await painel.waitFor({ timeout: 10000 });
+    await painel.getByRole("link", { name: "Simulador" }).click();
+    await page.waitForURL("**/simulador", { timeout: 15000 });
+    await page.getByRole("heading", { name: "Simulador de decisão" }).waitFor({ timeout: 15000 });
+    if (await painel.isVisible().catch(() => false)) falha("Painel Mais não fechou após navegar");
+    for (const [nome, url, titulo] of [
+      ["Análise por talhão", "**/analise-talhoes", "Análise por talhão"],
+      ["Calculadoras", "**/calculadoras", "Calculadoras"],
+    ]) {
+      await page.getByRole("button", { name: "Mais módulos" }).click();
+      await page.getByRole("dialog", { name: "Todos os módulos" }).getByRole("link", { name: nome }).click();
+      await page.waitForURL(url, { timeout: 15000 });
+      await page.getByRole("heading", { name: titulo }).waitFor({ timeout: 15000 });
+    }
+    passos.push("Painel Mais navega e fecha (Simulador, Análise, Calculadoras)");
+
+    passos.push("0e. Navegação desktop: menu lateral com todos os módulos");
+    const ctxDesktop = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      locale: "pt-BR",
+      storageState: await ctx.storageState(),
+    });
+    const desktop = await ctxDesktop.newPage();
+    await desktop.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const menu = desktop.getByRole("navigation", { name: "Navegação principal" });
+    for (const nome of ["Início", "Fazendas", "Usinas", "Colheitas", "Plantio", "Tratos", "Financeiro", "Relatórios", "Simulador", "Análise por talhão", "Calculadoras"]) {
+      await menu.getByRole("link", { name: nome }).waitFor({ timeout: 10000 });
+    }
+    await menu.getByRole("link", { name: "Simulador" }).click();
+    await desktop.waitForURL("**/simulador", { timeout: 15000 });
+    await desktop.getByRole("heading", { name: "Simulador de decisão" }).waitFor({ timeout: 15000 });
+    await ctxDesktop.close();
+    passos.push("Menu lateral mostra os 11 módulos e navega");
+
     passos.push("1. Nova usina (CRUD)");
     await page.goto(`${BASE}/usinas/nova`, { waitUntil: "networkidle" });
     await page.fill('input[name="nome"]', NOME_USINA);

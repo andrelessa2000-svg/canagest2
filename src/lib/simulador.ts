@@ -1,81 +1,157 @@
-import { TAREFAS_POR_HA } from "@/lib/format";
+/**
+ * Simulador de decisão: módulo puro (sem banco, sem React) para poder ser testado.
+ *
+ * Modelo: todo custo é expresso em R$ por hectare e por corte (safra).
+ * O plantio acontece uma vez e serve a vários cortes, então é diluído
+ * pelo número de cortes esperado.
+ */
+
+export type ColheitaMedia = {
+  tipo: string;
+  toneladas: number;
+  areaHa: number;
+  receita: number;
+  despesas: number;
+};
+export type PlantioMedia = { valor: number; areaHa: number };
+export type TratoMedia = { valor: number };
 
 export type MediasHistoricas = {
-  custoPlantioPorTarefa: number;
-  custoTratosPorTarefa: number;
-  custoColheitaPorTarefa: number;
-  custoTotalPorTarefa: number;
-  custoTotalPorHa: number;
-  produtividadeMedia: number;
-  toneladasTotais: number;
-  areaTotalHa: number;
-  qtdPlantios: number;
-  qtdTratos: number;
+  /** t/ha ponderada pela área colhida */
+  produtividade: number;
+  produtividadePorTipo: Record<string, number>;
+  /** R$/t: receita total / toneladas totais */
+  precoMedio: number;
+  /** R$/ha colhido por corte (CTC, arrendamento, adubo, herbicida, insumos, despesas da usina) */
+  custoColheitaHa: number;
+  /** R$ de tratos por ha colhido */
+  custoTratosHa: number;
+  /** R$/ha plantado, valor cheio (ainda não diluído em cortes) */
+  custoPlantioHa: number;
+  haColhidos: number;
   qtdColheitas: number;
+  qtdTratos: number;
+  qtdPlantios: number;
+  plantiosSemArea: number;
 };
 
-export type CenarioSimulacao = {
+const razao = (num: number, den: number) => (den > 0 ? num / den : 0);
+
+export function calcularMedias(
+  colheitas: ColheitaMedia[],
+  plantios: PlantioMedia[],
+  tratos: TratoMedia[],
+): MediasHistoricas {
+  const comArea = colheitas.filter((c) => c.areaHa > 0 && c.toneladas > 0);
+  const haColhidos = comArea.reduce((s, c) => s + c.areaHa, 0);
+  const tonComArea = comArea.reduce((s, c) => s + c.toneladas, 0);
+
+  const porTipo: Record<string, { ton: number; ha: number }> = {};
+  for (const c of comArea) {
+    const acc = (porTipo[c.tipo] ??= { ton: 0, ha: 0 });
+    acc.ton += c.toneladas;
+    acc.ha += c.areaHa;
+  }
+  const produtividadePorTipo: Record<string, number> = {};
+  for (const [tipo, v] of Object.entries(porTipo)) {
+    produtividadePorTipo[tipo] = razao(v.ton, v.ha);
+  }
+
+  const tonTotal = colheitas.reduce((s, c) => s + Math.max(c.toneladas, 0), 0);
+  const receitaTotal = colheitas.reduce((s, c) => s + (c.toneladas > 0 ? c.receita : 0), 0);
+
+  const plantiosComArea = plantios.filter((p) => p.areaHa > 0);
+
+  return {
+    produtividade: razao(tonComArea, haColhidos),
+    produtividadePorTipo,
+    precoMedio: razao(receitaTotal, tonTotal),
+    custoColheitaHa: razao(
+      comArea.reduce((s, c) => s + c.despesas, 0),
+      haColhidos,
+    ),
+    custoTratosHa: razao(
+      tratos.reduce((s, t) => s + t.valor, 0),
+      haColhidos,
+    ),
+    custoPlantioHa: razao(
+      plantiosComArea.reduce((s, p) => s + p.valor, 0),
+      plantiosComArea.reduce((s, p) => s + p.areaHa, 0),
+    ),
+    haColhidos,
+    qtdColheitas: colheitas.length,
+    qtdTratos: tratos.length,
+    qtdPlantios: plantios.length,
+    plantiosSemArea: plantios.length - plantiosComArea.length,
+  };
+}
+
+export type Cenario = {
   id: string;
   nome: string;
   areaHa: number;
-  custoTarefa: number;
-  tPorHa: number;
-  precoCana: number;
+  produtividade: number;
+  preco: number;
+  custoColheitaHa: number;
+  custoTratosHa: number;
+  custoPlantioHa: number;
+  cortes: number;
 };
 
-export type ResultadoSimulacao = {
-  cenario: CenarioSimulacao;
-  areaHa: number;
-  custoTarefa: number;
-  custoHa: number;
-  tPorHa: number;
-  precoCana: number;
+export type Resultado = {
   toneladas: number;
-  custoTotal: number;
   receita: number;
+  custoPlantioPorCorteHa: number;
+  custoHa: number;
+  custoTotal: number;
   lucro: number;
+  lucroHa: number;
   roi: number;
-  lucroPorHa: number;
-  custoPlantio: number;
-  custoTratos: number;
-  custoColheita: number;
+  margem: number;
+  /** R$/t de custo: abaixo disso de preço já dá prejuízo */
+  custoPorTonelada: number;
+  /** t/ha mínima para empatar, dado o preço */
+  produtividadeEquilibrio: number;
 };
 
-export function simularCenarios(cenarios: CenarioSimulacao[], medias: MediasHistoricas): ResultadoSimulacao[] {
-  return cenarios.map((c) => {
-    const area = c.areaHa;
-    const custoT = c.custoTarefa;
-    const custoH = custoT * TAREFAS_POR_HA;
-    const tHa = c.tPorHa;
-    const preco = c.precoCana;
-    const toneladas = area * tHa;
-    const custoTotal = area * custoH;
-    const receita = toneladas * preco;
-    const lucro = receita - custoTotal;
-    const roi = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0;
-    const lucroPorHa = area > 0 ? lucro / area : 0;
+export function simular(c: Cenario): Resultado {
+  const cortes = Math.max(1, Math.round(c.cortes) || 1);
+  const custoPlantioPorCorteHa = c.custoPlantioHa / cortes;
+  const custoHa = c.custoColheitaHa + c.custoTratosHa + custoPlantioPorCorteHa;
+  const receitaHa = c.produtividade * c.preco;
+  const lucroHa = receitaHa - custoHa;
+  const custoTotal = custoHa * c.areaHa;
+  const receita = receitaHa * c.areaHa;
+  const lucro = receita - custoTotal;
+  return {
+    toneladas: c.produtividade * c.areaHa,
+    receita,
+    custoPlantioPorCorteHa,
+    custoHa,
+    custoTotal,
+    lucro,
+    lucroHa,
+    roi: custoTotal > 0 ? (lucro / custoTotal) * 100 : 0,
+    margem: receita > 0 ? (lucro / receita) * 100 : 0,
+    custoPorTonelada: razao(custoHa, c.produtividade),
+    produtividadeEquilibrio: razao(custoHa, c.preco),
+  };
+}
 
-    const totalMedio = (medias.custoPlantioPorTarefa + medias.custoTratosPorTarefa + medias.custoColheitaPorTarefa) || 1;
-    const propPlantio = medias.custoPlantioPorTarefa / totalMedio;
-    const propTratos = medias.custoTratosPorTarefa / totalMedio;
-    const propColheita = medias.custoColheitaPorTarefa / totalMedio;
+export const VARIACOES_PRODUTIVIDADE = [-20, -10, 0, 10, 20] as const;
+export const VARIACOES_PRECO = [-10, 0, 10] as const;
 
-    return {
-      cenario: c,
-      areaHa: area,
-      custoTarefa: custoT,
-      custoHa: custoH,
-      tPorHa: tHa,
-      precoCana: preco,
-      toneladas,
-      custoTotal,
-      receita,
-      lucro,
-      roi,
-      lucroPorHa,
-      custoPlantio: custoTotal * propPlantio,
-      custoTratos: custoTotal * propTratos,
-      custoColheita: custoTotal * propColheita,
-    };
-  });
+/** Lucro total (R$) para combinações de produtividade × preço. */
+export function sensibilidade(c: Cenario): { produtividade: number; preco: number; lucro: number }[][] {
+  return VARIACOES_PRECO.map((vp) =>
+    VARIACOES_PRODUTIVIDADE.map((vt) => ({
+      produtividade: vt,
+      preco: vp,
+      lucro: simular({
+        ...c,
+        produtividade: c.produtividade * (1 + vt / 100),
+        preco: c.preco * (1 + vp / 100),
+      }).lucro,
+    })),
+  );
 }

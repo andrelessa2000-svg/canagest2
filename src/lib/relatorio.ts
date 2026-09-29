@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { calcularColheita, type ItemDespesa } from "./colheita";
 import { userIdAtual } from "./auth";
+import { TAREFAS_POR_HA } from "./format";
 
 export type FilaCascata = {
   fazendaId: string;
@@ -89,7 +90,7 @@ export async function cargarCascata(): Promise<Cascata> {
 
   for (const c of colheitas) {
     const areaFazendaHa = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
-    const areaTarefas = c.areaColhida ?? areaFazendaHa * 3.3;
+    const areaTarefas = c.areaColhida ?? areaFazendaHa * TAREFAS_POR_HA;
     const r = calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
