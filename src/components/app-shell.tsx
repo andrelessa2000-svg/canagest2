@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   BarChart3,
   Calculator,
@@ -56,6 +56,19 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [ferramentasAberto, setFerramentasAberto] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setFerramentasAberto(false);
+      }
+    }
+    if (ferramentasAberto) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ferramentasAberto]);
 
   return (
     <div className="min-h-dvh">
@@ -223,8 +236,11 @@ export function AppShell({
               <Calculator className="size-5" strokeWidth={ferramentaAtiva(pathname) ? 2.4 : 2} />
               <span className="text-[0.6rem]">Ferramentas</span>
             </button>
-            {ferramentasAberto && (
-              <div className="absolute bottom-full right-0 mb-1 z-50 min-w-[160px] rounded-lg border border-line bg-surface shadow-lg py-1">
+{ferramentasAberto && (
+                <div
+                  ref={dropdownRef}
+                  className="absolute bottom-full right-0 mb-1 z-50 min-w-[160px] rounded-lg border border-line bg-surface shadow-lg py-1"
+                >
                 {itensFerramentas.map(({ href, rotulo, icone: Icone }) => (
                   <Link
                     key={href}

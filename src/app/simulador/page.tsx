@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Plus, Trash2, Calculator, Target, Sparkles } from "lucide-react";
 import { fmtMoney, fmtCount, parseDecimal, TAREFAS_POR_HA } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { Campo } from "@/components/forms";
-import { simularCenarios, type CenarioSimulacao, type MediasHistoricas, type ResultadoSimulacao } from "@/lib/simulador";
+import { simularCenarios, type CenarioSimulacao, type MediasHistoricas } from "@/lib/simulador";
 
 type Cenario = {
   id: string;
@@ -37,12 +37,20 @@ export default function SimuladorPage() {
   const [cenarios, setCenarios] = useState<Cenario[]>([]);
   const [draft, setDraft] = useState<Cenario>({ ...cenarioVazio, id: crypto.randomUUID() });
   const [medias, setMedias] = useState<MediasHistoricas | null>(null);
-  const [carregandoMedias, setCarregandoMedias] = useState(true);
   const [usarMedias, setUsarMedias] = useState(false);
+
+  const preencherComMedias = useCallback((m: MediasHistoricas) => {
+    if (m.custoTotalPorTarefa > 0 && !draft.custoTarefa && !draft.custoHa) {
+      setDraft((d) => ({ ...d, custoTarefa: m.custoTotalPorTarefa.toFixed(2) }));
+    }
+    if (m.produtividadeMedia > 0 && !draft.tPorHa) {
+      setDraft((d) => ({ ...d, tPorHa: m.produtividadeMedia.toFixed(1) }));
+    }
+    setUsarMedias(true);
+  }, [draft]);
 
   useEffect(() => {
     async function carregar() {
-      setCarregandoMedias(true);
       try {
         const res = await fetch("/api/simulador/medias");
         if (res.ok) {
@@ -52,22 +60,10 @@ export default function SimuladorPage() {
         }
       } catch (e) {
         console.error("Erro ao carregar médias:", e);
-      } finally {
-        setCarregandoMedias(false);
       }
     }
     carregar();
-  }, []);
-
-  function preencherComMedias(m: MediasHistoricas) {
-    if (m.custoTotalPorTarefa > 0 && !draft.custoTarefa && !draft.custoHa) {
-      setDraft((d) => ({ ...d, custoTarefa: m.custoTotalPorTarefa.toFixed(2) }));
-    }
-    if (m.produtividadeMedia > 0 && !draft.tPorHa) {
-      setDraft((d) => ({ ...d, tPorHa: m.produtividadeMedia.toFixed(1) }));
-    }
-    setUsarMedias(true);
-  }
+  }, [preencherComMedias]);
 
   const recalcular = () => {
     const custoHa = num(draft.custoTarefa) * TAREFAS_POR_HA;
@@ -78,11 +74,6 @@ export default function SimuladorPage() {
       setDraft({ ...draft, custoTarefa: custoTarefa.toFixed(2) });
     }
   };
-
-  function num(v: string): number {
-    const p = parseDecimal(v);
-    return Number.isFinite(p) ? p : 0;
-  }
 
   const adicionar = () => {
     if (!draft.nome.trim() || !draft.areaHa || !draft.tPorHa || !draft.precoCana) return;
