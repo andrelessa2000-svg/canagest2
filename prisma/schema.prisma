@@ -26,6 +26,7 @@ model User {
   plantios     Plantio[]
   tratos       Trato[]
   investimentos Investimento[]
+  historicoPrecos HistoricoPreco[]
 }
 
 model Account {
@@ -255,4 +256,24 @@ model Investimento {
 
   @@index([fazendaId, data])
   @@index([userId, safra])
+}
+
+// Preco medio da cana (R$/t) por mes/ano — base do simulador temporal.
+// Opcionalmente guarda ATR mensal para usinas que remuneram por kg de ATR
+// (Coruripe). Sem ATR, vale o precoMedio (comportamento antigo preservado).
+model HistoricoPreco {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ano          Int
+  mes          Int // 1-12
+  precoMedio   Float
+  atrPorTonelada Float? // kg ATR/t do mes
+  precoKgAtr     Float? // R$/kg ATR do mes
+  fonte        String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([userId, ano, mes])
+  @@index([userId])
 }

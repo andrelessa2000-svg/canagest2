@@ -16,7 +16,7 @@ export function Campo({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid min-w-0 gap-1.5">
       <label htmlFor={htmlFor} className="field-label">
         {label}
       </label>

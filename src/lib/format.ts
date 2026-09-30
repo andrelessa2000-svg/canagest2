@@ -90,6 +90,21 @@ export function fmtKgAtr(v: number): string {
   return `${nfKg.format(Number.isFinite(v) ? v : 0)} kg ATR`;
 }
 
+const nfMoneyKgAtr = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+/**
+ * Preço do kg de ATR. Fica entre 2 e 4 casas porque R$ 0,145/kg não pode virar
+ * R$ 0,15/kg — perderia a precisão que o valor tem.
+ */
+export function fmtMoneyPorKgAtr(v: number): string {
+  return nfMoneyKgAtr.format(Number.isFinite(v) ? v : 0);
+}
+
 export function fmtProd(tHa: number): string {
   return `${new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,

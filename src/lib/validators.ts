@@ -66,6 +66,51 @@ export const usinaSchema = z.object({
   modelo: z.enum(MODELOS_USINA, { error: "Selecione o modelo de remuneração" }),
 });
 
+export const historicoPrecoSchema = z.object({
+  ano: z.coerce
+    .number({ error: "Informe o ano" })
+    .int("Ano inválido")
+    .min(2000, "Ano inválido")
+    .max(2100, "Ano inválido"),
+  mes: z.coerce
+    .number({ error: "Selecione o mês" })
+    .int("Mês inválido")
+    .min(1, "Mês inválido")
+    .max(12, "Mês inválido"),
+  precoMedio: z
+    .string()
+    .trim()
+    .min(1, "Informe o preço médio")
+    .transform((v) => parseDecimal(v))
+    .refine((v) => Number.isFinite(v) && v > 0, {
+      message: "Informe um preço maior que zero",
+    }),
+  fonte: z
+    .string()
+    .trim()
+    .max(60)
+    .optional()
+    .transform((v) => (v ? v : null)),
+  // ATR mensal (kg ATR/t) — opcional, registra a qualidade da cana por mês.
+  atrPorTonelada: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? parseDecimal(v) : null))
+    .refine((v) => v === null || (Number.isFinite(v) && v > 0), {
+      message: "Informe um ATR maior que zero",
+    }),
+  // Preço do kg de ATR (R$/kg) — opcional, completa a remuneração Coruripe.
+  precoKgAtr: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? parseDecimal(v) : null))
+    .refine((v) => v === null || (Number.isFinite(v) && v > 0), {
+      message: "Informe um preço do kg ATR maior que zero",
+    }),
+});
+
 const itemDespesaSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome da despesa").max(60),
   valor: z.number().min(0, "Valor não pode ser negativo").finite("Valor inválido"),
@@ -365,6 +410,7 @@ function moedaField(label: string) {
 export type FazendaInput = z.infer<typeof fazendaSchema>;
 export type TalhaoInput = z.infer<typeof talhaoSchema>;
 export type UsinaInput = z.infer<typeof usinaSchema>;
+export type HistoricoPrecoInput = z.infer<typeof historicoPrecoSchema>;
 export type ColheitaInput = z.infer<typeof colheitaSchema>;
 export type PlantioInput = z.infer<typeof plantioSchema>;
 export type TratoInput = z.infer<typeof tratoSchema>;

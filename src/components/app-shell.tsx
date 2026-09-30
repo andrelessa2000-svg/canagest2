@@ -15,6 +15,7 @@ import {
   SprayCan,
   Sprout,
   Tractor,
+  TrendingUp,
   Wallet,
   X,
   type LucideIcon,
@@ -58,6 +59,7 @@ const grupos: { titulo: string; itens: Item[] }[] = [
     titulo: "Ferramentas",
     itens: [
       { href: "/simulador", rotulo: "Simulador", icone: SlidersHorizontal },
+      { href: "/historico-preco", rotulo: "Preço da cana", icone: TrendingUp },
       { href: "/analise-talhoes", rotulo: "Análise por talhão", icone: Layers },
       { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
     ],

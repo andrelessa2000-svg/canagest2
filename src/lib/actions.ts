@@ -17,6 +17,7 @@ async function usuarioId(): Promise<string> {
 import {
   colheitaSchema,
   fazendaSchema,
+  historicoPrecoSchema,
   plantioSchema,
   primeiraMensagem,
   talhaoSchema,
@@ -794,4 +795,64 @@ export async function corrigirSafrasAntigas(): Promise<ActionState> {
     console.error(e);
     return falha(e);
   }
+}
+
+export async function salvarPreco(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = historicoPrecoSchema.safeParse({
+    ano: campo(formData, "ano"),
+    mes: campo(formData, "mes"),
+    precoMedio: campo(formData, "precoMedio"),
+    fonte: campo(formData, "fonte"),
+    atrPorTonelada: campo(formData, "atrPorTonelada"),
+    precoKgAtr: campo(formData, "precoKgAtr"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  const { ano, mes, precoMedio, fonte, atrPorTonelada, precoKgAtr } = parsed.data;
+
+  try {
+    await prisma.historicoPreco.upsert({
+      where: { userId_ano_mes: { userId: await usuarioId(), ano, mes } },
+      update: { precoMedio, fonte, atrPorTonelada, precoKgAtr },
+      create: {
+        userId: await usuarioId(),
+        ano,
+        mes,
+        precoMedio,
+        fonte,
+        atrPorTonelada,
+        precoKgAtr,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/historico-preco");
+  revalidatePath("/simulador");
+  return { ok: true, mensagem: `Preço de ${mes}/${ano} salvo.` };
+}
+
+export async function excluirPreco(
+  ano: number,
+  mes: number,
+): Promise<ActionState> {
+  try {
+    await prisma.historicoPreco.delete({
+      where: { userId_ano_mes: { userId: await usuarioId(), ano, mes } },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+  revalidatePath("/historico-preco");
+  revalidatePath("/simulador");
+  return { ok: true };
 }

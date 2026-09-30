@@ -23,6 +23,7 @@ const ROTAS = [
   { url: "/plantio", nome: "plantio" },
   { url: "/tratos", nome: "tratos" },
   { url: "/simulador", nome: "simulador" },
+  { url: "/historico-preco", nome: "historico-preco" },
   { url: "/analise-talhoes", nome: "analise-talhoes" },
   { url: "/financeiro", nome: "financeiro" },
 ];

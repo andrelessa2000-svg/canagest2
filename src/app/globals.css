@@ -20,6 +20,15 @@
   --danger: #b3402a;
   --danger-strong: #8f3020;
   --danger-soft: #fbebe7;
+  --success: #1f7a4d;
+  --success-strong: #17603d;
+  --success-soft: #e3f4ea;
+  --info: #1f5f8b;
+  --info-strong: #17496b;
+  --info-soft: #e4eef6;
+  --warning: #a35a10;
+  --warning-strong: #7f450b;
+  --warning-soft: #fbeedb;
 
   /* Forma */
   --radius: 10px;
@@ -61,6 +70,15 @@
   --color-danger: var(--danger);
   --color-danger-strong: var(--danger-strong);
   --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-strong: var(--success-strong);
+  --color-success-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-strong: var(--info-strong);
+  --color-info-soft: var(--info-soft);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-warning-soft: var(--warning-soft);
 }
 
 /* Um único raio: lg/xl seguem o token; md fica para selos pequenos */
@@ -127,6 +145,9 @@
 
   .field-input {
     width: 100%;
+    /* Sem isto, o largura mínima do <select> (option mais longo) estica a coluna
+       do grid e cria rolagem horizontal no celular. */
+    min-width: 0;
     min-height: 2.75rem;
     background: var(--surface);
     border: 1px solid var(--line-strong);
