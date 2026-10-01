@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { ColheitaForm } from "@/components/colheita-form";
 import { userIdAtual } from "@/lib/auth";
 import { safrasDoUsuario } from "@/lib/safras-usuario";
-import { type Insumo } from "@/components/seletor-insumos";
+import { type Despesa } from "@/components/editor-despesas";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export default async function EditarColheitaPage({
             arrendar: custo?.arrendar ?? false,
             tonsPorTarefa: numero(custo?.tonsPorTarefa),
             tarefasArrendadas: numero(custo?.tarefasArrendadas),
-            dividas: (custo?.dividas as unknown as Insumo[]) ?? [],
+            dividas: (custo?.dividas as unknown as Despesa[]) ?? [],
             observacao: colheita.observacao ?? "",
           }}
         />

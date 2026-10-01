@@ -18,13 +18,8 @@ import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { CelulaMetrica } from "./stat-cells";
 import { SelectorRegistro } from "./selector-registro";
-import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
-import {
-  SeletorPorcoes,
-  alocacoesDeJson,
-  alocacoesParaJson,
-  type Alocacao,
-} from "./seletor-porcoes";
+import { SeletorPorcoes, alocacoesDeJson, alocacoesParaJson, type Alocacao } from "./seletor-porcoes";
+import { EditorDespesas, despesasDeJson, despesasParaJson, type Despesa } from "./editor-despesas";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
@@ -49,7 +44,7 @@ type Campos = {
   tonsPorTarefa: string;
   tarefasArrendadas: string;
   observacao: string;
-  dividas?: Insumo[];
+  dividas?: Despesa[];
 };
 
 function n(v: string): number {
@@ -120,8 +115,8 @@ export function ColheitaForm({
     observacao: inicial?.observacao ?? "",
   }));
 
-  const [dividas, setDividas] = useState<Insumo[]>(
-    inicial?.dividas ? insumosDeJson(inicial.dividas) : [],
+  const [dividas, setDividas] = useState<Despesa[]>(
+    inicial?.dividas ? despesasDeJson(inicial.dividas) : [],
   );
   const [porcoes, setPorcoes] = useState<Alocacao[]>(
     inicial?.alocacoes ? alocacoesDeJson(inicial.alocacoes) : [],
@@ -206,7 +201,7 @@ export function ColheitaForm({
         arrendar: c.arrendar,
         tonsPorTarefa: opcional(c.tonsPorTarefa),
         tarefasArrendadas: opcional(c.tarefasArrendadas),
-        dividas: dividas.map((d) => ({ nome: d.nome, valor: Number(d.valorTotal) || 0 })),
+        dividas: dividas.map((d) => ({ nome: d.nome, valor: Number(parseDecimal(d.valor)) || 0 })),
       }),
     [modelo, c, dividas],
   );
@@ -463,13 +458,14 @@ export function ColheitaForm({
 
         {c.escopo === "fazenda" && fazendaAtual ? (
           <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
-            {fazendaAtual.nome} · {fmtTarefas(fazendaAtual.areaHa)} � registro em toda a fazenda
+            {fazendaAtual.nome} · {fmtTarefas(fazendaAtual.areaHa)} — registro em toda a fazenda
           </p>
         ) : (
           <>
             <p className="text-xs text-ink-3">
-              Toneladas e receita se repartem proporcional às tarefas de cada talhão. Você pode
-              misturar talhões inteiros e partes de outros.
+              Pode marcar <strong>vários talhões</strong> de uma vez: talhões inteiros, partes de
+              outros, ou uma mistura de ambos. As toneladas e a receita se repartem proporcional
+              às tarefas de cada talhão.
             </p>
             {talhoesFazenda.length === 0 ? (
               <p className="text-sm text-ink-2">Selecione primeiro a fazenda.</p>
@@ -579,11 +575,11 @@ export function ColheitaForm({
         )}
       </section>
 
-      {/* Dívidas com usina ou terceiros */}
+      {/* Despesas livres */}
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <SeletorInsumos
+        <h2 className="font-display text-lg text-ink">Despesas com a usina ou terceiros</h2>
+        <EditorDespesas
           id="dividas-colheita"
-          talhoes={talhoesFazenda}
           value={dividas}
           onChange={setDividas}
         />
@@ -604,7 +600,7 @@ export function ColheitaForm({
         </Campo>
       </section>
 
-      <input type="hidden" name="dividas" value={JSON.stringify(insumosParaJson(dividas))} />
+      <input type="hidden" name="dividas" value={JSON.stringify(despesasParaJson(dividas))} />
 
       {/* Resultado */}
       <section className="grid gap-3">
