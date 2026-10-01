@@ -10,21 +10,32 @@ import {
   fmtProd,
   fmtToneladas,
   fmtCount,
+  TAREFAS_POR_HA,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
 import {
   calcularColheita,
-  sacosAduboTarefa,
   MODELO_USINA_LABEL,
   type ItemDespesa,
   type ModeloUsina,
 } from "@/lib/colheita";
+import { areaColhidaHa } from "@/lib/rateio";
 import { excluirColheitaRedirecionando } from "@/lib/actions";
 import { CelulaMetrica } from "@/components/stat-cells";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { PageHeader } from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
+
+function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      nome: String(d.nome ?? ""),
+      valor: Number(d.valor ?? d.valorTotal) || 0,
+    }));
+}
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -71,20 +82,22 @@ export default async function ColheitaPage({
         select: {
           id: true,
           nome: true,
-          talhoes: { select: { areaHa: true } },
+          talhoes: { select: { id: true, fazendaId: true, areaHa: true } },
         },
       },
       usina: { select: { nome: true, modelo: true } },
+      custo: true,
     },
   });
 
   if (!c) notFound();
 
   const areaFazenda = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
+  const areaColhidaHaColheita = areaColhidaHa(c, c.fazendaId, c.fazenda.talhoes);
+  const tarefasColhidas = areaColhidaHaColheita * TAREFAS_POR_HA;
+  const custo = c.custo;
 
-  const herbicidas = (c.herbicidas ?? []) as ItemDespesa[];
-  const insumos = (c.insumos ?? []) as ItemDespesa[];
-  const despesasUsina = (c.despesasUsina ?? []) as ItemDespesa[];
+  const dividas = lerDividas(custo?.dividas);
   const r = calcularColheita({
     modelo: c.usina.modelo,
     tipo: c.tipo,
@@ -93,17 +106,11 @@ export default async function ColheitaPage({
     agio: c.agio,
     atrPorTonelada: c.atrPorTonelada,
     precoKgAtr: c.precoKgAtr,
-    ctc: c.ctc,
-    areaColhida: c.areaColhida,
-    arrendar: c.arrendar,
-    tonsPorTarefa: c.tonsPorTarefa,
-    tarefasArrendadas: c.tarefasArrendadas,
-    adubo: c.adubo,
-    precoTonAdubo: c.precoTonAdubo,
-    tarefasAdubo: c.tarefasAdubo ?? undefined,
-    herbicidas,
-    insumos,
-    despesasUsina,
+    ctc: custo?.ctc,
+    arrendar: custo?.arrendar ?? false,
+    tonsPorTarefa: custo?.tonsPorTarefa,
+    tarefasArrendadas: custo?.tarefasArrendadas,
+    dividas,
   });
 
   const ehCoruripe = c.usina.modelo === "coruripe";
@@ -195,7 +202,7 @@ export default async function ColheitaPage({
             <Linha rotulo="Toneladas colhidas" valor={fmtToneladas(c.toneladas)} />
             <Linha
               rotulo="Área colhida"
-              valor={`${fmtCount(c.areaColhida ?? 0)} tarefas`}
+              valor={`${fmtCount(tarefasColhidas)} tarefas`}
             />
             {ehCoruripe ? (
               <>
@@ -218,39 +225,17 @@ export default async function ColheitaPage({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        {c.arrendar && (
+        {custo?.arrendar && (
           <section className="ledger-panel p-5">
             <h2 className="font-display text-lg text-ink">Arrendamento</h2>
             <dl className="mt-2 divide-y divide-line">
-              <Linha rotulo="Toneladas por tarefa" valor={fmtCount(c.tonsPorTarefa ?? 0)} />
-              <Linha rotulo="Tarefas arrendadas" valor={fmtCount(c.tarefasArrendadas ?? 0)} />
+              <Linha rotulo="Toneladas por tarefa" valor={fmtCount(custo?.tonsPorTarefa ?? 0)} />
+              <Linha rotulo="Tarefas arrendadas" valor={fmtCount(custo?.tarefasArrendadas ?? 0)} />
               <Linha rotulo="Valor do arrendamento" valor={fmtMoney(r.arrendamento)} />
             </dl>
           </section>
         )}
-        {c.adubo && (
-          <section className="ledger-panel p-5">
-            <h2 className="font-display text-lg text-ink">Adubo</h2>
-            <dl className="mt-2 divide-y divide-line">
-              <Linha
-                rotulo="Sacos por tarefa"
-                valor={`${sacosAduboTarefa(c.tipo)} sacos de 50 kg`}
-              />
-              <Linha rotulo="Área" valor={`${fmtCount(c.tarefasAdubo ?? 0)} tarefas`} />
-              <Linha rotulo="Preço da tonelada" valor={fmtMoney(c.precoTonAdubo ?? 0)} />
-              <Linha rotulo="Valor do adubo" valor={fmtMoney(r.adubo)} />
-            </dl>
-          </section>
-        )}
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <ListaItens titulo="Herbicida (calda)" itens={herbicidas} />
-        <ListaItens titulo="Outros insumos" itens={insumos} />
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <ListaItens titulo="Despesas com a usina" itens={despesasUsina} />
-        <div />
+        <ListaItens titulo="Dívidas com usina ou terceiros" itens={dividas} />
       </div>
 
       {rateio.length > 0 && (
@@ -292,13 +277,11 @@ export default async function ColheitaPage({
           {r.arrendamento > 0 && (
             <Linha rotulo="Arrendamento" valor={fmtMoney(r.arrendamento)} />
           )}
-          {r.adubo > 0 && <Linha rotulo="Adubo" valor={fmtMoney(r.adubo)} />}
-          {r.herbicida > 0 && <Linha rotulo="Herbicida" valor={fmtMoney(r.herbicida)} />}
-          {r.insumos > 0 && (
-            <Linha rotulo="Outros insumos" valor={fmtMoney(r.insumos)} />
-          )}
-          {r.despesasUsina > 0 && (
-            <Linha rotulo="Despesas com a usina" valor={fmtMoney(r.despesasUsina)} />
+          {r.dividas > 0 && (
+            <Linha
+              rotulo="Dívidas com usina ou terceiros"
+              valor={fmtMoney(r.dividas)}
+            />
           )}
           <Linha rotulo="Total de despesas" valor={fmtMoney(r.totalDespesas)} />
           <Linha rotulo="Lucro bruto" valor={fmtMoney(r.lucro)} />

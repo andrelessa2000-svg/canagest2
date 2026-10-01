@@ -8,7 +8,7 @@ import {
   fmtToneladas,
   TAREFAS_POR_HA,
 } from "@/lib/format";
-import { calcularColheita } from "@/lib/colheita";
+import { calcularColheita, lerDividas } from "@/lib/colheita";
 import { cargarCascata } from "@/lib/relatorio";
 import { anoDeSafra, normalizarSafra } from "@/lib/safra";
 import { userIdAtual } from "@/lib/auth";
@@ -45,6 +45,7 @@ export default async function RelatoriosPage() {
           select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
         },
         usina: { select: { nome: true, modelo: true } },
+        custo: true,
       },
       orderBy: { data: "asc" },
     }),
@@ -81,6 +82,7 @@ export default async function RelatoriosPage() {
   const linhas = colheitas.map((c) => {
     const areaFazendaHa = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
     const areaTarefas = c.areaColhida ?? areaFazendaHa * TAREFAS_POR_HA;
+    const custo = c.custo;
     const r = calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
@@ -89,17 +91,11 @@ export default async function RelatoriosPage() {
       agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: areaTarefas,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? areaTarefas,
-      herbicidas: (c.herbicidas ?? []) as { nome: string; valor: number }[],
-      insumos: (c.insumos ?? []) as { nome: string; valor: number }[],
-      despesasUsina: (c.despesasUsina ?? []) as { nome: string; valor: number }[],
+      ctc: custo?.ctc,
+      arrendar: custo?.arrendar ?? false,
+      tonsPorTarefa: custo?.tonsPorTarefa,
+      tarefasArrendadas: custo?.tarefasArrendadas,
+      dividas: lerDividas(custo?.dividas),
     });
     return {
       id: c.id,
@@ -215,21 +211,10 @@ export default async function RelatoriosPage() {
       linhas.reduce((a, l) => a + l.r.arrendamento, 0),
       "var(--accent-strong)",
     ),
-    categoriaDespesas("Adubo", linhas.reduce((a, l) => a + l.r.adubo, 0), "var(--danger-strong)"),
     categoriaDespesas(
-      "Herbicida",
-      linhas.reduce((a, l) => a + l.r.herbicida, 0),
-      "var(--danger)",
-    ),
-    categoriaDespesas(
-      "Outros insumos",
-      linhas.reduce((a, l) => a + l.r.insumos, 0),
-      "var(--ink-2)",
-    ),
-    categoriaDespesas(
-      "Despesas com a usina",
-      linhas.reduce((a, l) => a + l.r.despesasUsina, 0),
-      "var(--ink-3)",
+      "Dívidas com usina ou terceiros",
+      linhas.reduce((a, l) => a + l.r.dividas, 0),
+      "var(--danger-strong)",
     ),
   ].filter((c) => c.valor > 0);
   const maxDespesa = Math.max(...categorias.map((c) => c.valor), 1);
@@ -311,8 +296,7 @@ export default async function RelatoriosPage() {
   const custosCascata =
     cascata.total.ctc +
     cascata.total.arrendamento +
-    cascata.total.insumos +
-    cascata.total.despesasUsina +
+    cascata.total.dividas +
     cascata.total.tratos +
     cascata.total.plantio +
     cascata.total.proj;

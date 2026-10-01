@@ -10,6 +10,7 @@ import {
   proximoMes,
   rotulo,
   serieMensal,
+  temPreco,
   variacao,
   type PrecoMes,
 } from "../src/lib/historico-preco";
@@ -64,6 +65,23 @@ test("variacao so funciona com base positiva", () => {
   assert.ok(perto(variacao(100, 80) ?? 0, -20));
   assert.equal(variacao(0, 100), null);
   assert.equal(variacao(-10, 100), null);
+});
+
+test("mes cadastrado so com ATR (preco 0) nao vira -100% nem derruba a media", () => {
+  // o mes de outubro entrou apenas com ATR, entao chega com precoMedio 0
+  const comAtr = [...serie, { ano: 2026, mes: 3, precoMedio: 0, atrPorTonelada: null, precoKgAtr: 1.2681 }];
+
+  assert.equal(temPreco(comAtr[0]), true);
+  assert.equal(temPreco(comAtr[comAtr.length - 1]), false);
+
+  // sem base de preco nao ha variacao a mostrar
+  assert.equal(variacao(140, 0), null);
+
+  // a media conta apenas meses com preco: pega os 3 ultimos precados
+  // (170, 180, 140) em vez de puxar o mes sem preco como se fosse R$ 0
+  assert.ok(perto(mediaMovel(comAtr, 3), (170 + 180 + 140) / 3));
+  // e nao deforma a media de 6 meses, que antes cairia para 150
+  assert.ok(perto(mediaMovel(comAtr, 6), (150 + 160 + 170 + 180 + 140) / 5));
 });
 
 test("compararCenarios quantifica a perda de esperar o mes cair", () => {

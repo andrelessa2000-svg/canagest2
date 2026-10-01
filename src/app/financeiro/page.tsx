@@ -1,10 +1,6 @@
 import { Check, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
-import {
-  fmtDate,
-  fmtMoney,
-  TAREFAS_POR_HA,
-} from "@/lib/format";
+import { fmtDate, fmtMoney } from "@/lib/format";
 import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
 import { cargarCascata } from "@/lib/relatorio";
 import {
@@ -24,6 +20,16 @@ import { safrasDoUsuario } from "@/lib/safras-usuario";
 import { anoDeSafraIgual, safraDeAno } from "@/lib/safra";
 
 export const dynamic = "force-dynamic";
+
+function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      nome: String(d.nome ?? ""),
+      valor: Number(d.valor ?? d.valorTotal) || 0,
+    }));
+}
 
 export default async function FinanceiroPage() {
   const ano = new Date().getFullYear();
@@ -59,9 +65,10 @@ export default async function FinanceiroPage() {
         where: { userId, projecao: true },
         include: {
           fazenda: {
-            select: { id: true, nome: true, ativa: true, talhoes: { select: { areaHa: true } } },
+            select: { id: true, nome: true, ativa: true },
           },
           usina: { select: { modelo: true } },
+          custo: true,
         },
       }),
     ]);
@@ -96,9 +103,7 @@ export default async function FinanceiroPage() {
   const gastosProximaSafra = [...gastosProjPorFazenda.values()].reduce((a, v) => a + v, 0);
 
   const receitaColheitaProj = (c: (typeof colheitasProj)[number]): number => {
-    const areaTarefas =
-      c.areaColhida ??
-      c.fazenda.talhoes.reduce((a, tt) => a + tt.areaHa, 0) * TAREFAS_POR_HA;
+    const custo = c.custo;
     return calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
@@ -107,17 +112,11 @@ export default async function FinanceiroPage() {
       agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: areaTarefas,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? areaTarefas,
-      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
-      insumos: (c.insumos ?? []) as ItemDespesa[],
-      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+      ctc: custo?.ctc,
+      arrendar: custo?.arrendar ?? false,
+      tonsPorTarefa: custo?.tonsPorTarefa,
+      tarefasArrendadas: custo?.tarefasArrendadas,
+      dividas: lerDividas(custo?.dividas),
     }).receita;
   };
 

@@ -1,34 +1,20 @@
-import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
-import type { NextRequest } from "next/server";
+import { auth } from "@/lib/auth";
 
-const publicas = ["/login", "/registro", "/recuperar", "/redefinir", "/api/auth"];
+export const runtime = "nodejs";
 
-export async function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname;
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isOnPublic = ["/login", "/registro", "/recuperar", "/redefinir", "/api/auth"].some((p) => 
+    req.nextUrl.pathname === p || req.nextUrl.pathname.startsWith(`${p}/`)
+  );
 
-  if (publicas.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next();
-  }
-
-  try {
-    const token = await getToken({
-      req,
-      secret: process.env.AUTH_SECRET,
-      secureCookie: req.nextUrl.protocol === "https:",
-    });
-    if (!token) {
-      const url = new URL("/login", req.url);
-      if (pathname !== "/") url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
-    }
-  } catch {
+  if (isOnPublic) return;
+  if (!isLoggedIn) {
     const url = new URL("/login", req.url);
-    return NextResponse.redirect(url);
+    if (req.nextUrl.pathname !== "/") url.searchParams.set("callbackUrl", req.nextUrl.pathname);
+    return Response.redirect(url);
   }
-
-  return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

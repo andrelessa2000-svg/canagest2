@@ -32,7 +32,7 @@ export default async function HistoricoPrecoPage() {
   const serie: PrecoMes[] = registros.map((r) => ({
     ano: r.ano,
     mes: r.mes,
-    precoMedio: r.precoMedio,
+    precoMedio: r.precoMedio ?? 0,
     fonte: r.fonte,
     atrPorTonelada: r.atrPorTonelada,
     precoKgAtr: r.precoKgAtr,
@@ -188,17 +188,23 @@ export default async function HistoricoPrecoPage() {
                         {p.atrPorTonelada != null && p.atrPorTonelada > 0 && (
                           <span className="truncate text-xs text-ink-3 tnum">
                             {fmtAtrT(p.atrPorTonelada)}
-                            {p.precoKgAtr != null && p.precoKgAtr > 0
-                              ? ` · ${fmtMoneyPorKgAtr(p.precoKgAtr)}`
-                              : ""}
+                          </span>
+                        )}
+                        {p.precoKgAtr != null && p.precoKgAtr > 0 && (
+                          <span className="truncate text-xs text-ink-3 tnum">
+                            {fmtMoneyPorKgAtr(p.precoKgAtr)}
                           </span>
                         )}
                       </span>
 
                       <span className="flex shrink-0 items-center gap-3">
-                        <span className="tnum text-[0.9375rem] font-bold text-ink">
-                          {fmtMoney(p.precoMedio)}/t
-                        </span>
+                        {p.precoMedio != null && p.precoMedio > 0 ? (
+                          <span className="tnum text-[0.9375rem] font-bold text-ink">
+                            {fmtMoney(p.precoMedio)}/t
+                          </span>
+                        ) : (
+                          <span className="text-[0.9375rem] font-medium text-ink-3">só ATR</span>
+                        )}
                         {varPreco !== null && (
                           <span className={`hidden items-center gap-0.5 text-xs font-semibold sm:flex ${cor}`}>
                             <Icone className="size-3.5" aria-hidden="true" />

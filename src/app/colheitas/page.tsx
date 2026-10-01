@@ -3,7 +3,7 @@ import { Check, Pencil, Plus, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { fmtDate, fmtMoney, fmtToneladas, fmtCount } from "@/lib/format";
 import { tipoLabel, TIPOS_COLHEITA } from "@/lib/validators";
-import { calcularColheita } from "@/lib/colheita";
+import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
 import { concretizarColheita, excluirColheita } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -14,6 +14,16 @@ import { normalizarSafra } from "@/lib/safra";
 import { safrasDoUsuario } from "@/lib/safras-usuario";
 
 export const dynamic = "force-dynamic";
+
+function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      nome: String(d.nome ?? ""),
+      valor: Number(d.valor ?? d.valorTotal) || 0,
+    }));
+}
 
 type Filtros = {
   fazenda?: string;
@@ -55,6 +65,7 @@ export default async function ColheitasPage({
       include: {
         fazenda: { select: { id: true, nome: true } },
         usina: { select: { nome: true, modelo: true } },
+        custo: true,
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
@@ -71,29 +82,26 @@ export default async function ColheitasPage({
     safrasDoUsuario(),
   ]);
 
-  const linhas = colheitas.map((c) => ({
-    c,
-    r: calcularColheita({
-      modelo: c.usina.modelo,
-      tipo: c.tipo,
-      toneladas: c.toneladas,
-      precoCana: c.precoCana,
-      agio: c.agio,
-      atrPorTonelada: c.atrPorTonelada,
-      precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: c.areaColhida,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? undefined,
-      herbicidas: (c.herbicidas ?? []) as { nome: string; valor: number }[],
-      insumos: (c.insumos ?? []) as { nome: string; valor: number }[],
-      despesasUsina: (c.despesasUsina ?? []) as { nome: string; valor: number }[],
-    }),
-  }));
+  const linhas = colheitas.map((c) => {
+    const custo = c.custo;
+    return {
+      c,
+      r: calcularColheita({
+        modelo: c.usina.modelo,
+        tipo: c.tipo,
+        toneladas: c.toneladas,
+        precoCana: c.precoCana,
+        agio: c.agio,
+        atrPorTonelada: c.atrPorTonelada,
+        precoKgAtr: c.precoKgAtr,
+        ctc: custo?.ctc,
+        arrendar: custo?.arrendar ?? false,
+        tonsPorTarefa: custo?.tonsPorTarefa,
+        tarefasArrendadas: custo?.tarefasArrendadas,
+        dividas: lerDividas(custo?.dividas),
+      }),
+    };
+  });
 
   const totais = linhas.reduce(
     (acc, { r }) => ({

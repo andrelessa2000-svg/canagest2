@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calcularMedias, sensibilidade, simular, type Cenario } from "../src/lib/simulador";
-import { calcularColheita } from "../src/lib/colheita";
+import { calcularColheita, lerDividas } from "../src/lib/colheita";
 
 const base: Cenario = {
   id: "1",
@@ -103,11 +103,53 @@ test("modelo Pindorama: receita = toneladas × (preço + ágio) e lucro desconta
     precoCana: 150,
     agio: 10,
     ctc: 1000,
-    despesasUsina: [{ nome: "Frete", valor: 500 }],
+    dividas: [{ nome: "Frete", valor: 500 }],
   });
   assert.equal(r.receita, 16000);
   assert.equal(r.totalDespesas, 1500);
   assert.equal(r.lucro, 14500);
+});
+
+test("arrendamento incide sobre o preço bruto, nunca sobre ágio ou ATR", () => {
+  const pindorama = calcularColheita({
+    modelo: "pindorama",
+    toneladas: 1000,
+    precoCana: 150,
+    agio: 25,
+    arrendar: true,
+    tonsPorTarefa: 40,
+    tarefasArrendadas: 10,
+  });
+  assert.equal(pindorama.receita, 175000);
+  assert.equal(pindorama.arrendamento, 40 * 150 * 10);
+
+  const coruripe = calcularColheita({
+    modelo: "coruripe",
+    toneladas: 1000,
+    atrPorTonelada: 130,
+    precoKgAtr: 1.1,
+    precoCana: 150,
+    arrendar: true,
+    tonsPorTarefa: 40,
+    tarefasArrendadas: 10,
+  });
+  assert.equal(coruripe.arrendamento, 40 * 150 * 10);
+});
+
+test("dívidas gravadas no formato do banco são somadas pelo valor total", () => {
+  const lidas = lerDividas([
+    { nome: "Plantio", quantidade: 10, unidade: "t", valorUnitario: 30, valorTotal: 300 },
+    { nome: "Semente", quantidade: 5, unidade: "un", valorUnitario: 20, valorTotal: 100 },
+  ]);
+  const r = calcularColheita({
+    modelo: "pindorama",
+    toneladas: 100,
+    precoCana: 150,
+    ctc: 500,
+    dividas: lidas,
+  });
+  assert.equal(r.dividas, 400);
+  assert.equal(r.totalDespesas, 900);
 });
 
 test("modelo Coruripe: receita pelo ATR quando há preço do kg", () => {

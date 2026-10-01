@@ -110,39 +110,6 @@ export const historicoPrecoSchema = z.object({
       message: "Informe um preço do kg ATR maior que zero",
     }),
 });
-
-const itemDespesaSchema = z.object({
-  nome: z.string().trim().min(1, "Informe o nome da despesa").max(60),
-  valor: z.number().min(0, "Valor não pode ser negativo").finite("Valor inválido"),
-});
-
-const itensJson = () =>
-  z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (!v || v.trim() === "") return [];
-      try {
-        const arr = JSON.parse(v);
-        if (!Array.isArray(arr)) return [];
-        return arr
-          .filter(
-            (i) =>
-              (typeof i?.nome === "string" && i.nome.trim() !== "") ||
-              (typeof i?.valor === "string" && i.valor.trim() !== ""),
-          )
-          .map((i) => {
-            const nome = (typeof i?.nome === "string" ? i.nome : "").trim();
-            const raw = typeof i?.valor === "string" ? i.valor : String(i?.valor ?? "");
-            const parsed = parseDecimal(raw);
-            return { nome, valor: Number.isFinite(parsed) ? parsed : 0 };
-          });
-      } catch {
-        return [];
-      }
-    })
-    .pipe(z.array(itemDespesaSchema));
-
 function ligaField() {
   return z
     .string()
@@ -155,6 +122,10 @@ export const colheitaSchema = z.object({
   usinaId: z.string().min(1, "Selecione a usina"),
   data: z.string().min(1, "Informe a data"),
   tipo: z.enum(TIPOS, { error: "Selecione o tipo de colheita" }),
+  talhaoId: z.string().optional(),
+  talhoesIds: itensStringJson(),
+  alocacoes: alocacoesJson(),
+  escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }).default("fazenda"),
   safra: safraSchema,
   projecao: ligaField(),
   talhoesColhidos: itensTalhaoAreaJson(),
@@ -165,24 +136,23 @@ export const colheitaSchema = z.object({
   atrPorTonelada: numeroOpcional("ATR por tonelada"),
   precoKgAtr: numeroOpcional("Preço do kg de ATR"),
 
-  ctc: moedaField("CTC"),
-
   areaColhida: numeroOpcional("Área colhida"),
 
   arrendar: ligaField(),
   tonsPorTarefa: numeroOpcional("Toneladas por tarefa"),
   tarefasArrendadas: numeroOpcional("Tarefas arrendadas"),
 
-  adubo: ligaField(),
-  precoTonAdubo: numeroOpcional("Preço da tonelada de adubo"),
-  tarefasAdubo: numeroOpcional("Tarefas com adubo"),
-
-  herbicidas: itensJson(),
-  insumos: itensJson(),
-  insumosComuns: insumosJson(),
-  despesasUsina: itensJson(),
+  dividas: insumosJson(),
 
   observacao: optionalField(300),
+});
+
+export const custoColheitaSchema = z.object({
+  ctc: moedaField("CTC"),
+  arrendar: ligaField(),
+  tonsPorTarefa: numeroOpcional("Toneladas por tarefa"),
+  tarefasArrendadas: numeroOpcional("Tarefas arrendadas"),
+  dividas: insumosJson(),
 });
 
 export const TIPOS_PLANTIO = ["planta", "reforma"] as const;

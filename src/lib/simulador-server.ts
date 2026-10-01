@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import { userIdAtual } from "@/lib/auth";
-import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
-import { TAREFAS_POR_HA } from "@/lib/format";
+import { calcularColheita, lerDividas } from "@/lib/colheita";
 import { areaColhidaHa, areaRegistroHa } from "@/lib/rateio";
 import {
   calcularMedias,
@@ -37,12 +36,13 @@ export async function getMediasHistoricas(): Promise<MediasHistoricas> {
     }),
     prisma.colheita.findMany({
       where: { userId, projecao: false },
-      include: { usina: { select: { modelo: true } } },
+      include: { usina: { select: { modelo: true } }, custo: true },
     }),
   ]);
 
   const colheitasMedia: ColheitaMedia[] = colheitas.map((c) => {
     const areaHa = areaColhidaHa(c, c.fazendaId, talhoes);
+    const custo = c.custo;
     const r = calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
@@ -51,17 +51,11 @@ export async function getMediasHistoricas(): Promise<MediasHistoricas> {
       agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: areaHa * TAREFAS_POR_HA,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? areaHa * TAREFAS_POR_HA,
-      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
-      insumos: (c.insumos ?? []) as ItemDespesa[],
-      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+      ctc: custo?.ctc,
+      arrendar: custo?.arrendar ?? false,
+      tonsPorTarefa: custo?.tonsPorTarefa,
+      tarefasArrendadas: custo?.tarefasArrendadas,
+      dividas: lerDividas(custo?.dividas),
     });
     return {
       tipo: c.tipo,
@@ -81,3 +75,6 @@ export async function getMediasHistoricas(): Promise<MediasHistoricas> {
 
   return calcularMedias(colheitasMedia, plantiosMedia, tratosMedia);
 }
+
+
+

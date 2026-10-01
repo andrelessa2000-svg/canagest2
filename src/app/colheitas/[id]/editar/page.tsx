@@ -27,6 +27,7 @@ export default async function EditarColheitaPage({
   const [colheita, fazendasRaw, usinas, talhoes, safras] = await Promise.all([
     prisma.colheita.findUnique({
       where: { id, userId: await userIdAtual() },
+      include: { custo: true },
     }),
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
@@ -48,7 +49,7 @@ export default async function EditarColheitaPage({
 
   if (!colheita) notFound();
 
-
+  const custo = colheita.custo;
   const fazendas = fazendasRaw.map((f) => ({
     id: f.id,
     nome: f.nome,
@@ -84,45 +85,22 @@ export default async function EditarColheitaPage({
             tipo: colheita.tipo,
             safra: colheita.safra ?? "",
             projecao: colheita.projecao,
-            talhoesColhidos:
-              (colheita.talhoesColhidos as { id: string; areaHa: number }[] | null) ??
-              [],
             toneladas: numero(colheita.toneladas),
             precoCana: numero(colheita.precoCana),
             agio: numero(colheita.agio),
             atrPorTonelada: numero(colheita.atrPorTonelada),
             precoKgAtr: numero(colheita.precoKgAtr),
-            ctc: numero(colheita.ctc),
+            ctc: numero(custo?.ctc),
             areaColhida: numero(colheita.areaColhida),
-            arrendar: colheita.arrendar,
-            tonsPorTarefa: numero(colheita.tonsPorTarefa),
-            tarefasArrendadas: numero(colheita.tarefasArrendadas),
-            adubo: colheita.adubo,
-            precoTonAdubo: numero(colheita.precoTonAdubo),
-            tarefasAdubo: numero(colheita.tarefasAdubo),
+            escopo: colheita.escopo ?? "fazenda",
+            talhaoId: colheita.talhaoId,
+            talhoesIds: colheita.talhoesIds,
+            alocacoes: colheita.alocacoes,
+            arrendar: custo?.arrendar ?? false,
+            tonsPorTarefa: numero(custo?.tonsPorTarefa),
+            tarefasArrendadas: numero(custo?.tarefasArrendadas),
+            dividas: (custo?.dividas as unknown as Insumo[]) ?? [],
             observacao: colheita.observacao ?? "",
-            herbicidas: (
-              (colheita.herbicidas as unknown as { nome?: string; valor?: number }[]) ??
-              []
-            ).map((i) => ({
-              nome: i.nome ?? "",
-              valor: i.valor === undefined ? "" : numero(i.valor),
-            })),
-            insumos: (
-              (colheita.insumos as unknown as { nome?: string; valor?: number }[]) ??
-              []
-            ).map((i) => ({
-              nome: i.nome ?? "",
-              valor: i.valor === undefined ? "" : numero(i.valor),
-            })),
-            insumosComuns: (colheita.insumosComuns as unknown as Insumo[]) ?? [],
-            despesasUsina: (
-              (colheita.despesasUsina as unknown as { nome?: string; valor?: number }[]) ??
-              []
-            ).map((i) => ({
-              nome: i.nome ?? "",
-              valor: i.valor === undefined ? "" : numero(i.valor),
-            })),
           }}
         />
       </div>

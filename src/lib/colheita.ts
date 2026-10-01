@@ -23,6 +23,25 @@ export const SACOS_ADUBO_POR_TAREFA: Record<TipoCorte, number> = {
 
 export type ItemDespesa = { nome: string; valor: number };
 
+/** Dívida como gravada no banco: [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }] */
+export type DividaGravada = {
+  talhaoId?: string | null;
+  nome?: string;
+  valorUnitario?: number;
+  valorTotal?: number;
+};
+
+/** Converte as dívidas gravadas em Itens de despesa, tolerando o formato antigo { nome, valor }. */
+export function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto.flatMap((d): ItemDespesa[] => {
+    if (!d || typeof d !== "object") return [];
+    const it = d as DividaGravada;
+    const valor = typeof it.valorTotal === "number" ? it.valorTotal : 0;
+    return [{ nome: it.nome ?? "", valor: Number.isFinite(valor) ? valor : 0 }];
+  });
+}
+
 export type EntradaCalculo = {
   modelo: ModeloUsina | string;
   tipo?: TipoCorte | string;
@@ -33,21 +52,16 @@ export type EntradaCalculo = {
   atrPorTonelada?: number | null;
   precoKgAtr?: number | null;
 
-  ctc?: number;
+  // 1. CTC informado pela usina
+  ctc?: number | null;
 
-  areaColhida?: number | null;
+  // 2. Arrendamento — calculado sobre o preço BRUTO da cana
   arrendar?: boolean;
   tonsPorTarefa?: number | null;
   tarefasArrendadas?: number | null;
 
-  adubo?: boolean;
-  precoTonAdubo?: number | null;
-  sacosPorTarefa?: number;
-  tarefasAdubo?: number;
-
-  herbicidas?: ItemDespesa[];
-  insumos?: ItemDespesa[];
-  despesasUsina?: ItemDespesa[];
+  // 3. Dívidas com usina ou terceiros: plantio, operações, semente
+  dividas?: ItemDespesa[];
 };
 
 export type ResultadoColheita = {
@@ -56,11 +70,7 @@ export type ResultadoColheita = {
   receita: number;
   ctc: number;
   arrendamento: number;
-  adubo: number;
-  herbicida: number;
-  insumos: number;
-  despesasUsina: number;
-  totalInsumos: number;
+  dividas: number;
   totalDespesas: number;
   lucro: number;
   receitaPorTonelada: number;
@@ -74,10 +84,6 @@ function n(v: number | null | undefined): number {
 
 function soma(itens: ItemDespesa[] | undefined): number {
   return (itens ?? []).reduce((acc, i) => acc + n(i.valor), 0);
-}
-
-export function sacosAduboTarefa(tipo: string | undefined): number {
-  return SACOS_ADUBO_POR_TAREFA[(tipo as TipoCorte) ?? "soca"] ?? 3;
 }
 
 export function calcularColheita(e: EntradaCalculo): ResultadoColheita {
@@ -97,26 +103,15 @@ export function calcularColheita(e: EntradaCalculo): ResultadoColheita {
 
   const ctc = n(e.ctc);
 
-  const areaBase = n(e.areaColhida) > 0 ? n(e.areaColhida) : n(e.tarefasAdubo);
-
+  // Arrendamento incide sobre o preço BRUTO da cana: nunca sobre ágio nem sobre ATR.
   const arrendamento =
     e.arrendar && n(e.tonsPorTarefa) > 0 && n(e.tarefasArrendadas) > 0
       ? n(e.tonsPorTarefa) * n(e.precoCana) * n(e.tarefasArrendadas)
       : 0;
 
-  const sacos = e.sacosPorTarefa ?? sacosAduboTarefa(e.tipo);
-  const tarefasAdubo = n(e.tarefasAdubo) > 0 ? n(e.tarefasAdubo) : areaBase;
-  const adubo =
-    e.adubo && n(e.precoTonAdubo) > 0 && tarefasAdubo > 0
-      ? sacos * 50 * tarefasAdubo * (n(e.precoTonAdubo) / 1000)
-      : 0;
+  const dividas = soma(e.dividas);
 
-  const herbicida = soma(e.herbicidas);
-  const insumos = soma(e.insumos);
-  const totalInsumos = adubo + herbicida + insumos;
-  const despesasUsina = soma(e.despesasUsina);
-
-  const totalDespesas = ctc + arrendamento + totalInsumos + despesasUsina;
+  const totalDespesas = ctc + arrendamento + dividas;
   const lucro = receita - totalDespesas;
 
   return {
@@ -125,11 +120,7 @@ export function calcularColheita(e: EntradaCalculo): ResultadoColheita {
     receita,
     ctc,
     arrendamento,
-    adubo,
-    herbicida,
-    insumos,
-    despesasUsina,
-    totalInsumos,
+    dividas,
     totalDespesas,
     lucro,
     receitaPorTonelada: toneladas > 0 ? receita / toneladas : 0,

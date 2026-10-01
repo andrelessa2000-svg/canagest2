@@ -10,9 +10,18 @@ import { safrasDoUsuario } from "@/lib/safras-usuario";
 import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
 import { areaColhidaHa } from "@/lib/rateio";
 import { agregarPorTalhao, type Agregado } from "@/lib/analise";
-import { TAREFAS_POR_HA } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      nome: String(d.nome ?? ""),
+      valor: Number(d.valor ?? d.valorTotal) || 0,
+    }));
+}
 
 type Filtros = {
   safra?: string;
@@ -50,7 +59,7 @@ export default async function AnaliseTalhoesPage({
   const [plantios, tratos, colheitas, fazendas, talhoes, safras] = await Promise.all([
     prisma.plantio.findMany({ where }),
     prisma.trato.findMany({ where }),
-    prisma.colheita.findMany({ where, include: { usina: { select: { modelo: true } } } }),
+    prisma.colheita.findMany({ where, include: { usina: { select: { modelo: true } }, custo: true } }),
     prisma.fazenda.findMany({
       where: { userId },
       select: { id: true, nome: true },
@@ -66,6 +75,7 @@ export default async function AnaliseTalhoesPage({
 
   const colheitasCalculadas = colheitas.map((c) => {
     const ha = areaColhidaHa(c, c.fazendaId, talhoes);
+    const custo = c.custo;
     const r = calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
@@ -74,17 +84,11 @@ export default async function AnaliseTalhoesPage({
       agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: ha * TAREFAS_POR_HA,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? ha * TAREFAS_POR_HA,
-      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
-      insumos: (c.insumos ?? []) as ItemDespesa[],
-      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+      ctc: custo?.ctc,
+      arrendar: custo?.arrendar ?? false,
+      tonsPorTarefa: custo?.tonsPorTarefa,
+      tarefasArrendadas: custo?.tarefasArrendadas,
+      dividas: lerDividas(custo?.dividas),
     });
     return {
       fazendaId: c.fazendaId,

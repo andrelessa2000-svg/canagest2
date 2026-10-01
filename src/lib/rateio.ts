@@ -96,21 +96,51 @@ function areaDaFazenda(fazendaId: string, talhoes: TalhaoBase[]): number {
   return talhoes.filter((t) => t.fazendaId === fazendaId).reduce((s, t) => s + t.areaHa, 0);
 }
 
+/** Soma das tarefas das porções [{ talhaoId, tarefas, completo }]. */
+function tarefasDasAlocacoes(alocacoes: unknown, talhoes: TalhaoBase[]): number {
+  if (!Array.isArray(alocacoes)) return 0;
+  const porId = new Map(talhoes.map((t) => [t.id, t.areaHa]));
+  return alocacoes.reduce<number>((s, a) => {
+    if (!ehObjeto(a)) return s;
+    if (a.completo === true) {
+      const id = typeof a.talhaoId === "string" ? a.talhaoId : "";
+      return s + (porId.get(id) ?? 0) * TAREFAS_POR_HA;
+    }
+    return s + (Number(a.tarefas) || 0);
+  }, 0);
+}
+
 /** Área colhida em hectares. `areaColhida` é gravada em TAREFAS. */
 export function areaColhidaHa(
-  c: { areaColhida?: number | null; talhoesColhidos?: unknown },
+  c: {
+    areaColhida?: number | null;
+    talhoesColhidos?: unknown;
+    alocacoes?: unknown;
+    escopo?: string | null;
+    talhoesIds?: unknown;
+  },
   fazendaId: string,
   talhoes: TalhaoBase[],
 ): number {
   if (typeof c.areaColhida === "number" && c.areaColhida > 0) {
     return c.areaColhida / TAREFAS_POR_HA;
   }
+  const tarefas = tarefasDasAlocacoes(c.alocacoes, talhoes);
+  if (tarefas > 0) return tarefas / TAREFAS_POR_HA;
   const colhidos = Array.isArray(c.talhoesColhidos) ? c.talhoesColhidos : [];
   const soma = colhidos.reduce<number>(
     (s, x) => s + (ehObjeto(x) ? Number(x.areaHa) || 0 : 0),
     0,
   );
   if (soma > 0) return soma;
+  if (c.escopo && c.escopo !== "fazenda" && Array.isArray(c.talhoesIds)) {
+    const porId = new Map(talhoes.map((t) => [t.id, t.areaHa]));
+    const parcial = (c.talhoesIds as unknown[]).reduce<number>(
+      (s, id) => s + (typeof id === "string" ? (porId.get(id) ?? 0) : 0),
+      0,
+    );
+    if (parcial > 0) return parcial;
+  }
   return areaDaFazenda(fazendaId, talhoes);
 }
 
@@ -120,6 +150,7 @@ export function areaRegistroHa(
     tarefas?: number | null;
     areaHa?: number | null;
     escopo?: string | null;
+    alocacoes?: unknown;
     talhoesIds?: unknown;
   },
   fazendaId: string,
@@ -127,6 +158,8 @@ export function areaRegistroHa(
 ): number {
   if (typeof r.tarefas === "number" && r.tarefas > 0) return r.tarefas / TAREFAS_POR_HA;
   if (typeof r.areaHa === "number" && r.areaHa > 0) return r.areaHa;
+  const tarefas = tarefasDasAlocacoes(r.alocacoes, talhoes);
+  if (tarefas > 0) return tarefas / TAREFAS_POR_HA;
   if (r.escopo === "fazenda") return areaDaFazenda(fazendaId, talhoes);
   const ids = Array.isArray(r.talhoesIds) ? (r.talhoesIds as unknown[]) : [];
   const porId = new Map(talhoes.map((t) => [t.id, t.areaHa]));

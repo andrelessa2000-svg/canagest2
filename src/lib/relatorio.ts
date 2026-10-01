@@ -1,5 +1,5 @@
-import { prisma } from "./db";
-import { calcularColheita, type ItemDespesa } from "./colheita";
+﻿import { prisma } from "./db";
+import { calcularColheita, lerDividas } from "./colheita";
 import { userIdAtual } from "./auth";
 import { TAREFAS_POR_HA } from "./format";
 
@@ -11,8 +11,7 @@ export type FilaCascata = {
   receita: number;
   ctc: number;
   arrendamento: number;
-  insumos: number;
-  despesasUsina: number;
+  dividas: number;
   lucroBruto: number;
   tratos: number;
   plantio: number;
@@ -40,6 +39,7 @@ export async function cargarCascata(): Promise<Cascata> {
           select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
         },
         usina: { select: { nome: true, modelo: true } },
+        custo: true,
       },
     }),
     prisma.trato.findMany({
@@ -91,6 +91,7 @@ export async function cargarCascata(): Promise<Cascata> {
   for (const c of colheitas) {
     const areaFazendaHa = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
     const areaTarefas = c.areaColhida ?? areaFazendaHa * TAREFAS_POR_HA;
+    const custo = c.custo;
     const r = calcularColheita({
       modelo: c.usina.modelo,
       tipo: c.tipo,
@@ -99,17 +100,11 @@ export async function cargarCascata(): Promise<Cascata> {
       agio: c.agio,
       atrPorTonelada: c.atrPorTonelada,
       precoKgAtr: c.precoKgAtr,
-      ctc: c.ctc,
-      areaColhida: areaTarefas,
-      arrendar: c.arrendar,
-      tonsPorTarefa: c.tonsPorTarefa,
-      tarefasArrendadas: c.tarefasArrendadas,
-      adubo: c.adubo,
-      precoTonAdubo: c.precoTonAdubo,
-      tarefasAdubo: c.tarefasAdubo ?? areaTarefas,
-      herbicidas: (c.herbicidas ?? []) as ItemDespesa[],
-      insumos: (c.insumos ?? []) as ItemDespesa[],
-      despesasUsina: (c.despesasUsina ?? []) as ItemDespesa[],
+      ctc: custo?.ctc,
+      arrendar: custo?.arrendar ?? false,
+      tonsPorTarefa: custo?.tonsPorTarefa,
+      tarefasArrendadas: custo?.tarefasArrendadas,
+      dividas: lerDividas(custo?.dividas),
     });
 
     if (c.projecao) {
@@ -131,8 +126,7 @@ export async function cargarCascata(): Promise<Cascata> {
       receita: 0,
       ctc: 0,
       arrendamento: 0,
-      insumos: 0,
-      despesasUsina: 0,
+      dividas: 0,
       lucroBruto: 0,
       tratos: 0,
       plantio: 0,
@@ -149,8 +143,7 @@ export async function cargarCascata(): Promise<Cascata> {
     fila.receita += r.receita;
     fila.ctc += r.ctc;
     fila.arrendamento += r.arrendamento;
-    fila.insumos += r.totalInsumos;
-    fila.despesasUsina += r.despesasUsina;
+    fila.dividas += r.dividas;
     mapa.set(c.fazendaId, fila);
   }
 
@@ -158,8 +151,7 @@ export async function cargarCascata(): Promise<Cascata> {
     f.tratos = tratosPorFazenda.get(f.fazendaId) ?? 0;
     f.plantio = plantioPorFazenda.get(f.fazendaId) ?? 0;
     f.proj = projPorFazenda.get(f.fazendaId) ?? 0;
-    f.lucroBruto =
-      f.receita - f.ctc - f.arrendamento - f.insumos - f.despesasUsina;
+    f.lucroBruto = f.receita - f.ctc - f.arrendamento - f.dividas;
     f.lucroNeto = f.lucroBruto - f.tratos - f.plantio;
     f.lucroNetoEstimado = f.lucroNeto - f.proj;
     return f;
@@ -173,8 +165,7 @@ export async function cargarCascata(): Promise<Cascata> {
     receita: 0,
     ctc: 0,
     arrendamento: 0,
-    insumos: 0,
-    despesasUsina: 0,
+    dividas: 0,
     lucroBruto: 0,
     tratos: 0,
     plantio: 0,
@@ -194,8 +185,7 @@ export async function cargarCascata(): Promise<Cascata> {
     t.receita += f.receita;
     t.ctc += f.ctc;
     t.arrendamento += f.arrendamento;
-    t.insumos += f.insumos;
-    t.despesasUsina += f.despesasUsina;
+    t.dividas += f.dividas;
     t.lucroBruto += f.lucroBruto;
     t.tratos += f.tratos;
     t.plantio += f.plantio;
@@ -222,8 +212,7 @@ export function filaCascataCSV(f: FilaCascata): string {
     num(f.receita),
     num(f.ctc),
     num(f.arrendamento),
-    num(f.insumos),
-    num(f.despesasUsina),
+    num(f.dividas),
     num(f.lucroBruto),
     num(f.tratos),
     num(f.plantio),

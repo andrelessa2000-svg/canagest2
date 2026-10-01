@@ -58,9 +58,17 @@ export function proximoMes(ano: number, mes: number): { ano: number; mes: number
   return deslocarMes(ano, mes, 1);
 }
 
+/**
+ * Só existe comparação de preço entre meses que têm R$/t de verdade.
+ * Meses cadastrados apenas com ATR entram como 0 e ficam de fora.
+ */
+export function temPreco(p: PrecoMes): boolean {
+  return Number.isFinite(p.precoMedio) && p.precoMedio > 0;
+}
+
 /** Média simples dos últimos N meses que tenham preço cadastrado. */
 export function mediaMovel(serie: PrecoMes[], meses: number): number {
-  const recentes = ordenar(serie).slice(-meses);
+  const recentes = ordenar(serie).filter(temPreco).slice(-meses);
   if (recentes.length === 0) return 0;
   return recentes.reduce((s, p) => s + p.precoMedio, 0) / recentes.length;
 }
@@ -68,6 +76,7 @@ export function mediaMovel(serie: PrecoMes[], meses: number): number {
 /** Variação percentual entre dois meses. Retorna null se não houver base. */
 export function variacao(deAnterior: number, atual: number): number | null {
   if (!Number.isFinite(deAnterior) || deAnterior <= 0) return null;
+  if (!Number.isFinite(atual) || atual <= 0) return null;
   return ((atual - deAnterior) / deAnterior) * 100;
 }
 

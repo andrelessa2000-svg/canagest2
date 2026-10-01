@@ -102,24 +102,35 @@ async function main() {
             data: new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000),
             tipo,
             toneladas,
-            ...remuneracao,
-            ctc: rand(15000),
+...remuneracao,
+            escopo: "fazenda",
             areaColhida: tarefas,
-            arrendar: cIdx % 4 === 0,
-            tonsPorTarefa: cIdx % 4 === 0 ? rand(6, 1) + 34 : null,
-            tarefasArrendadas: cIdx % 4 === 0 ? tarefas : null,
-            adubo: true,
-            precoTonAdubo: rand(2500, 0) + 2400,
-            tarefasAdubo: tarefas,
-            herbicidas: [
-              { nome: "Glifosato", valor: rand(900) },
-              { nome: "Diurana", valor: rand(600) },
-            ],
-            insumos: [
-              { nome: "Calcário", valor: rand(1200) },
-              { nome: "Biológico", valor: rand(400) },
-            ],
-            despesasUsina: [{ nome: "Plantio", valor: rand(3000) }],
+            custo: {
+              create: {
+                ctc: rand(15000),
+                arrendar: cIdx % 4 === 0,
+                tonsPorTarefa: cIdx % 4 === 0 ? rand(6, 1) + 34 : null,
+                tarefasArrendadas: cIdx % 4 === 0 ? tarefas : null,
+                dividas: [
+                  {
+                    talhaoId: null,
+                    nome: "Plantio",
+                    quantidade: tarefas,
+                    unidade: "t",
+                    valorUnitario: rand(30, 1) + 10,
+                    valorTotal: tarefas * (rand(30, 1) + 10),
+                  },
+                  {
+                    talhaoId: null,
+                    nome: "Operações",
+                    quantidade: tarefas,
+                    unidade: "t",
+                    valorUnitario: rand(18, 1) + 5,
+                    valorTotal: tarefas * (rand(18, 1) + 5),
+                  },
+                ],
+              },
+            },
           },
         });
       }

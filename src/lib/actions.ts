@@ -2,20 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { parseDecimal } from "./format";
 import { userIdAtual } from "./auth";
+import { MESES } from "./historico-preco";
 import { MENSAGEM_SAFRA_INVALIDA, normalizarSafra } from "./safra";
 import { normalizarSafrasDoUsuario } from "./safras-usuario";
-
-async function usuarioId(): Promise<string> {
-  const id = await userIdAtual();
-  if (!id) throw new Error("Não autenticado");
-  return id;
-}
+import { z } from "zod";
 import {
   colheitaSchema,
+  custoColheitaSchema,
   fazendaSchema,
   historicoPrecoSchema,
   plantioSchema,
@@ -29,6 +26,12 @@ import {
 } from "./validators";
 
 export type ActionState = { ok: true; mensagem?: string } | { ok: false; error: string };
+
+async function usuarioId(): Promise<string> {
+  const id = await userIdAtual();
+  if (!id) throw new Error("Não autenticado");
+  return id;
+}
 
 function campo(formData: FormData, nome: string): string {
   return formData.get(nome)?.toString() ?? "";
@@ -133,9 +136,8 @@ export async function criarTalhao(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
 
-  let talhaoId: string;
   try {
-    const talhao = await prisma.talhao.create({
+    await prisma.talhao.create({
       data: {
         userId: await usuarioId(),
         fazendaId,
@@ -143,7 +145,6 @@ export async function criarTalhao(
         areaHa: parsed.data.areaHa,
       },
     });
-    talhaoId = talhao.id;
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -152,7 +153,7 @@ export async function criarTalhao(
   revalidatePath("/");
   revalidatePath("/fazendas");
   revalidatePath(`/fazendas/${fazendaId}`);
-  redirect(`/talhoes/${talhaoId}`);
+  redirect(`/fazendas/${fazendaId}/talhoes/novo`);
 }
 
 export async function atualizarTalhao(
@@ -307,19 +308,22 @@ function camposColheita(formData: FormData) {
     agio: campo(formData, "agio"),
     atrPorTonelada: campo(formData, "atrPorTonelada"),
     precoKgAtr: campo(formData, "precoKgAtr"),
-    ctc: campo(formData, "ctc"),
+    talhaoId: campo(formData, "talhaoId"),
+    talhoesIds: campo(formData, "talhoesIds"),
+    alocacoes: campo(formData, "alocacoes"),
+    escopo: campo(formData, "escopo"),
     areaColhida: campo(formData, "areaColhida"),
+    observacao: campo(formData, "observacao"),
+  };
+}
+
+function camposCustoColheita(formData: FormData) {
+  return {
+    ctc: campo(formData, "ctc"),
     arrendar: campo(formData, "arrendar"),
     tonsPorTarefa: campo(formData, "tonsPorTarefa"),
     tarefasArrendadas: campo(formData, "tarefasArrendadas"),
-    adubo: campo(formData, "adubo"),
-    precoTonAdubo: campo(formData, "precoTonAdubo"),
-    tarefasAdubo: campo(formData, "tarefasAdubo"),
-    herbicidas: campo(formData, "herbicidas"),
-    insumos: campo(formData, "insumos"),
-    insumosComuns: campo(formData, "insumosComuns"),
-    despesasUsina: campo(formData, "despesasUsina"),
-    observacao: campo(formData, "observacao"),
+    dividas: campo(formData, "dividas"),
   };
 }
 
@@ -356,21 +360,25 @@ function dadosColheita(d: ColheitaInput) {
     agio: d.agio,
     atrPorTonelada: d.atrPorTonelada,
     precoKgAtr: d.precoKgAtr,
-ctc: d.ctc,
+    talhaoId: d.talhaoId || null,
+    talhoesIds: d.talhoesIds as unknown as Prisma.InputJsonValue,
+    alocacoes: d.alocacoes as unknown as Prisma.InputJsonValue,
+    escopo: d.escopo,
     areaColhida: d.areaColhida,
+    observacao: d.observacao,
+  };
+}
+
+function dadosCustoColheita(d: z.infer<typeof custoColheitaSchema>) {
+  return {
+    ctc: d.ctc,
     arrendar: d.arrendar,
     tonsPorTarefa: d.tonsPorTarefa,
     tarefasArrendadas: d.tarefasArrendadas,
-    adubo: d.adubo,
-    precoTonAdubo: d.precoTonAdubo,
-    tarefasAdubo: d.tarefasAdubo,
-    herbicidas: d.herbicidas as unknown as Prisma.InputJsonValue,
-    insumos: d.insumos as unknown as Prisma.InputJsonValue,
-    insumosComuns: d.insumosComuns?.length > 0
-      ? (d.insumosComuns as unknown as Prisma.InputJsonValue)
-      : undefined,
-    despesasUsina: d.despesasUsina as unknown as Prisma.InputJsonValue,
-    observacao: d.observacao,
+    dividas:
+      d.dividas && d.dividas.length > 0
+        ? (d.dividas as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
   };
 }
 
@@ -390,23 +398,35 @@ export async function criarColheita(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = colheitaSchema.safeParse(camposColheita(formData));
+  const parsedColheita = colheitaSchema.safeParse(camposColheita(formData));
+  const parsedCusto = custoColheitaSchema.safeParse(camposCustoColheita(formData));
 
-  if (!parsed.success) {
-    return { ok: false, error: primeiraMensagem(parsed.error) };
+  if (!parsedColheita.success) {
+    return { ok: false, error: primeiraMensagem(parsedColheita.error) };
+  }
+  if (!parsedCusto.success) {
+    return { ok: false, error: primeiraMensagem(parsedCusto.error) };
   }
 
-  const erroUsina = await validarUsina(parsed.data.usinaId, parsed.data);
+  const erroUsina = await validarUsina(parsedColheita.data.usinaId, parsedColheita.data);
   if (erroUsina) {
     return { ok: false, error: erroUsina };
   }
 
   let criada!: { id: string; fazendaId: string };
   try {
-    const c = await prisma.colheita.create({
-      data: { userId: await usuarioId(), ...dadosColheita(parsed.data) },
+    criada = await prisma.$transaction(async (tx) => {
+      const c = await tx.colheita.create({
+        data: { userId: await usuarioId(), ...dadosColheita(parsedColheita.data) },
+      });
+      await tx.custoColheita.create({
+        data: {
+          colheitaId: c.id,
+          ...dadosCustoColheita(parsedCusto.data),
+        },
+      });
+      return { id: c.id, fazendaId: c.fazendaId };
     });
-    criada = { id: c.id, fazendaId: c.fazendaId };
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -423,13 +443,17 @@ export async function atualizarColheita(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = colheitaSchema.safeParse(camposColheita(formData));
+  const parsedColheita = colheitaSchema.safeParse(camposColheita(formData));
+  const parsedCusto = custoColheitaSchema.safeParse(camposCustoColheita(formData));
 
-  if (!parsed.success) {
-    return { ok: false, error: primeiraMensagem(parsed.error) };
+  if (!parsedColheita.success) {
+    return { ok: false, error: primeiraMensagem(parsedColheita.error) };
+  }
+  if (!parsedCusto.success) {
+    return { ok: false, error: primeiraMensagem(parsedCusto.error) };
   }
 
-  const erroUsina = await validarUsina(parsed.data.usinaId, parsed.data);
+  const erroUsina = await validarUsina(parsedColheita.data.usinaId, parsedColheita.data);
   if (erroUsina) {
     return { ok: false, error: erroUsina };
   }
@@ -437,7 +461,15 @@ export async function atualizarColheita(
   try {
     const c = await prisma.colheita.update({
       where: { id, userId: await usuarioId() },
-      data: dadosColheita(parsed.data),
+      data: dadosColheita(parsedColheita.data),
+    });
+    await prisma.custoColheita.upsert({
+      where: { colheitaId: id },
+      update: dadosCustoColheita(parsedCusto.data),
+      create: {
+        colheitaId: id,
+        ...dadosCustoColheita(parsedCusto.data),
+      },
     });
     revalidatePath("/");
     revalidatePath("/colheitas");
@@ -838,6 +870,50 @@ export async function salvarPreco(
   revalidatePath("/historico-preco");
   revalidatePath("/simulador");
   return { ok: true, mensagem: `Preço de ${mes}/${ano} salvo.` };
+}
+
+/**
+ * Salva só o ATR do mês, sem mexer no preço em R$/t.
+ *
+ * O comparativo do simulador se apoia no `precoKgAtr` (quanto a usina paga
+ * por kg de ATR no mês), que é o número que de fato muda de um mês para o
+ * outro. `precoMedio` é opcional no banco: quem cadastra só o ATR não
+ * precisa inventar um R$/t.
+ */
+export async function salvarAtrMes(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const ano = Number(campo(formData, "ano"));
+  const mes = Number(campo(formData, "mes"));
+  const bruto = campo(formData, "precoKgAtr").replace(",", ".");
+  const precoKgAtr = Number(bruto);
+
+  if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) {
+    return { ok: false, error: "Ano inválido" };
+  }
+  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+    return { ok: false, error: "Mês inválido" };
+  }
+  if (!Number.isFinite(precoKgAtr) || precoKgAtr <= 0) {
+    return { ok: false, error: "Informe o ATR do mês maior que zero" };
+  }
+
+  try {
+    const userId = await usuarioId();
+    await prisma.historicoPreco.upsert({
+      where: { userId_ano_mes: { userId, ano, mes } },
+      update: { precoKgAtr },
+      create: { userId, ano, mes, precoKgAtr },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/historico-preco");
+  revalidatePath("/simulador");
+  return { ok: true, mensagem: `ATR de ${MESES[mes - 1]}/${ano} salvo.` };
 }
 
 export async function excluirPreco(

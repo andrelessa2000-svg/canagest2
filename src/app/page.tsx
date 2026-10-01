@@ -12,13 +12,23 @@ import {
   fmtTons,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
-import { calcularColheita } from "@/lib/colheita";
+import { calcularColheita, type ItemDespesa } from "@/lib/colheita";
 import { userIdAtual } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells";
 
 export const dynamic = "force-dynamic";
+
+function lerDividas(bruto: unknown): ItemDespesa[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      nome: String(d.nome ?? ""),
+      valor: Number(d.valor ?? d.valorTotal) || 0,
+    }));
+}
 
 export default async function DashboardPage() {
   const userId = await userIdAtual();
@@ -36,6 +46,7 @@ export default async function DashboardPage() {
             select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
           },
           usina: { select: { nome: true } },
+          custo: true,
         },
         orderBy: { data: "desc" },
         take: 5,
@@ -46,25 +57,9 @@ export default async function DashboardPage() {
       }),
       prisma.colheita.findMany({
         where: { userId, projecao: false },
-        select: {
-          toneladas: true,
-          tipo: true,
-          precoCana: true,
-          agio: true,
-          atrPorTonelada: true,
-          precoKgAtr: true,
-          ctc: true,
-          areaColhida: true,
-          arrendar: true,
-          tonsPorTarefa: true,
-          tarefasArrendadas: true,
-          adubo: true,
-          precoTonAdubo: true,
-          tarefasAdubo: true,
-          herbicidas: true,
-          insumos: true,
-          despesasUsina: true,
+        include: {
           usina: { select: { modelo: true } },
+          custo: true,
         },
       }),
     ]);
@@ -78,6 +73,7 @@ export default async function DashboardPage() {
 
   const fin = colheitasFin.reduce(
     (acc, c) => {
+      const custo = c.custo;
       const r = calcularColheita({
         modelo: c.usina.modelo,
         tipo: c.tipo,
@@ -86,17 +82,11 @@ export default async function DashboardPage() {
         agio: c.agio,
         atrPorTonelada: c.atrPorTonelada,
         precoKgAtr: c.precoKgAtr,
-        ctc: c.ctc,
-        areaColhida: c.areaColhida,
-        arrendar: c.arrendar,
-        tonsPorTarefa: c.tonsPorTarefa,
-        tarefasArrendadas: c.tarefasArrendadas,
-        adubo: c.adubo,
-        precoTonAdubo: c.precoTonAdubo,
-        tarefasAdubo: c.tarefasAdubo ?? undefined,
-        herbicidas: (c.herbicidas ?? []) as { nome: string; valor: number }[],
-        insumos: (c.insumos ?? []) as { nome: string; valor: number }[],
-        despesasUsina: (c.despesasUsina ?? []) as { nome: string; valor: number }[],
+        ctc: custo?.ctc,
+        arrendar: custo?.arrendar ?? false,
+        tonsPorTarefa: custo?.tonsPorTarefa,
+        tarefasArrendadas: custo?.tarefasArrendadas,
+        dividas: lerDividas(custo?.dividas),
       });
       return {
         toneladas: acc.toneladas + r.toneladas,

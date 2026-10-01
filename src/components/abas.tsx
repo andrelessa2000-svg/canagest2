@@ -1,22 +1,6 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { CircleCheck, PencilLine, TrendingUp, type LucideIcon } from "lucide-react";
-import {
-  CLASSE_ORIGEM,
-  ROTULO_ORIGEM,
-  type OrigemValor,
-} from "@/lib/simulador-preco-comparacao";
-
-/**
- * Ícone por origem. A cor sozinha nunca carrega o significado: o selo sempre
- * mostra ícone + sigla em texto.
- */
-const ICONE_ORIGEM: Record<OrigemValor, LucideIcon> = {
-  real: CircleCheck,
-  simulacao: PencilLine,
-  projecao: TrendingUp,
-};
 
 export type ItemAba = {
   id: string;
@@ -114,33 +98,5 @@ export function Abas({
         </div>
       ))}
     </div>
-  );
-}
-
-/** Selo de origem do valor: ícone + REAL / SIMULAÇÃO / PROJEÇÃO. */
-export function SeloOrigem({ origem }: { origem: OrigemValor }) {
-  const Icone = ICONE_ORIGEM[origem];
-  return (
-    <span
-      title={ROTULO_ORIGEM[origem].descricao}
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap ${CLASSE_ORIGEM[origem]}`}
-    >
-      <Icone className="size-3" aria-hidden="true" />
-      {ROTULO_ORIGEM[origem].sigla}
-    </span>
-  );
-}
-
-/** Legenda textual do que significa cada origem — usada abaixo dos gráficos. */
-export function LegendaOrigens() {
-  return (
-    <ul className="grid gap-1.5">
-      {(Object.keys(ROTULO_ORIGEM) as OrigemValor[]).map((o) => (
-        <li key={o} className="flex items-start gap-2 text-xs text-ink-2">
-          <SeloOrigem origem={o} />
-          <span>{ROTULO_ORIGEM[o].descricao}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -2,34 +2,33 @@
 
 import { useEffect, useMemo, useState, useActionState } from "react";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ActionState } from "@/lib/actions";
 import { TIPOS_COLHEITA, type TipoColheita } from "@/lib/validators";
 import {
   fmtMoney,
-  fmtCount,
+  fmtTarefas,
   parseDecimal,
   TAREFAS_POR_HA,
   toDateInputValue,
 } from "@/lib/format";
-import {
-  calcularColheita,
-  sacosAduboTarefa,
-  MODELO_USINA_LABEL,
-  type ModeloUsina,
-} from "@/lib/colheita";
+import { calcularColheita, MODELO_USINA_LABEL, type ModeloUsina } from "@/lib/colheita";
+import { ESCOPOS_TRATO_LABEL } from "@/lib/validators";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { CelulaMetrica } from "./stat-cells";
 import { SelectorRegistro } from "./selector-registro";
 import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
+import {
+  SeletorPorcoes,
+  alocacoesDeJson,
+  alocacoesParaJson,
+  type Alocacao,
+} from "./seletor-porcoes";
 
 export type FazendaOpcao = { id: string; nome: string; areaHa: number };
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
-
-type Item = { nome: string; valor: string };
 
 type Campos = {
   fazendaId: string;
@@ -45,14 +44,12 @@ type Campos = {
   precoKgAtr: string;
   ctc: string;
   areaColhida: string;
+  escopo: string;
   arrendar: boolean;
   tonsPorTarefa: string;
   tarefasArrendadas: string;
-  adubo: boolean;
-  precoTonAdubo: string;
-  tarefasAdubo: string;
   observacao: string;
-  insumosComuns?: Insumo[];
+  dividas?: Insumo[];
 };
 
 function n(v: string): number {
@@ -64,74 +61,8 @@ function opcional(v: string): number | null {
   return v.trim() === "" ? null : n(v);
 }
 
-function itensParaCalc(itens: Item[]): { nome: string; valor: number }[] {
-  return itens
-    .filter((i) => i.nome.trim() !== "" || i.valor.trim() !== "")
-    .map((i) => ({ nome: i.nome, valor: n(i.valor) }));
-}
-
 function areaTarefas(areaHa: number): number {
   return Math.round(areaHa * 3.3 * 100) / 100;
-}
-
-function ListaItens({
-  rotulo,
-  dica,
-  itens,
-  onChange,
-  nomeCampo,
-}: {
-  rotulo: string;
-  dica: string;
-  itens: Item[];
-  onChange: (itens: Item[]) => void;
-  nomeCampo: string;
-}) {
-  function setItem(idx: number, campo: keyof Item, valor: string) {
-    onChange(itens.map((i, k) => (k === idx ? { ...i, [campo]: valor } : i)));
-  }
-  return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-ink">{rotulo}</p>
-        <button
-          type="button"
-          onClick={() => onChange([...itens, { nome: "", valor: "" }])}
-          className="text-sm font-semibold text-accent hover:text-accent-strong"
-        >
-          + Adicionar item
-        </button>
-      </div>
-      <p className="-mt-2 text-xs text-ink-3">{dica}</p>
-      <input type="hidden" name={nomeCampo} value={JSON.stringify(itens)} />
-      {itens.map((item, idx) => (
-        <div key={idx} className="flex items-start gap-2">
-          <input
-            className="field-input min-w-0 flex-1"
-            value={item.nome}
-            onChange={(e) => setItem(idx, "nome", e.target.value)}
-            placeholder="Nome (ex.: Adubo foliar)"
-            maxLength={60}
-          />
-          <input
-            className="field-input tnum w-32"
-            value={item.valor}
-            onChange={(e) => setItem(idx, "valor", e.target.value)}
-            inputMode="decimal"
-            placeholder="Valor R$"
-          />
-          <button
-            type="button"
-            onClick={() => onChange(itens.filter((_, k) => k !== idx))}
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
-            aria-label="Remover item"
-          >
-            <Trash2 className="size-4" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export function ColheitaForm({
@@ -150,10 +81,9 @@ export function ColheitaForm({
   talhoes?: TalhaoOpcao[];
   safras?: string[];
   inicial?: Partial<Campos> & {
-    herbicidas?: Item[];
-    insumos?: Item[];
-    despesasUsina?: Item[];
-    talhoesColhidos?: { id: string; areaHa: number }[];
+    talhaoId?: string | null;
+    talhoesIds?: unknown;
+    alocacoes?: unknown;
   };
   modo?: "criar" | "editar";
   cancelarHref?: string;
@@ -183,26 +113,19 @@ export function ColheitaForm({
     precoKgAtr: inicial?.precoKgAtr ?? "",
     ctc: inicial?.ctc ?? "",
     areaColhida: areaInicial,
+    escopo: inicial?.escopo ?? "fazenda",
     arrendar: inicial?.arrendar ?? false,
     tonsPorTarefa: inicial?.tonsPorTarefa ?? "",
     tarefasArrendadas: inicial?.tarefasArrendadas ?? areaInicial,
-    adubo: inicial?.adubo ?? false,
-    precoTonAdubo: inicial?.precoTonAdubo ?? "",
-    tarefasAdubo: inicial?.tarefasAdubo ?? areaInicial,
     observacao: inicial?.observacao ?? "",
   }));
 
-  const [herbicidas, setHerbicidas] = useState<Item[]>(
-    inicial?.herbicidas ?? [],
+  const [dividas, setDividas] = useState<Insumo[]>(
+    inicial?.dividas ? insumosDeJson(inicial.dividas) : [],
   );
-  const [insumos, setInsumos] = useState<Item[]>(inicial?.insumos ?? []);
-  const [insumosComuns, setInsumosComuns] = useState<Insumo[]>(inicial?.insumosComuns ? insumosDeJson(inicial.insumosComuns) : []);
-  const [despesasUsina, setDespesasUsina] = useState<Item[]>(
-    inicial?.despesasUsina ?? [],
+  const [porcoes, setPorcoes] = useState<Alocacao[]>(
+    inicial?.alocacoes ? alocacoesDeJson(inicial.alocacoes) : [],
   );
-  const [talhoesSel, setTalhoesSel] = useState<
-    { id: string; areaHa: number }[]
-  >((inicial?.talhoesColhidos as { id: string; areaHa: number }[] | undefined) ?? []);
 
   useEffect(() => {
     if (state && !state.ok) {
@@ -224,8 +147,8 @@ export function ColheitaForm({
       fazendaId: id,
       areaColhida: prev.areaColhida || area,
       tarefasArrendadas: prev.tarefasArrendadas || area,
-      tarefasAdubo: prev.tarefasAdubo || area,
     }));
+    setPorcoes([]);
   }
 
   function trocarAreaColhida(valor: string) {
@@ -238,10 +161,6 @@ export function ColheitaForm({
           !prev.tarefasArrendadas || prev.tarefasArrendadas === atual
             ? valor
             : prev.tarefasArrendadas,
-        tarefasAdubo:
-          !prev.tarefasAdubo || prev.tarefasAdubo === atual
-            ? valor
-            : prev.tarefasAdubo,
       };
     });
   }
@@ -253,7 +172,25 @@ export function ColheitaForm({
   const modelo =
     (usinas.find((u) => u.id === c.usinaId)?.modelo ?? "pindorama") as ModeloUsina;
   const ehCoruripe = modelo === "coruripe";
-  const sacos = sacosAduboTarefa(c.tipo);
+
+  const talhoesFazenda = c.fazendaId
+    ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
+    : [];
+
+  // Escopo "fazenda" cobre todos os talhões; nos demais, usa as porções escolhidas.
+  const { alocacoes, talhoesIds, tarefasTotais } = alocacoesParaJson(
+    porcoes,
+    talhoesFazenda,
+  );
+  const tarefasColhidas =
+    c.escopo === "fazenda"
+      ? areaTarefas(fazendas.find((f) => f.id === c.fazendaId)?.areaHa ?? 0)
+      : tarefasTotais;
+
+  // En escopos de talhão/parte la "área colhida" proviene de las porciones;
+  // en "fazenda" el usuario puede ajustarla manualmente.
+  const areaColhidaValor =
+    c.escopo === "fazenda" ? c.areaColhida : tarefasColhidas > 0 ? String(tarefasColhidas) : "";
 
   const resultado = useMemo(
     () =>
@@ -266,49 +203,31 @@ export function ColheitaForm({
         atrPorTonelada: opcional(c.atrPorTonelada),
         precoKgAtr: opcional(c.precoKgAtr),
         ctc: opcional(c.ctc) ?? 0,
-        areaColhida: opcional(c.areaColhida),
         arrendar: c.arrendar,
         tonsPorTarefa: opcional(c.tonsPorTarefa),
         tarefasArrendadas: opcional(c.tarefasArrendadas),
-        adubo: c.adubo,
-        precoTonAdubo: opcional(c.precoTonAdubo),
-        tarefasAdubo: opcional(c.tarefasAdubo) ?? undefined,
-        herbicidas: itensParaCalc(herbicidas),
-        insumos: itensParaCalc(insumos),
-        despesasUsina: itensParaCalc(despesasUsina),
+        dividas: dividas.map((d) => ({ nome: d.nome, valor: Number(d.valorTotal) || 0 })),
       }),
-    [modelo, c, herbicidas, insumos, despesasUsina],
+    [modelo, c, dividas],
   );
 
   const linhasDespesas = [
     { r: "CTC", v: resultado.ctc },
     { r: "Arrendamento", v: resultado.arrendamento },
-    { r: "Adubo", v: resultado.adubo },
-    { r: "Herbicida", v: resultado.herbicida },
-    { r: "Outros insumos", v: resultado.insumos },
-    { r: "Despesas com a usina", v: resultado.despesasUsina },
+    { r: "Dívidas com usina ou terceiros", v: resultado.dividas },
   ].filter((x) => x.v > 0);
 
-  const talhoesFazenda = c.fazendaId
-    ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
-    : [];
-  const talhoesColhidos = talhoesFazenda
-    .map((t) => {
-      const sel = talhoesSel.find((s) => s.id === t.id);
-      return sel ? { ...t, areaColhida: sel.areaHa } : null;
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
-  const areaColhidaTotal = talhoesColhidos.reduce((a, t) => a + t.areaColhida, 0);
-  const rateio = talhoesColhidos.map((t) => {
-    const prop = areaColhidaTotal > 0 ? t.areaColhida / areaColhidaTotal : 0;
+  const rateio = talhoesFazenda.map((t) => {
+    const tarefasTalhao = c.escopo === "fazenda" ? t.areaHa * TAREFAS_POR_HA : (alocacoes.find((a) => a.talhaoId === t.id)?.tarefas ?? 0);
+    const prop = tarefasColhidas > 0 ? tarefasTalhao / tarefasColhidas : 0;
     return {
       nome: t.nome,
-      areaColhida: t.areaColhida,
+      areaColhida: tarefasTalhao / TAREFAS_POR_HA,
       toneladas: n(c.toneladas) * prop,
-      tHa: t.areaColhida > 0 ? (n(c.toneladas) * prop) / t.areaColhida : 0,
+      tHa: t.areaHa > 0 ? (n(c.toneladas) * prop) / t.areaHa : 0,
       receita: resultado.receita * prop,
     };
-  });
+  }).filter((r) => r.areaColhida > 0);
 
   return (
     <form action={acaoForm} className="grid gap-6 pb-4">
@@ -331,7 +250,7 @@ export function ColheitaForm({
               onChange={(e) => trocarFazenda(e.target.value)}
             >
               <option value="" disabled>
-                Selecione a fazenda…
+                Selecione a fazenda⬦
               </option>
               {fazendas.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -350,7 +269,7 @@ export function ColheitaForm({
               onChange={(e) => trocarUsina(e.target.value)}
             >
               <option value="" disabled>
-                Selecione a usina…
+                Selecione a usina⬦
               </option>
               {usinas.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -422,7 +341,7 @@ export function ColheitaForm({
             htmlFor="areaColhida"
             hint={
               fazendaAtual
-                ? `Fazenda: ${areaTarefas(fazendaAtual.areaHa)} tarefas — ajuste se não colheu tudo`
+                ? `Fazenda: ${areaTarefas(fazendaAtual.areaHa)} tarefas � ajuste se não colheu tudo`
                 : undefined
             }
           >
@@ -431,7 +350,8 @@ export function ColheitaForm({
               name="areaColhida"
               className="field-input tnum"
               inputMode="decimal"
-              value={c.areaColhida}
+              value={areaColhidaValor}
+              readOnly={c.escopo !== "fazenda"}
               onChange={(e) => trocarAreaColhida(e.target.value)}
               placeholder="Ex.: 200"
             />
@@ -464,7 +384,7 @@ export function ColheitaForm({
             </>
           ) : (
             <>
-              <Campo label="ATR por tonelada" htmlFor="atrPorTonelada" hint="kg ATR/t — ex.: 125,496">
+              <Campo label="ATR por tonelada" htmlFor="atrPorTonelada" hint="kg ATR/t � ex.: 125,496">
                 <input
                   id="atrPorTonelada"
                   name="atrPorTonelada"
@@ -505,7 +425,7 @@ export function ColheitaForm({
           )}
 
           <Campo
-            label="CTC — corte, carregamento e transporte (R$)"
+            label="CTC � corte, carregamento e transporte (R$)"
             htmlFor="ctc"
             hint="Valor informado pela usina."
           >
@@ -522,109 +442,84 @@ export function ColheitaForm({
         </div>
       </section>
 
-      {/* Talhões colhidos */}
+      {/* Escopo e talhões colhidos */}
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <h2 className="font-display text-lg text-ink">Talhões colhidos</h2>
-        <p className="text-xs text-ink-3">
-          Marque os talhões e informe quantos ha colheu em cada um (ex.: talhão todo ou só parte).
-          Toneladas e receita se repartem proporcional à área colhida.
-        </p>
-        {c.fazendaId && talhoesFazenda.length > 0 ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {talhoesFazenda.map((t) => {
-                const sel = talhoesSel.find((s) => s.id === t.id);
-                return (
-                  <label
-                    key={t.id}
-                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
-                      sel
-                        ? "border-accent bg-accent-soft text-ink"
-                        : "border-line bg-surface text-ink-2"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-[var(--accent)]"
-                      checked={Boolean(sel)}
-                      onChange={() =>
-                        setTalhoesSel(
-                          sel
-                            ? talhoesSel.filter((x) => x.id !== t.id)
-                            : [...talhoesSel, { id: t.id, areaHa: t.areaHa }],
-                        )
-                      }
-                    />
-                    {t.nome}
-                    <span className="text-xs text-ink-3">
-                      {fmtCount(Math.round(t.areaHa * TAREFAS_POR_HA))} tarefas · {t.areaHa} ha
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            {talhoesColhidos.length > 0 && (
-              <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-                <table className="w-full min-w-[460px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
-                      <th className="px-3 py-2 font-semibold">Talhão</th>
-                      <th className="px-3 py-2 text-right font-semibold">Área colhida (ha)</th>
-                      <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
-                      <th className="px-3 py-2 text-right font-semibold">t/ha</th>
-                      <th className="px-3 py-2 text-right font-semibold">Receita</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {talhoesColhidos.map((t) => {
-                      const r = rateio.find((x) => x.nome === t.nome);
-                      return (
-                        <tr key={t.id} className="border-b border-line">
-                          <td className="px-3 py-2 font-medium text-ink">{t.nome}</td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="field-input tnum w-28 py-1.5"
-                              inputMode="decimal"
-                              value={String(t.areaColhida)}
-                              onChange={(e) =>
-                                setTalhoesSel(
-                                  talhoesSel.map((s) =>
-                                    s.id === t.id
-                                      ? { ...s, areaHa: n(e.target.value) }
-                                      : s,
-                                  ),
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-ink">
-                            {r?.toneladas.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-ink">
-                            {r?.tHa.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-ink">
-                            {fmtMoney(r?.receita ?? 0)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <input
-              type="hidden"
-              name="talhoesColhidos"
-              value={JSON.stringify(
-                talhoesSel.map((s) => ({ id: s.id, areaHa: s.areaHa })),
-              )}
-            />
-          </>
-        ) : (
-          <p className="text-sm text-ink-2">
-            Selecione primeiro a fazenda para marcar os talhões colhidos.
+        <h2 className="font-display text-lg text-ink">Escopo da colheita</h2>
+        <Campo label="Abrangência" htmlFor="escopo">
+          <select
+            id="escopo"
+            name="escopo"
+            className="field-input"
+            value={c.escopo}
+            onChange={(e) => set("escopo", e.target.value)}
+          >
+            {Object.entries(ESCOPOS_TRATO_LABEL).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </Campo>
+
+        {c.escopo === "fazenda" && fazendaAtual ? (
+          <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
+            {fazendaAtual.nome} · {fmtTarefas(fazendaAtual.areaHa)} � registro em toda a fazenda
           </p>
+        ) : (
+          <>
+            <p className="text-xs text-ink-3">
+              Toneladas e receita se repartem proporcional às tarefas de cada talhão. Você pode
+              misturar talhões inteiros e partes de outros.
+            </p>
+            {talhoesFazenda.length === 0 ? (
+              <p className="text-sm text-ink-2">Selecione primeiro a fazenda.</p>
+            ) : (
+              <SeletorPorcoes
+                id="porcoes-colheita"
+                talhoes={talhoesFazenda}
+                value={porcoes}
+                onChange={setPorcoes}
+              />
+            )}
+          </>
+        )}
+
+        <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
+        <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
+
+        {rateio.length > 0 && (
+          <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+            <table className="w-full min-w-[460px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                  <th className="px-3 py-2 font-semibold">Talhão</th>
+                  <th className="px-3 py-2 text-right font-semibold">Área colhida (ha)</th>
+                  <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                  <th className="px-3 py-2 text-right font-semibold">t/ha</th>
+                  <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rateio.map((r) => (
+                  <tr key={r.nome} className="border-b border-line">
+                    <td className="px-3 py-2 font-medium text-ink">{r.nome}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {r.areaColhida.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {r.toneladas.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {r.tHa.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {fmtMoney(r.receita)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -684,99 +579,13 @@ export function ColheitaForm({
         )}
       </section>
 
-      {/* Adubo */}
-      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <label className="flex items-center gap-2 text-sm font-medium text-ink">
-          <input
-            type="checkbox"
-            name="adubo"
-            className="size-4 accent-[var(--accent)]"
-            checked={c.adubo}
-            onChange={(e) => set("adubo", e.target.checked)}
-          />
-          Comprei/paguei adubo
-        </label>
-        {c.adubo && (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Campo
-              label="Preço da tonelada de adubo"
-              htmlFor="precoTonAdubo"
-              hint="R$ por tonelada do adubo."
-            >
-              <input
-                id="precoTonAdubo"
-                name="precoTonAdubo"
-                className="field-input tnum"
-                inputMode="decimal"
-                value={c.precoTonAdubo}
-                onChange={(e) => set("precoTonAdubo", e.target.value)}
-                placeholder="Ex.: 2.500"
-              />
-            </Campo>
-            <Campo
-              label="Área (tarefas)"
-              htmlFor="tarefasAdubo"
-              hint={c.areaColhida ? `Padrão: área colhida (${c.areaColhida})` : undefined}
-            >
-              <input
-                id="tarefasAdubo"
-                name="tarefasAdubo"
-                className="field-input tnum"
-                inputMode="decimal"
-                value={c.tarefasAdubo}
-                onChange={(e) => set("tarefasAdubo", e.target.value)}
-                placeholder="Ex.: 100"
-              />
-            </Campo>
-            <div className="flex items-end">
-              <p className="w-full rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-ink-2">
-                {sacos} sacos/tarefa · {fmtMoney(resultado.adubo)}
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Herbicida */}
-      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <ListaItens
-          rotulo="Herbicida (calda)"
-          dica="Adicione cada herbicida colocado na calda e o valor dele. Aplicado na área colhida."
-          itens={herbicidas}
-          onChange={setHerbicidas}
-          nomeCampo="herbicidas"
-        />
-      </section>
-
-      {/* Outros insumos */}
-      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <ListaItens
-          rotulo="Outros insumos"
-          dica="Calcário, pó de rocha, biológicos, vinhaça, indutores… Adicione quantos itens precisar."
-          itens={insumos}
-          onChange={setInsumos}
-          nomeCampo="insumos"
-        />
-      </section>
-
-      {/* Insumos comuns (vinculados a talhões) */}
+      {/* Dívidas com usina ou terceiros */}
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
         <SeletorInsumos
-          id="insumos-colheita"
+          id="dividas-colheita"
           talhoes={talhoesFazenda}
-          value={insumosComuns}
-          onChange={setInsumosComuns}
-        />
-      </section>
-
-      {/* Despesas com a usina */}
-      <section className="ledger-panel grid gap-4 p-5 sm:p-6">
-        <ListaItens
-          rotulo="Despesas com a usina"
-          dica="Adubo pago pela usina, herbicida devido, biológico, plantio… Adicione quantos itens precisar."
-          itens={despesasUsina}
-          onChange={setDespesasUsina}
-          nomeCampo="despesasUsina"
+          value={dividas}
+          onChange={setDividas}
         />
       </section>
 
@@ -790,12 +599,12 @@ export function ColheitaForm({
             maxLength={300}
             value={c.observacao}
             onChange={(e) => set("observacao", e.target.value)}
-            placeholder="Anotações sobre esta colheita…"
+            placeholder="Anotações sobre esta colheita⬦"
           />
         </Campo>
       </section>
 
-      <input type="hidden" name="insumosComuns" value={JSON.stringify(insumosParaJson(insumosComuns))} />
+      <input type="hidden" name="dividas" value={JSON.stringify(insumosParaJson(dividas))} />
 
       {/* Resultado */}
       <section className="grid gap-3">
@@ -848,3 +657,4 @@ export function ColheitaForm({
     </form>
   );
 }
+

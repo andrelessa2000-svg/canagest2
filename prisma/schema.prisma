@@ -102,6 +102,7 @@ model Talhao {
   criadoEm  DateTime @default(now())
   plantios  Plantio[]
   tratos    Trato[]
+  colheitas Colheita[]
 
   @@unique([fazendaId, nome])
   @@index([userId])
@@ -122,19 +123,19 @@ model Usina {
 }
 
 model Colheita {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fazendaId String
-  fazenda   Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
-  usinaId   String
-  usina     Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
-  data      DateTime @default(now())
-  tipo      String
-  safra     String?
-  projecao  Boolean  @default(false)
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fazendaId       String
+  fazenda         Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  usinaId         String
+  usina           Usina    @relation(fields: [usinaId], references: [id], onDelete: Restrict)
+  data            DateTime @default(now())
+  tipo            String
+  safra           String?
+  projecao        Boolean  @default(false)
   talhoesColhidos Json?
-  toneladas Float
+  toneladas       Float
 
   // Remuneração — Pindorama
   precoCana Float?
@@ -144,41 +145,48 @@ model Colheita {
   atrPorTonelada Float?
   precoKgAtr     Float?
 
-  // CTC (valor informado pela usina)
-  ctc Float @default(0)
+  // Escopo da colheita — mesmo padrão de Plantio e Trato
+  talhaoId   String?
+  talhao     Talhao? @relation(fields: [talhaoId], references: [id], onDelete: SetNull)
+  talhoesIds Json?
+  // Porções [{ talhaoId, tarefas, completo }] — mistura de talhões inteiros e partes
+  alocacoes  Json?
+  escopo     String  @default("fazenda")
 
-  // Area colhida (tarefas) — base para arrendamento, adubo e herbicida
+  // Área colhida em TAREFAS — base do rateio
   areaColhida Float?
-
-  // Arrendamento (calculado: t/tarefa x preco da cana x tarefas arrendadas)
-  arrendar          Boolean @default(false)
-  tonsPorTarefa     Float?
-  tarefasArrendadas Float?
-
-  // Adubo (calculado: sacos/tarefa x 50 kg x preco da tonelada x area colhida)
-  adubo         Boolean @default(false)
-  precoTonAdubo Float?
-  tarefasAdubo  Float?
-
-  // Herbicida — itens da calda [{ nome, valor }]
-  herbicidas Json?
-
-  // Outros insumos — itens dinamicos [{ nome, valor }] (calcario, po de rocha, biologico, vinhaça...)
-  insumos Json?
-
-  // Insumos comuns unificados: [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }]
-  insumosComuns Json?
-
-  // Despesas com a usina — itens dinamicos [{ nome, valor }]
-  despesasUsina Json?
 
   observacao String?
   criadaEm   DateTime @default(now())
+
+  custo CustoColheita?
 
   @@index([fazendaId, data])
   @@index([usinaId])
   @@index([data])
   @@index([userId, safra])
+  @@index([talhaoId])
+}
+
+model CustoColheita {
+  id         String   @id @default(cuid())
+  colheitaId String   @unique
+  colheita   Colheita @relation(fields: [colheitaId], references: [id], onDelete: Cascade)
+
+  // CTC — valor informado pela usina
+  ctc Float @default(0)
+
+  // Arrendamento — calculado sobre o preço BRUTO da cana (sem ágio e sem ATR)
+  arrendar          Boolean @default(false)
+  tonsPorTarefa     Float?
+  tarefasArrendadas Float?
+
+  // Dívidas com usina ou terceiros: plantio, operações, semente
+  // [{ talhaoId?, nome, quantidade, unidade, valorUnitario, valorTotal }]
+  dividas Json?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }
 
 model Plantio {
@@ -267,9 +275,9 @@ model HistoricoPreco {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ano          Int
   mes          Int // 1-12
-  precoMedio   Float
+  precoMedio   Float? // R$/t do mes — opcional: hoje o comparativo usa o ATR
   atrPorTonelada Float? // kg ATR/t do mes
-  precoKgAtr     Float? // R$/kg ATR do mes
+  precoKgAtr     Float? // R$/kg ATR anunciado pela usina no mes — e o valor que varia
   fonte        String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
