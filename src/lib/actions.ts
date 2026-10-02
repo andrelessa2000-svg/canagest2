@@ -895,6 +895,21 @@ export async function salvarAtrMes(
   if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
     return { ok: false, error: "Mês inválido" };
   }
+  if (bruto.trim() === "") {
+    // Campo vacío: quita el ATR del mes (si existía).
+    try {
+      const userId = await usuarioId();
+      await prisma.historicoPreco.deleteMany({
+        where: { userId, ano, mes, precoKgAtr: { not: null } },
+      });
+    } catch (e) {
+      console.error(e);
+      return falha(e);
+    }
+    revalidatePath("/historico-preco");
+    revalidatePath("/simulador");
+    return { ok: true, mensagem: `ATR de ${MESES[mes - 1]}/${ano} limpiado.` };
+  }
   if (!Number.isFinite(precoKgAtr) || precoKgAtr <= 0) {
     return { ok: false, error: "Informe o ATR do mês maior que zero" };
   }

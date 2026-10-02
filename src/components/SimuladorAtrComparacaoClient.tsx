@@ -127,13 +127,15 @@ function linhaMes(m: MesAtr): LinhaMes {
 function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; rotulo: string; inicial: string }) {
   const [state, acao] = useActionState<ActionState | undefined, FormData>(salvarAtrMes, undefined);
   const [texto, setTexto] = useState(inicial);
+  const haValor = inicial.trim() !== "";
 
   return (
-    <form action={acao} className="grid gap-1">
+    <form action={acao} className="grid gap-1 rounded-[10px] border border-line bg-surface p-3">
+      <p className="text-xs font-semibold text-ink">{rotulo}</p>
       <input type="hidden" name="ano" value={ano} />
       <input type="hidden" name="mes" value={mes} />
-      <div className="flex items-end gap-2">
-        <Campo label={`ATR de ${rotulo}`} htmlFor={`atr-${ano}-${mes}`} hint="R$ por kg de ATR">
+      <div className="grid gap-1.5">
+        <Campo label="ATR (R$/kg)" htmlFor={`atr-${ano}-${mes}`} hint="por kg de ATR">
           <input
             id={`atr-${ano}-${mes}`}
             name="precoKgAtr"
@@ -144,8 +146,8 @@ function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; r
             placeholder="ex.: 1,2784"
           />
         </Campo>
-        <button type="submit" className="btn btn-secondary">
-          Salvar
+        <button type="submit" className="btn btn-secondary w-full">
+          {haValor ? "Atualizar" : "Salvar"}
         </button>
       </div>
       {state && !state.ok ? (
@@ -160,48 +162,60 @@ function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; r
 function EditorMeses({ meses }: { meses: MesAtr[] }) {
   const ordenados = mesesComAtr(meses);
 
+  const hoje = new Date();
+  const anoSafra = ordenados.length > 0 ? ordenados[ordenados.length - 1].ano : hoje.getFullYear();
+  const anos = [...new Set([...ordenados.map((m) => m.ano), anoSafra, anoSafra - 1, anoSafra + 1])].sort();
+  const [anoSel, setAnoSel] = useState(anoSafra);
+
+  const porChave = new Map(ordenados.map((m) => [`${m.ano}-${m.mes}`, m]));
+
   return (
     <div className="grid gap-4">
-      {ordenados.length === 0 ? (
-        <Vazio>
-          Nenhum mês cadastrado ainda. Informe abaixo o ATR anunciado pela usina para começar — o{" "}
-          <strong>primeiro mês da safra</strong> e os seguintes, um por vez.
-        </Vazio>
-      ) : (
-        <>
-          <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {ordenados.map((m) => (
-              <li key={`${m.ano}-${m.mes}`}>
-                <FormAtrMes ano={m.ano} mes={m.mes} rotulo={linhaMes(m).rotulo} inicial={String(m.precoKgAtr)} />
-              </li>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="grid gap-1">
+          <span className="field-label">Ano da safra</span>
+          <select
+            className="field-input"
+            value={anoSel}
+            onChange={(e) => setAnoSel(Number(e.target.value))}
+          >
+            {anos.map((a) => (
+              <option key={a} value={a}>
+                {a}/{String(a + 1).slice(2)}
+              </option>
             ))}
-          </ol>
-          <p className="text-xs text-ink-3">
-            Siga adicionando o ATR de cada mês abaixo — o comparativo se atualiza sozinho.
+          </select>
+        </label>
+        {ordenados.length === 0 && (
+          <p className="text-sm text-ink-2">
+            Cadastre o ATR que a usina anuncia para cada mês — o comparativo se monta sozinho.
           </p>
-        </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {MESES.map((nome, i) => {
+          const mes = i + 1;
+          const existente = porChave.get(`${anoSel}-${mes}`);
+          return (
+            <FormAtrMes
+              key={`${anoSel}-${mes}`}
+              ano={anoSel}
+              mes={mes}
+              rotulo={`${nome}/${String(anoSel).slice(2)}`}
+              inicial={existente ? String(existente.precoKgAtr) : ""}
+            />
+          );
+        })}
+      </div>
+
+      {ordenados.length > 0 && (
+        <p className="text-xs text-ink-3">
+          Os meses com ATR cadastrado aparecen pre-cargados. Para limpiar un mês, guarde el campo vacío
+          (o use el histórico de precios para eliminarlo).
+        </p>
       )}
-      <FormAdicionarMes ultimo={ordenados[ordenados.length - 1]} />
     </div>
-  );
-}
-
-function FormAdicionarMes({ ultimo }: { ultimo: MesAtr | undefined }) {
-  const proximo = (() => {
-    if (ultimo) {
-      const total = ultimo.ano * 12 + (ultimo.mes - 1) + 1;
-      const ano = Math.floor(total / 12);
-      const mes = (total % 12) + 1;
-      return { ano, mes, rotulo: `${MESES[mes - 1]}/${String(ano).slice(2)}` };
-    }
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = hoje.getMonth() + 1;
-    return { ano, mes, rotulo: `${MESES[mes - 1]}/${String(ano).slice(2)}` };
-  })();
-
-  return (
-    <FormAtrMes ano={proximo.ano} mes={proximo.mes} rotulo={proximo.rotulo} inicial="" />
   );
 }
 
