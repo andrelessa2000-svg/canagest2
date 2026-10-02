@@ -80,9 +80,9 @@ export const historicoPrecoSchema = z.object({
   precoMedio: z
     .string()
     .trim()
-    .min(1, "Informe o preço médio")
-    .transform((v) => parseDecimal(v))
-    .refine((v) => Number.isFinite(v) && v > 0, {
+    .optional()
+    .transform((v) => (v ? parseDecimal(v) : null))
+    .refine((v) => v === null || (Number.isFinite(v) && v > 0), {
       message: "Informe um preço maior que zero",
     }),
   fonte: z

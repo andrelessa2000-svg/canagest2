@@ -160,34 +160,43 @@ function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; r
 function EditorMeses({ meses }: { meses: MesAtr[] }) {
   const ordenados = mesesComAtr(meses);
 
-  if (ordenados.length === 0) {
-    return (
-      <Vazio>
-        Nenhum mês cadastrado ainda. Informe abaixo o ATR anunciado pela usina para começar — o{" "}
-        <strong>primeiro mês da safra</strong> e os seguintes, um por vez.
-      </Vazio>
-    );
-  }
-
   return (
     <div className="grid gap-4">
-      <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ordenados.map((m) => (
-          <li key={`${m.ano}-${m.mes}`}>
-            <FormAtrMes ano={m.ano} mes={m.mes} rotulo={linhaMes(m).rotulo} inicial={String(m.precoKgAtr)} />
-          </li>
-        ))}
-      </ol>
+      {ordenados.length === 0 ? (
+        <Vazio>
+          Nenhum mês cadastrado ainda. Informe abaixo o ATR anunciado pela usina para começar — o{" "}
+          <strong>primeiro mês da safra</strong> e os seguintes, um por vez.
+        </Vazio>
+      ) : (
+        <>
+          <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {ordenados.map((m) => (
+              <li key={`${m.ano}-${m.mes}`}>
+                <FormAtrMes ano={m.ano} mes={m.mes} rotulo={linhaMes(m).rotulo} inicial={String(m.precoKgAtr)} />
+              </li>
+            ))}
+          </ol>
+          <p className="text-xs text-ink-3">
+            Siga adicionando o ATR de cada mês abaixo — o comparativo se atualiza sozinho.
+          </p>
+        </>
+      )}
       <FormAdicionarMes ultimo={ordenados[ordenados.length - 1]} />
     </div>
   );
 }
 
-function FormAdicionarMes({ ultimo }: { ultimo: MesAtr }) {
+function FormAdicionarMes({ ultimo }: { ultimo: MesAtr | undefined }) {
   const proximo = (() => {
-    const total = ultimo.ano * 12 + (ultimo.mes - 1) + 1;
-    const ano = Math.floor(total / 12);
-    const mes = (total % 12) + 1;
+    if (ultimo) {
+      const total = ultimo.ano * 12 + (ultimo.mes - 1) + 1;
+      const ano = Math.floor(total / 12);
+      const mes = (total % 12) + 1;
+      return { ano, mes, rotulo: `${MESES[mes - 1]}/${String(ano).slice(2)}` };
+    }
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth() + 1;
     return { ano, mes, rotulo: `${MESES[mes - 1]}/${String(ano).slice(2)}` };
   })();
 

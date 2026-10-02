@@ -57,7 +57,7 @@ export function PrecoForm({ acao }: { acao: (prev: ActionState | undefined, form
       <Campo
         label="Preço médio da cana (R$/t)"
         htmlFor="precoMedio"
-        hint="Valor líquido por tonelada que você recebe da usina."
+        hint="Opcional — pode registrar só o ATR. Valor líquido por tonelada que você recebe da usina."
       >
         <input
           id="precoMedio"
@@ -65,7 +65,6 @@ export function PrecoForm({ acao }: { acao: (prev: ActionState | undefined, form
           className="field-input tnum"
           inputMode="decimal"
           placeholder="164,00"
-          required
         />
       </Campo>
 
