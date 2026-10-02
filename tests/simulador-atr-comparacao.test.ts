@@ -9,6 +9,7 @@ import {
   rotuloMes,
   serieAtrComparativo,
   serieAtrMensal,
+  simularMes,
   simularProximoMes,
   ultimoMesAtr,
   valorNoMes,
@@ -257,6 +258,26 @@ test("simularProximoMes sem ATR cadastrado não simula nada", () => {
   assert.equal(p.mes, null);
   assert.equal(p.linhas.length, 0);
   assert.equal(perto(p.totalDiferenca, 0), true);
+});
+
+test("simularMes simula qualquer mês da safra cadastrado", () => {
+  const grupos = agruparPorMoinada([colheita()]);
+  // Colheita moeu em Set/25 (ATR 1,2784). Simular que Set/25 tivesse o ATR de Ago (1,3120).
+  const p = simularMes(grupos, atrs, { ano: 2025, mes: 8, rotulo: "Ago/25" }, 1.312);
+
+  assert.equal(p.mes?.rotulo, "Ago/25");
+  assert.equal(p.linhas.length, 1);
+  const linha = p.linhas[0];
+  assert.equal(perto(linha.receitaPrevista, 145852 * (1.312 / 1.2784)), true);
+  assert.equal(linha.perda, false);
+  assert.equal(linha.diferenca > 0, true);
+});
+
+test("simularMes com alvo nulo não simula nada", () => {
+  const grupos = agruparPorMoinada([colheita()]);
+  const p = simularMes(grupos, atrs, null, 1.2681);
+  assert.equal(p.mes, null);
+  assert.equal(p.linhas.length, 0);
 });
 
 /* ---------- séries dos gráficos ---------- */

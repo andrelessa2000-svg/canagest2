@@ -261,12 +261,16 @@ export type Previsao = {
 };
 
 /**
- * Impacto de um ATR especulado no próximo mês sobre as fazendas já
- * colhidas. Fazenda sem o ATR do mês em que moeu fica de fora — sem a base
+ * Impacto de um ATR especulado em um mês qualquer da safra sobre as fazendas
+ * já colhidas. Fazenda sem o ATR do mês em que moeu fica de fora — sem a base
  * não há proporção possível.
  */
-export function simularProximoMes(grupos: GrupoMoinada[], meses: MesAtr[], atrSimulado: number): Previsao {
-  const alvo = proximoMesAtr(meses);
+export function simularMes(
+  grupos: GrupoMoinada[],
+  meses: MesAtr[],
+  alvo: MesReferencia | null,
+  atrSimulado: number,
+): Previsao {
   const ordenados = mesesComAtr(meses);
   const linhas: LinhaPrevisao[] = [];
   let totalDiferenca = 0;
@@ -300,6 +304,16 @@ export function simularProximoMes(grupos: GrupoMoinada[], meses: MesAtr[], atrSi
   linhas.sort((a, b) => a.diferenca - b.diferenca);
 
   return { mes: alvo, atrSimulado, linhas, totalDiferenca, semBase };
+}
+
+/**
+ * Impacto de um ATR especulado no próximo mês sobre as fazendas já
+ * colhidas. Fazenda sem o ATR do mês em que moeu fica de fora — sem a base
+ * não há proporção possível.
+ */
+export function simularProximoMes(grupos: GrupoMoinada[], meses: MesAtr[], atrSimulado: number): Previsao {
+  const alvo = proximoMesAtr(meses);
+  return simularMes(grupos, meses, alvo, atrSimulado);
 }
 
 /* ============================================================
