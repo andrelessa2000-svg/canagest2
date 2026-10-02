@@ -21,7 +21,7 @@ import {
 import { useActionState } from "react";
 import { CircleCheck, Info, PencilLine, TriangleAlert } from "lucide-react";
 import { fmtCount, fmtMoney, fmtMoneyPorKgAtr, fmtToneladas, parseDecimal } from "@/lib/format";
-import { MESES } from "@/lib/historico-preco";
+import { MESES, deslocarMes } from "@/lib/historico-preco";
 import { salvarAtrMes, type ActionState } from "@/lib/actions";
 import {
   agruparPorMoinada,
@@ -115,7 +115,7 @@ function Vazio({ children }: { children: ReactNode }) {
 }
 
 /* ============================================================
-   Editor dos meses — o produtor digita o ATR mês a mês
+   Editor dos meses — cadastre a safra mês a mês
    ============================================================ */
 
 type LinhaMes = { ano: number; mes: number; rotulo: string; atr: string };
@@ -124,20 +124,73 @@ function linhaMes(m: MesAtr): LinhaMes {
   return { ano: m.ano, mes: m.mes, rotulo: `${MESES[m.mes - 1]}/${String(m.ano).slice(2)}`, atr: String(m.precoKgAtr) };
 }
 
-function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; rotulo: string; inicial: string }) {
+function FormAtrMes({
+  ano,
+  mes,
+  rotulo,
+  inicial,
+  editavel = false,
+}: {
+  ano: number;
+  mes: number;
+  rotulo: string;
+  inicial: string;
+  editavel?: boolean;
+}) {
   const [state, acao] = useActionState<ActionState | undefined, FormData>(salvarAtrMes, undefined);
   const [texto, setTexto] = useState(inicial);
+  const [mesSel, setMesSel] = useState(mes);
+  const [anoSel, setAnoSel] = useState(ano);
   const haValor = inicial.trim() !== "";
+
+  const rotuloSel = `${MESES[mesSel - 1]}/${String(anoSel).slice(2)}`;
+  const anos = [anoSel - 1, anoSel, anoSel + 1];
 
   return (
     <form action={acao} className="grid gap-1 rounded-[10px] border border-line bg-surface p-3">
-      <p className="text-xs font-semibold text-ink">{rotulo}</p>
-      <input type="hidden" name="ano" value={ano} />
-      <input type="hidden" name="mes" value={mes} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        {editavel ? (
+          <>
+            <select
+              name="mes"
+              className="field-input !min-h-9 !px-2 text-sm"
+              value={mesSel}
+              onChange={(e) => setMesSel(Number(e.target.value))}
+              aria-label="Mês"
+            >
+              {MESES.map((nome, i) => (
+                <option key={nome} value={i + 1}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+            <select
+              name="ano"
+              className="field-input !min-h-9 !px-2 text-sm"
+              value={anoSel}
+              onChange={(e) => setAnoSel(Number(e.target.value))}
+              aria-label="Ano"
+            >
+              {anos.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <>
+            <input type="hidden" name="ano" value={ano} />
+            <input type="hidden" name="mes" value={mes} />
+            <p className="text-xs font-semibold text-ink">{rotulo}</p>
+          </>
+        )}
+      </div>
+      {editavel && <p className="text-xs font-semibold text-ink">{rotuloSel}</p>}
       <div className="grid gap-1.5">
-        <Campo label="ATR (R$/kg)" htmlFor={`atr-${ano}-${mes}`} hint="por kg de ATR">
+        <Campo label="ATR (R$/kg)" htmlFor={`atr-${anoSel}-${mesSel}`} hint="por kg de ATR">
           <input
-            id={`atr-${ano}-${mes}`}
+            id={`atr-${anoSel}-${mesSel}`}
             name="precoKgAtr"
             className="field-input tnum"
             inputMode="decimal"
@@ -162,59 +215,94 @@ function FormAtrMes({ ano, mes, rotulo, inicial }: { ano: number; mes: number; r
 function EditorMeses({ meses }: { meses: MesAtr[] }) {
   const ordenados = mesesComAtr(meses);
 
+  // Começa no mês atual, a menos que já haja meses cadastrados (continua do último).
   const hoje = new Date();
-  const anoSafra = ordenados.length > 0 ? ordenados[ordenados.length - 1].ano : hoje.getFullYear();
-  const anos = [...new Set([...ordenados.map((m) => m.ano), anoSafra, anoSafra - 1, anoSafra + 1])].sort();
-  const [anoSel, setAnoSel] = useState(anoSafra);
+  const inicio =
+    ordenados.length > 0
+      ? ordenados[ordenados.length - 1]
+      : { ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 };
 
-  const porChave = new Map(ordenados.map((m) => [`${m.ano}-${m.mes}`, m]));
+  // Meses adicionados com o botão "+ Adicionar" (ainda não salvos).
+  const [adicionados, setAdicionados] = useState<{ ano: number; mes: number }[]>([]);
+
+  function adicionar() {
+    const ultimo =
+      adicionados.length > 0
+        ? adicionados[adicionados.length - 1]
+        : { ano: inicio.ano, mes: inicio.mes };
+    const prox = deslocarMes(ultimo.ano, ultimo.mes, 1);
+    setAdicionados((prev) => [...prev, prox]);
+  }
+
+  function remover(idx: number) {
+    setAdicionados((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  const rotulo = (ano: number, mes: number) => `${MESES[mes - 1]}/${String(ano).slice(2)}`;
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="grid gap-1">
-          <span className="field-label">Ano da safra</span>
-          <select
-            className="field-input"
-            value={anoSel}
-            onChange={(e) => setAnoSel(Number(e.target.value))}
-          >
-            {anos.map((a) => (
-              <option key={a} value={a}>
-                {a}/{String(a + 1).slice(2)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {ordenados.length === 0 && (
-          <p className="text-sm text-ink-2">
-            Cadastre o ATR que a usina anuncia para cada mês — o comparativo se monta sozinho.
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {MESES.map((nome, i) => {
-          const mes = i + 1;
-          const existente = porChave.get(`${anoSel}-${mes}`);
-          return (
-            <FormAtrMes
-              key={`${anoSel}-${mes}`}
-              ano={anoSel}
-              mes={mes}
-              rotulo={`${nome}/${String(anoSel).slice(2)}`}
-              inicial={existente ? String(existente.precoKgAtr) : ""}
-            />
-          );
-        })}
-      </div>
-
-      {ordenados.length > 0 && (
-        <p className="text-xs text-ink-3">
-          Os meses com ATR cadastrado aparecen pre-cargados. Para limpiar un mês, guarde el campo vacío
-          (o use el histórico de precios para eliminarlo).
+      {ordenados.length === 0 && (
+        <p className="rounded-md border border-line bg-surface-muted p-3 text-sm text-ink-2">
+          Comece informando o <strong>primeiro mês da safra</strong> — ex.: Agosto/26 — e o ATR que a
+          usina anunciou. Depois use o botão <strong>+ Adicionar</strong> para o mês seguinte.
         </p>
       )}
+
+      {/* Meses já cadastrados */}
+      {ordenados.length > 0 && (
+        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {ordenados.map((m) => (
+            <li key={`${m.ano}-${m.mes}`}>
+              <FormAtrMes ano={m.ano} mes={m.mes} rotulo={linhaMes(m).rotulo} inicial={String(m.precoKgAtr)} />
+            </li>
+          ))}
+          {adicionados.map((a, i) => (
+            <li key={`novo-${a.ano}-${a.mes}`} className="relative">
+              <FormAtrMes ano={a.ano} mes={a.mes} rotulo={rotulo(a.ano, a.mes)} inicial="" editavel />
+              <button
+                type="button"
+                onClick={() => remover(i)}
+                className="absolute right-2 top-2 text-xs text-ink-3 hover:text-danger"
+                aria-label={`Remover ${rotulo(a.ano, a.mes)}`}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {/* Sem nenhum mês ainda: mostra o primeiro campo com mês/ano escolhíveis */}
+      {ordenados.length === 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:max-w-xs">
+          <div className="relative">
+            <FormAtrMes ano={inicio.ano} mes={inicio.mes} rotulo={rotulo(inicio.ano, inicio.mes)} inicial="" editavel />
+          </div>
+          {adicionados.map((a, i) => (
+            <div key={`novo-${a.ano}-${a.mes}`} className="relative">
+              <FormAtrMes ano={a.ano} mes={a.mes} rotulo={rotulo(a.ano, a.mes)} inicial="" editavel />
+              <button
+                type="button"
+                onClick={() => remover(i)}
+                className="absolute right-2 top-2 text-xs text-ink-3 hover:text-danger"
+                aria-label={`Remover ${rotulo(a.ano, a.mes)}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <button type="button" onClick={adicionar} className="btn btn-ghost">
+          + Adicionar próximo mês
+        </button>
+        <p className="mt-1 text-xs text-ink-3">
+          Clica em &quot;+ Adicionar&quot; para registrar o ATR do mês seguinte.
+        </p>
+      </div>
     </div>
   );
 }
