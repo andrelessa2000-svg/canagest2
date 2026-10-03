@@ -314,13 +314,29 @@ function EditorMeses({ meses }: { meses: MesAtr[] }) {
 
 function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaComReceita[] }) {
   const grupos = useMemo(() => agruparPorMoinada(colheitas), [colheitas]);
-  const serie = useMemo(() => serieAtrComparativo(grupos, meses), [grupos, meses]);
+  const ordenados = mesesComAtr(meses);
+
+  // Simulação: o usuário escolhe um mês ainda não anunciado e digita um ATR fictício.
+  const [simular, setSimular] = useState(false);
+  const proximo = useMemo(() => proximoMesAtr(meses), [meses]);
+  const [simAno, setSimAno] = useState(proximo?.ano ?? new Date().getFullYear());
+  const [simMes, setSimMes] = useState(proximo?.mes ?? new Date().getMonth() + 1);
+  const [simTexto, setSimTexto] = useState("");
+  const simAtr = parseDecimal(simTexto);
+
+  // Meses efetivos = reais + simulado (se preenchido).
+  const simuladoValido = simular && Number.isFinite(simAtr) && simAtr > 0 && !ordenados.some((m) => m.ano === simAno && m.mes === simMes);
+  const mesesEfetivos = useMemo(() => {
+    if (!simuladoValido) return ordenados;
+    return [...ordenados, { ano: simAno, mes: simMes, precoKgAtr: simAtr }];
+  }, [ordenados, simuladoValido, simAno, simMes, simAtr]);
+
+  const serie = useMemo(() => serieAtrComparativo(grupos, mesesEfetivos), [grupos, mesesEfetivos]);
   const comparacoes = useMemo(
-    () => grupos.map((g) => ({ g, c: compararAtrReal(g, meses) })),
-    [grupos, meses],
+    () => grupos.map((g) => ({ g, c: compararAtrReal(g, mesesEfetivos) })),
+    [grupos, mesesEfetivos],
   );
 
-  const ordenados = mesesComAtr(meses);
   const semAtr = comparacoes.filter((x) => x.c.semAtrNoMesReal);
 
   if (ordenados.length === 0) {
@@ -344,6 +360,10 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
   const perdaTotal = comparacoes.reduce((s, x) => s + x.c.perdaVsMelhor, 0);
   const melhorAtr = ordenados.reduce((a, b) => (b.precoKgAtr > a.precoKgAtr ? b : a));
 
+  // Rótulo do mês simulado para marcar a coluna/barra.
+  const rotuloSim = simuladoValido ? rotuloMes(simAno, simMes) : null;
+  const ehSimulado = (rotulo: string) => rotulo === rotuloSim;
+
   return (
     <div className="grid gap-5">
       <div className="metric-grid grid-cols-2 lg:grid-cols-4">
@@ -353,9 +373,68 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
         <CelulaMetrica rotulo="Perda vs. melhor mês" valor={fmtMoney(perdaTotal)} legenda="somando todas as fazendas" />
       </div>
 
+      {/* Simulação de um mês ainda não anunciado */}
+      <Moldura
+        titulo="Simular um mês ainda não anunciado"
+        descricao="Digite um ATR fictício para um mês futuro (ex.: o próximo mês) e veja no gráfico e na tabela o que a produção valeria. A coluna simulada fica marcada como SIMULAÇÃO — nunca se mistura com os dados reais."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Campo label="Mês a simular" htmlFor="atr-sim-mes">
+            <select
+              id="atr-sim-mes"
+              className="field-input"
+              value={`${simAno}-${simMes}`}
+              onChange={(e) => {
+                const [a, m] = e.target.value.split("-").map(Number);
+                setSimAno(a);
+                setSimMes(m);
+              }}
+            >
+              {MESES.map((nome, i) => {
+                const mes = i + 1;
+                const jaExiste = ordenados.some((mm) => mm.ano === simAno && mm.mes === mes);
+                return (
+                  <option key={`${simAno}-${mes}`} value={`${simAno}-${mes}`} disabled={jaExiste}>
+                    {nome}/{String(simAno).slice(2)}{jaExiste ? " (já cadastrado)" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </Campo>
+          <Campo
+            label="ATR fictício (R$/kg)"
+            htmlFor="atr-sim-valor"
+            hint="Só para comparação — não é salvo no histórico."
+          >
+            <input
+              id="atr-sim-valor"
+              className="field-input tnum"
+              inputMode="decimal"
+              value={simTexto}
+              onChange={(e) => setSimTexto(e.target.value)}
+              placeholder="ex.: 1,2681"
+            />
+          </Campo>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSimular((v) => !v)}
+            className="btn btn-secondary"
+          >
+            {simular ? "Ocultar simulação" : "Mostrar simulação"}
+          </button>
+          {simuladoValido && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-ink-2">
+              <Selo tipo="simulacao" /> coluna {rotuloSim} é uma hipótese.
+            </span>
+          )}
+        </div>
+      </Moldura>
+
       <Moldura
         titulo="O que sua cana valeria em cada mês"
-        descricao="Cada barra é a produção já colhida reavaliada pelo ATR daquele mês. A barra destacada é o mês em que a moagem realmente aconteceu."
+        descricao="Cada barra é a produção já colhida reavaliada pelo ATR daquele mês. A barra destacada é o mês em que a moagem realmente aconteceu; a barra tracejada é a simulação."
       >
         <AreaGrafico>
           <ComposedChart data={serie} margin={MARGEM}>
@@ -371,15 +450,25 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
               tickFormatter={(v: unknown) => fmtMoneyPorKgAtr(Number(v))}
             />
             <Tooltip
-              formatter={(v: unknown, nome: unknown, item: { payload?: { ehReal?: boolean } }) => [
+              formatter={(v: unknown, nome: unknown, item: { payload?: { ehReal?: boolean; rotulo?: string } }) => [
                 nome === "atr" ? fmtMoneyPorKgAtr(Number(v)) : fmtMoney(Number(v)),
-                nome === "atr" ? "ATR do mês" : item?.payload?.ehReal ? "recebido (mês real)" : "hipótese do mês",
+                nome === "atr"
+                  ? "ATR do mês"
+                  : item?.payload?.ehReal
+                    ? "recebido (mês real)"
+                    : ehSimulado(item?.payload?.rotulo ?? "")
+                      ? "SIMULAÇÃO (hipótese)"
+                      : "hipótese do mês",
               ]}
               contentStyle={{ borderRadius: 10, border: "1px solid var(--line)", fontSize: 12 }}
             />
             <Bar dataKey="valor" name="Valor bruto" radius={[4, 4, 0, 0]} maxBarSize={64} isAnimationActive={false}>
               {serie.map((s) => (
-                <Cell key={s.rotulo} fill={s.ehReal ? COR_REAL : "var(--line-strong)"} />
+                <Cell
+                  key={s.rotulo}
+                  fill={s.ehReal ? COR_REAL : ehSimulado(s.rotulo) ? "var(--warning)" : "var(--line-strong)"}
+                  opacity={ehSimulado(s.rotulo) ? 0.6 : 1}
+                />
               ))}
             </Bar>
             <Line
@@ -399,7 +488,10 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
             <span className="size-3 rounded-sm" style={{ background: COR_REAL }} aria-hidden="true" /> Mês real da moagem
           </li>
           <li className="flex items-center gap-1.5">
-            <span className="size-3 rounded-sm" style={{ background: "var(--line-strong)" }} aria-hidden="true" /> Outro mês
+            <span className="size-3 rounded-sm" style={{ background: "var(--line-strong)" }} aria-hidden="true" /> Outro mês real
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="size-3 rounded-sm opacity-60" style={{ background: "var(--warning)" }} aria-hidden="true" /> Simulação
           </li>
           <li className="flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded" style={{ background: "var(--info)" }} aria-hidden="true" /> ATR (R$/kg)
@@ -429,11 +521,18 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
                 <th scope="col">Mês da moagem</th>
                 <th scope="col" className="text-right">Toneladas</th>
                 <th scope="col" className="text-right">Recebido</th>
-                {ordenados.length > 0 && (
+                {mesesEfetivos.length > 0 && (
                   <>
-                    {ordenados.map((m) => (
+                    {mesesEfetivos.map((m) => (
                       <th key={`${m.ano}-${m.mes}`} scope="col" className="text-right">
-                        {`Se ${linhaMes(m).rotulo}`}
+                        {ehSimulado(rotuloMes(m.ano, m.mes)) ? (
+                          <span className="inline-flex flex-col items-end gap-1">
+                            {`Se ${rotuloMes(m.ano, m.mes)}`}
+                            <Selo tipo="simulacao" />
+                          </span>
+                        ) : (
+                          `Se ${rotuloMes(m.ano, m.mes)}`
+                        )}
                       </th>
                     ))}
                     <th scope="col" className="text-right">Perda vs. melhor</th>
@@ -458,20 +557,22 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
                   </td>
                   <td className="tnum text-right">{fmtToneladas(g.toneladas)}</td>
                   <td className="tnum text-right font-semibold">{fmtMoney(g.receitaReal)}</td>
-                  {ordenados.map((m) => {
+                  {mesesEfetivos.map((m) => {
                     const linha = c.linhas.find((l) => l.ano === m.ano && l.mes === m.mes);
                     if (!linha) return <td key={`${m.ano}-${m.mes}`} className="tnum text-right">—</td>;
+                    const sim = ehSimulado(rotuloMes(m.ano, m.mes));
                     return (
                       <td
                         key={`${m.ano}-${m.mes}`}
-                        className={`tnum text-right ${linha.ehReal ? "font-semibold text-success-strong" : linha.diferenca < 0 ? "text-ink-3" : "text-ink-2"}`}
+                        className={`tnum text-right ${linha.ehReal ? "font-semibold text-success-strong" : sim ? "font-semibold text-warning-strong" : linha.diferenca < 0 ? "text-ink-3" : "text-ink-2"}`}
                       >
                         {c.semAtrNoMesReal ? "—" : fmtMoney(linha.valor)}
                         {linha.ehReal && <span className="block text-[0.6875rem] font-normal">recebido</span>}
+                        {sim && <span className="block text-[0.6875rem] font-normal">simulação</span>}
                       </td>
                     );
                   })}
-                  {ordenados.length > 0 && (
+                  {mesesEfetivos.length > 0 && (
                     <td className="tnum text-right">{c.perdaVsMelhor > 0 ? fmtMoney(c.perdaVsMelhor) : "—"}</td>
                   )}
                 </tr>
