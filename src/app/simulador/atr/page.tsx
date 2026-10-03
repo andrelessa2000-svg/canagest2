@@ -17,7 +17,6 @@ export default async function SimuladorAtrPage() {
       <SimuladorAtrComparacaoClient
         meses={dados.meses}
         colheitas={dados.colheitas}
-        ultimoAtr={dados.ultimoAtr}
       />
     </>
   );

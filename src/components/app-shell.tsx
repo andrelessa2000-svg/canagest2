@@ -43,9 +43,9 @@ const grupos: { titulo: string; itens: Item[] }[] = [
   {
     titulo: "Operação",
     itens: [
-      { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
       { href: "/plantio", rotulo: "Plantio", icone: Leaf },
       { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
+      { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
     ],
   },
   {
@@ -68,9 +68,9 @@ const grupos: { titulo: string; itens: Item[] }[] = [
 
 const principaisMobile: Item[] = [
   { href: "/", rotulo: "Início", icone: Home },
-  { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
   { href: "/plantio", rotulo: "Plantio", icone: Leaf },
   { href: "/tratos", rotulo: "Tratos", icone: SprayCan },
+  { href: "/colheitas", rotulo: "Colheitas", icone: Tractor },
 ];
 
 function ativo(pathname: string, href: string): boolean {

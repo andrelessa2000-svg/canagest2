@@ -30,7 +30,6 @@ import {
   proximoMesAtr,
   rotuloMes,
   serieAtrComparativo,
-  simularMes,
   type ColheitaComReceita,
   type MesAtr,
 } from "@/lib/simulador-atr-comparacao";
@@ -51,9 +50,6 @@ function useMontado() {
   return useSyncExternalStore(semInscritos, montadoNoCliente, desmontadoNoServidor);
 }
 
-const sinal = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
-const comSinal = (n: number) => `${sinal(n)}${fmtMoney(Math.abs(n))}`;
-
 /**
  * Selo de origem. A cor sozinha nunca carrega o significado: o selo sempre
  * mostra ícone + texto.
@@ -68,7 +64,7 @@ function Selo({ tipo }: { tipo: "real" | "simulacao" }) {
       }`}
     >
       <Icone className="size-3" aria-hidden="true" />
-      {real ? "REAL" : "SIMULAÇÃO"}
+      {real ? "REAL" : "SIMULA�!ÒO"}
     </span>
   );
 }
@@ -116,7 +112,7 @@ function Vazio({ children }: { children: ReactNode }) {
 }
 
 /* ============================================================
-   Editor dos meses — cadastre a safra mês a mês
+   Editor dos meses � cadastre a safra mês a mês
    ============================================================ */
 
 type LinhaMes = { ano: number; mes: number; rotulo: string; atr: string };
@@ -245,7 +241,7 @@ function EditorMeses({ meses }: { meses: MesAtr[] }) {
     <div className="grid gap-4">
       {ordenados.length === 0 && (
         <p className="rounded-md border border-line bg-surface-muted p-3 text-sm text-ink-2">
-          Comece informando o <strong>primeiro mês da safra</strong> — ex.: Agosto/26 — e o ATR que a
+          Comece informando o <strong>primeiro mês da safra</strong> � ex.: Agosto/26 � e o ATR que a
           usina anunciou. Depois use o botão <strong>+ Adicionar</strong> para o mês seguinte.
         </p>
       )}
@@ -267,7 +263,7 @@ function EditorMeses({ meses }: { meses: MesAtr[] }) {
                 className="absolute right-2 top-2 text-xs text-ink-3 hover:text-danger"
                 aria-label={`Remover ${rotulo(a.ano, a.mes)}`}
               >
-                ×
+                �
               </button>
             </li>
           ))}
@@ -289,7 +285,7 @@ function EditorMeses({ meses }: { meses: MesAtr[] }) {
                 className="absolute right-2 top-2 text-xs text-ink-3 hover:text-danger"
                 aria-label={`Remover ${rotulo(a.ano, a.mes)}`}
               >
-                ×
+                �
               </button>
             </div>
           ))}
@@ -309,7 +305,7 @@ function EditorMeses({ meses }: { meses: MesAtr[] }) {
 }
 
 /* ============================================================
-   Aba 1 — Comparativo real
+   Aba 1 � Comparativo real
    ============================================================ */
 
 function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaComReceita[] }) {
@@ -369,14 +365,14 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
       <div className="metric-grid grid-cols-2 lg:grid-cols-4">
         <CelulaMetrica rotulo="Meses com ATR" valor={fmtCount(ordenados.length)} legenda={`${fmtMoneyPorKgAtr(melhorAtr.precoKgAtr)} no melhor mês`} />
         <CelulaMetrica rotulo="Fazendas moídas" valor={fmtCount(grupos.length)} legenda={`${fmtToneladas(grupos.reduce((s, g) => s + g.toneladas, 0))}`} />
-        <CelulaMetrica rotulo="Melhor mês" valor={maior.c.melhor?.rotulo ?? "—"} legenda={maior.c.melhor ? fmtMoney(maior.c.melhor.valor) : "—"} />
+        <CelulaMetrica rotulo="Melhor mês" valor={maior.c.melhor?.rotulo ?? "�"} legenda={maior.c.melhor ? fmtMoney(maior.c.melhor.valor) : "�"} />
         <CelulaMetrica rotulo="Perda vs. melhor mês" valor={fmtMoney(perdaTotal)} legenda="somando todas as fazendas" />
       </div>
 
       {/* Simulação de um mês ainda não anunciado */}
       <Moldura
         titulo="Simular um mês ainda não anunciado"
-        descricao="Digite um ATR fictício para um mês futuro (ex.: o próximo mês) e veja no gráfico e na tabela o que a produção valeria. A coluna simulada fica marcada como SIMULAÇÃO — nunca se mistura com os dados reais."
+        descricao="Digite um ATR fictício para um mês futuro (ex.: o próximo mês) e veja no gráfico e na tabela o que a produção valeria. A coluna simulada fica marcada como SIMULA�!ÒO � nunca se mistura com os dados reais."
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Campo label="Mês a simular" htmlFor="atr-sim-mes">
@@ -404,7 +400,7 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
           <Campo
             label="ATR fictício (R$/kg)"
             htmlFor="atr-sim-valor"
-            hint="Só para comparação — não é salvo no histórico."
+            hint="Só para comparação � não é salvo no histórico."
           >
             <input
               id="atr-sim-valor"
@@ -457,7 +453,7 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
                   : item?.payload?.ehReal
                     ? "recebido (mês real)"
                     : ehSimulado(item?.payload?.rotulo ?? "")
-                      ? "SIMULAÇÃO (hipótese)"
+                      ? "SIMULA�!ÒO (hipótese)"
                       : "hipótese do mês",
               ]}
               contentStyle={{ borderRadius: 10, border: "1px solid var(--line)", fontSize: 12 }}
@@ -559,21 +555,21 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
                   <td className="tnum text-right font-semibold">{fmtMoney(g.receitaReal)}</td>
                   {mesesEfetivos.map((m) => {
                     const linha = c.linhas.find((l) => l.ano === m.ano && l.mes === m.mes);
-                    if (!linha) return <td key={`${m.ano}-${m.mes}`} className="tnum text-right">—</td>;
+                    if (!linha) return <td key={`${m.ano}-${m.mes}`} className="tnum text-right">�</td>;
                     const sim = ehSimulado(rotuloMes(m.ano, m.mes));
                     return (
                       <td
                         key={`${m.ano}-${m.mes}`}
                         className={`tnum text-right ${linha.ehReal ? "font-semibold text-success-strong" : sim ? "font-semibold text-warning-strong" : linha.diferenca < 0 ? "text-ink-3" : "text-ink-2"}`}
                       >
-                        {c.semAtrNoMesReal ? "—" : fmtMoney(linha.valor)}
+                        {c.semAtrNoMesReal ? "�" : fmtMoney(linha.valor)}
                         {linha.ehReal && <span className="block text-[0.6875rem] font-normal">recebido</span>}
                         {sim && <span className="block text-[0.6875rem] font-normal">simulação</span>}
                       </td>
                     );
                   })}
                   {mesesEfetivos.length > 0 && (
-                    <td className="tnum text-right">{c.perdaVsMelhor > 0 ? fmtMoney(c.perdaVsMelhor) : "—"}</td>
+                    <td className="tnum text-right">{c.perdaVsMelhor > 0 ? fmtMoney(c.perdaVsMelhor) : "�"}</td>
                   )}
                 </tr>
               ))}
@@ -584,175 +580,6 @@ function AbaReal({ meses, colheitas }: { meses: MesAtr[]; colheitas: ColheitaCom
     </div>
   );
 }
-
-/* ============================================================
-   Aba 2 — Comparativo simulado / previsto
-   ============================================================ */
-
-function AbaPrevisto({ meses, colheitas, ultimoAtr }: { meses: MesAtr[]; colheitas: ColheitaComReceita[]; ultimoAtr: number | null }) {
-  const grupos = useMemo(() => agruparPorMoinada(colheitas), [colheitas]);
-  const ordenados = mesesComAtr(meses);
-
-  // Meses da safra para escolher: todos os cadastrados + o próximo (se existir).
-  const opcoes = useMemo(() => {
-    const lista: { ano: number; mes: number; rotulo: string; ehProximo: boolean }[] = ordenados.map((m) => ({
-      ano: m.ano,
-      mes: m.mes,
-      rotulo: rotuloMes(m.ano, m.mes),
-      ehProximo: false,
-    }));
-    const prox = proximoMesAtr(meses);
-    if (prox && !lista.some((o) => o.ano === prox.ano && o.mes === prox.mes)) {
-      lista.push({ ...prox, ehProximo: true });
-    }
-    return lista;
-  }, [meses, ordenados]);
-
-  const alvoInicial = opcoes[opcoes.length - 1] ?? null;
-  const [alvoSel, setAlvoSel] = useState<string>(alvoInicial ? `${alvoInicial.ano}-${alvoInicial.mes}` : "");
-  const alvo = opcoes.find((o) => `${o.ano}-${o.mes}` === alvoSel) ?? alvoInicial;
-
-  // Sugere o ATR do mês escolhido (se já cadastrado) ou o último.
-  const atrDoMes = ordenados.find((m) => m.ano === alvo?.ano && m.mes === alvo?.mes);
-  const [texto, setTexto] = useState(() =>
-    atrDoMes ? String(atrDoMes.precoKgAtr) : ultimoAtr ? String(ultimoAtr) : "",
-  );
-
-  const atrSimulado = parseDecimal(texto);
-  const alvoRef = useMemo(
-    () => (alvo ? { ano: alvo.ano, mes: alvo.mes, rotulo: alvo.rotulo } : null),
-    [alvo],
-  );
-  const previsao = useMemo(
-    () => simularMes(grupos, meses, alvoRef, Number.isFinite(atrSimulado) ? atrSimulado : 0),
-    [grupos, meses, alvoRef, atrSimulado],
-  );
-
-  if (ordenados.length === 0) {
-    return <Vazio>Cadastre o ATR de pelo menos um mês para poder simular.</Vazio>;
-  }
-
-  if (grupos.length === 0) {
-    return <Vazio>Você ainda não tem colheitas reais registradas para comparar.</Vazio>;
-  }
-
-  const valido = Number.isFinite(atrSimulado) && atrSimulado > 0;
-
-  return (
-    <div className="grid gap-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Selo tipo="simulacao" />
-        <p className="text-sm text-ink-2">
-          Valor que <strong>você informa</strong>. Escolha o mês da safra, digite o ATR esperado e veja
-          o efeito em cada fazenda comparado com o que você já recebeu.
-        </p>
-      </div>
-
-      <Moldura
-        titulo="Simular o ATR de um mês da safra"
-        descricao="Escolha qualquer mês da safra (ou o próximo, ainda não anunciado) e veja quanto a produção valeria com esse ATR."
-      >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Campo label="Mês da safra" htmlFor="atr-mes-alvo">
-            <select
-              id="atr-mes-alvo"
-              className="field-input"
-              value={alvo ? `${alvo.ano}-${alvo.mes}` : ""}
-              onChange={(e) => {
-                const [a, m] = e.target.value.split("-").map(Number);
-                const sel = opcoes.find((o) => o.ano === a && o.mes === m);
-                setAlvoSel(`${a}-${m}`);
-                const atrM = ordenados.find((mm) => mm.ano === a && mm.mes === m);
-                setTexto(atrM ? String(atrM.precoKgAtr) : ultimoAtr ? String(ultimoAtr) : "");
-                void sel;
-              }}
-            >
-              {opcoes.map((o) => (
-                <option key={`${o.ano}-${o.mes}`} value={`${o.ano}-${o.mes}`}>
-                  {o.rotulo}
-                  {o.ehProximo ? " (próximo mês)" : ""}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          {alvo && (
-            <Campo
-              label={`ATR de ${alvo.rotulo} (R$/kg)`}
-              htmlFor="atr-simulado"
-              hint={atrDoMes ? `Já cadastrado: ${fmtMoneyPorKgAtr(atrDoMes.precoKgAtr)}` : "Informe o ATR que você espera para este mês"}
-            >
-              <input
-                id="atr-simulado"
-                className="field-input tnum"
-                inputMode="decimal"
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                placeholder="ex.: 1,2681"
-              />
-            </Campo>
-          )}
-        </div>
-      </Moldura>
-
-      {valido && alvo ? (
-        <>
-          <div className="metric-grid grid-cols-2 lg:grid-cols-3">
-            <CelulaMetrica rotulo="Mês simulado" valor={alvo.rotulo} legenda={`ATR de ${fmtMoneyPorKgAtr(atrSimulado)}`} />
-            <CelulaMetrica
-              rotulo="Impacto somando as fazendas"
-              valor={comSinal(previsao.totalDiferenca)}
-              legenda={previsao.totalDiferenca < 0 ? "perda estimada" : "ganho estimado"}
-            />
-            <CelulaMetrica
-              rotulo="Fazendas afetadas"
-              valor={fmtCount(previsao.linhas.length)}
-              legenda={previsao.semBase > 0 ? `${previsao.semBase} sem base` : "todas com base"}
-            />
-          </div>
-
-          <Moldura
-            titulo="Quanto muda em cada fazenda"
-            descricao="Pior efeito primeiro. Compara o valor bruto que a fazenda recebeu com o valor que receberia se este mês fechar no ATR que você digitou."
-          >
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Fazenda</th>
-                    <th scope="col">Mês real</th>
-                    <th scope="col" className="text-right">Toneladas</th>
-                    <th scope="col" className="text-right">Recebido</th>
-                    <th scope="col" className="text-right">Se {alvo.rotulo}</th>
-                    <th scope="col" className="text-right">Diferença</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previsao.linhas.map((l) => (
-                    <tr key={l.grupo.id}>
-                      <th scope="row" className="font-medium">{l.grupo.fazendaNome}</th>
-                      <td className="text-ink-2">{l.mesReal}</td>
-                      <td className="tnum text-right">{fmtToneladas(l.toneladas)}</td>
-                      <td className="tnum text-right">{fmtMoney(l.receitaReal)}</td>
-                      <td className="tnum text-right font-semibold">{fmtMoney(l.receitaPrevista)}</td>
-                      <td className={`tnum text-right font-semibold ${l.perda ? "text-danger" : "text-success-strong"}`}>
-                        {comSinal(l.diferenca)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Moldura>
-        </>
-      ) : (
-        <Vazio>
-          Digite um ATR maior que zero para ver o efeito nas suas fazendas.
-        </Vazio>
-      )}
-    </div>
-  );
-}
-
 /* ============================================================
    Tela
    ============================================================ */
@@ -760,10 +587,9 @@ function AbaPrevisto({ meses, colheitas, ultimoAtr }: { meses: MesAtr[]; colheit
 export type PropsAtr = {
   meses: MesAtr[];
   colheitas: ColheitaComReceita[];
-  ultimoAtr: number | null;
 };
 
-export default function SimuladorAtrComparacaoClient({ meses, colheitas, ultimoAtr }: PropsAtr) {
+export default function SimuladorAtrComparacaoClient({ meses, colheitas }: PropsAtr) {
   const [filtroFazenda, setFiltroFazenda] = useState("");
 
   const fazendas = useMemo(() => {
@@ -780,7 +606,7 @@ export default function SimuladorAtrComparacaoClient({ meses, colheitas, ultimoA
   return (
     <div className="grid gap-5">
       <Moldura
-        titulo="Meses da safra — ATR anunciado pela usina"
+        titulo="Meses da safra � ATR anunciado pela usina"
         descricao="Informe o ATR de cada mês, um por vez. O comparativo abaixo se monta sozinho a partir daqui."
       >
         <EditorMeses meses={meses} />
@@ -811,11 +637,6 @@ export default function SimuladorAtrComparacaoClient({ meses, colheitas, ultimoA
             id: "real",
             rotulo: "Comparativo real",
             conteudo: <AbaReal meses={meses} colheitas={colheitasFiltradas} />,
-          },
-          {
-            id: "previsto",
-            rotulo: "Previsto (simulação)",
-            conteudo: <AbaPrevisto meses={meses} colheitas={colheitasFiltradas} ultimoAtr={ultimoAtr} />,
           },
         ]}
       />
