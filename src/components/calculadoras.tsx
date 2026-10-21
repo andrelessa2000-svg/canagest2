@@ -342,13 +342,41 @@ function AbaAdubo() {
 
 type Produto = { nome: string; dose: string; unidade: string };
 
+type Implemento = {
+  id: string;
+  rotulo: string;
+  /** Rótulo do volume do equipamento (tanque/carga/depósito). */
+  volumeRotulo: string;
+  /** Rótulo do rendimento por carga. */
+  rendRotulo: string;
+  /** Sugestão de volume (L ou kg). */
+  volumeInicial: string;
+  /** Sugestão de rendimento por carga. */
+  rendInicial: string;
+};
+
+const IMPLEMENTOS: Implemento[] = [
+  { id: "tratorizado", rotulo: "Pulverizador tratorizado", volumeRotulo: "Tanque (L)", rendRotulo: "Rendimento (ha por tanque)", volumeInicial: "600", rendInicial: "3" },
+  { id: "costal", rotulo: "Pulverizador costal", volumeRotulo: "Tanque (L)", rendRotulo: "Rendimento (ha por tanque)", volumeInicial: "20", rendInicial: "0,04" },
+  { id: "atomizador", rotulo: "Atomizador", volumeRotulo: "Tanque (L)", rendRotulo: "Rendimento (ha por tanque)", volumeInicial: "300", rendInicial: "1,5" },
+  { id: "drone", rotulo: "Drone", volumeRotulo: "Carga (L)", rendRotulo: "Rendimento (ha por carga)", volumeInicial: "10", rendInicial: "1" },
+];
+
 function AbaHerbicida() {
-  const [tanque, setTanque] = useState("600");
-  const [rendimento, setRendimento] = useState("3");
+  const [implemento, setImplemento] = useState(IMPLEMENTOS[0].id);
+  const impl = IMPLEMENTOS.find((i) => i.id === implemento) ?? IMPLEMENTOS[0];
+  const [tanque, setTanque] = useState(impl.volumeInicial);
+  const [rendimento, setRendimento] = useState(impl.rendInicial);
   const [produtos, setProdutos] = useState<Produto[]>([{ nome: "", dose: "", unidade: "L/ha" }]);
 
   const haTanque = num(rendimento);
-  const tanqueL = num(tanque);
+
+  function escolherImplemento(id: string) {
+    const novo = IMPLEMENTOS.find((i) => i.id === id) ?? IMPLEMENTOS[0];
+    setImplemento(id);
+    setTanque(novo.volumeInicial);
+    setRendimento(novo.rendInicial);
+  }
 
   function setProduto(idx: number, campo: keyof Produto, valor: string) {
     setProdutos(produtos.map((p, k) => (k === idx ? { ...p, [campo]: valor } : p)));
@@ -356,18 +384,34 @@ function AbaHerbicida() {
 
   return (
     <div className="grid gap-4">
-      <h2 className="font-display text-lg text-ink">Calda — barra tratorizada</h2>
+      <h2 className="font-display text-lg text-ink">Calda de herbicida</h2>
       <p className="text-xs text-ink-3">
-        Tanque de {tanqueL || "600"} L, rende {nf2.format(haTanque)} ha por tanque. A dose vem do
-        receituário; o app NÃO recomenda dose.
+        Escolha o implemento e informe a capacidade e o rendimento. A dose vem do receituário; o app NÃO
+        recomenda dose — só calcula a quantidade por carga.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Campo label="Tanque (L)" htmlFor="tanqueL">
-          <input id="tanqueL" className="field-input tnum" inputMode="decimal" value={tanque} onChange={(e) => setTanque(e.target.value)} />
+        <Campo label="Implemento" htmlFor="implementoHerbicida">
+          <select
+            id="implementoHerbicida"
+            className="field-input"
+            value={implemento}
+            onChange={(e) => escolherImplemento(e.target.value)}
+          >
+            {IMPLEMENTOS.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.rotulo}
+              </option>
+            ))}
+          </select>
         </Campo>
-        <Campo label="Rendimento (ha por tanque)" htmlFor="rendimento">
-          <input id="rendimento" className="field-input tnum" inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
-        </Campo>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo label={impl.volumeRotulo} htmlFor="tanqueL">
+            <input id="tanqueL" className="field-input tnum" inputMode="decimal" value={tanque} onChange={(e) => setTanque(e.target.value)} />
+          </Campo>
+          <Campo label={impl.rendRotulo} htmlFor="rendimento">
+            <input id="rendimento" className="field-input tnum" inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
+          </Campo>
+        </div>
       </div>
 
       <div className="grid gap-3">
@@ -407,8 +451,8 @@ function AbaHerbicida() {
                 <option value="L/ha">L/ha</option>
                 <option value="kg/ha">kg/ha</option>
               </select>
-              <span className="tnum w-28 shrink-0 text-right text-sm font-semibold text-ink">
-                {nf2.format(quantidade)} {p.unidade === "L/ha" ? "L" : "kg"}/tanque
+              <span className="tnum w-32 shrink-0 text-right text-sm font-semibold text-ink">
+                {nf2.format(quantidade)} {p.unidade === "L/ha" ? "L" : "kg"}/carga
               </span>
               <button
                 type="button"
