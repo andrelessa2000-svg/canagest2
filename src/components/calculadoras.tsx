@@ -364,18 +364,73 @@ const IMPLEMENTOS: Implemento[] = [
 
 function AbaHerbicida() {
   const [implemento, setImplemento] = useState(IMPLEMENTOS[0].id);
-  const impl = IMPLEMENTOS.find((i) => i.id === implemento) ?? IMPLEMENTOS[0];
-  const [tanque, setTanque] = useState(impl.volumeInicial);
-  const [rendimento, setRendimento] = useState(impl.rendInicial);
+  const [tanque, setTanque] = useState(IMPLEMENTOS[0].volumeInicial);
+  const [rendimento, setRendimento] = useState(IMPLEMENTOS[0].rendInicial);
   const [produtos, setProdutos] = useState<Produto[]>([{ nome: "", dose: "", unidade: "L/ha" }]);
+
+  // Implementos personalizados, persistidos no navegador.
+  const [mostrarNovo, setMostrarNovo] = useState(false);
+  const [novoRotulo, setNovoRotulo] = useState("");
+  const [novoVol, setNovoVol] = useState("");
+  const [novoRend, setNovoRend] = useState("");
+
+  const [extras, setExtras] = useState<Implemento[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("canagest.implementos.herbicida");
+      return raw ? (JSON.parse(raw) as Implemento[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  function salvarExtras(lista: Implemento[]) {
+    setExtras(lista);
+    try {
+      window.localStorage.setItem("canagest.implementos.herbicida", JSON.stringify(lista));
+    } catch {}
+  }
+
+  const todos = [...IMPLEMENTOS, ...extras];
+  const impl = todos.find((i) => i.id === implemento) ?? IMPLEMENTOS[0];
 
   const haTanque = num(rendimento);
 
   function escolherImplemento(id: string) {
-    const novo = IMPLEMENTOS.find((i) => i.id === id) ?? IMPLEMENTOS[0];
+    const novo = todos.find((i) => i.id === id) ?? IMPLEMENTOS[0];
     setImplemento(id);
     setTanque(novo.volumeInicial);
     setRendimento(novo.rendInicial);
+  }
+
+  function adicionarImplemento() {
+    const nome = novoRotulo.trim();
+    const vol = parseDecimal(novoVol);
+    const rend = parseDecimal(novoRend);
+    if (!nome || !Number.isFinite(vol) || vol <= 0 || !Number.isFinite(rend) || rend <= 0) return;
+    const novo: Implemento = {
+      id: `custom-${Date.now()}`,
+      rotulo: nome,
+      volumeRotulo: "Tanque (L)",
+      rendRotulo: "Rendimento (ha por tanque)",
+      volumeInicial: String(vol).replace(".", ","),
+      rendInicial: String(rend).replace(".", ","),
+    };
+    salvarExtras([...extras, novo]);
+    setNovoRotulo("");
+    setNovoVol("");
+    setNovoRend("");
+    setMostrarNovo(false);
+    escolherImplemento(novo.id);
+  }
+
+  function removerImplemento(id: string) {
+    salvarExtras(extras.filter((e) => e.id !== id));
+    if (implemento === id) {
+      setImplemento(IMPLEMENTOS[0].id);
+      setTanque(IMPLEMENTOS[0].volumeInicial);
+      setRendimento(IMPLEMENTOS[0].rendInicial);
+    }
   }
 
   function setProduto(idx: number, campo: keyof Produto, valor: string) {
@@ -386,8 +441,9 @@ function AbaHerbicida() {
     <div className="grid gap-4">
       <h2 className="font-display text-lg text-ink">Calda de herbicida</h2>
       <p className="text-xs text-ink-3">
-        Escolha o implemento e informe a capacidade e o rendimento. A dose vem do receituário; o app NÃO
-        recomenda dose — só calcula a quantidade por carga.
+        Escolha o implemento e informe a capacidade e o rendimento. Pode criar o seu próprio implemento
+        clicando em &quot;Adicionar implemento&quot;. A dose vem do receituário; o app NÃO recomenda dose —
+        só calcula a quantidade por carga.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo label="Implemento" htmlFor="implementoHerbicida">
@@ -397,7 +453,7 @@ function AbaHerbicida() {
             value={implemento}
             onChange={(e) => escolherImplemento(e.target.value)}
           >
-            {IMPLEMENTOS.map((i) => (
+            {todos.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.rotulo}
               </option>
@@ -413,6 +469,81 @@ function AbaHerbicida() {
           </Campo>
         </div>
       </div>
+
+      {/* Implementos personalizados */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setMostrarNovo((v) => !v)} className="btn btn-ghost">
+          + Adicionar implemento
+        </button>
+        {extras.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {extras.map((e) => (
+              <span key={e.id} className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1 text-xs font-medium text-ink-2">
+                {e.rotulo}
+                <button
+                  type="button"
+                  onClick={() => removerImplemento(e.id)}
+                  className="text-ink-3 hover:text-danger"
+                  aria-label={`Remover implemento ${e.rotulo}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {mostrarNovo && (
+        <div className="grid gap-3 rounded-[10px] border border-dashed border-line-strong bg-surface/60 p-4">
+          <p className="text-sm font-medium text-ink">Novo implemento</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Campo label="Nome" htmlFor="novoImplNome">
+              <input
+                id="novoImplNome"
+                className="field-input"
+                value={novoRotulo}
+                onChange={(e) => setNovoRotulo(e.target.value)}
+                placeholder="Ex.: Pulverizador elétrico"
+                maxLength={60}
+              />
+            </Campo>
+            <Campo label="Capacidade (L)" htmlFor="novoImplVol">
+              <input
+                id="novoImplVol"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={novoVol}
+                onChange={(e) => setNovoVol(e.target.value)}
+                placeholder="Ex.: 15"
+              />
+            </Campo>
+            <Campo label="Rendimento (ha por tanque)" htmlFor="novoImplRend">
+              <input
+                id="novoImplRend"
+                className="field-input tnum"
+                inputMode="decimal"
+                value={novoRend}
+                onChange={(e) => setNovoRend(e.target.value)}
+                placeholder="Ex.: 0,5"
+              />
+            </Campo>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={adicionarImplemento}
+              disabled={!novoRotulo.trim() || !(Number(parseDecimal(novoVol)) > 0) || !(Number(parseDecimal(novoRend)) > 0)}
+              className="btn btn-secondary"
+            >
+              Salvar implemento
+            </button>
+            <button type="button" onClick={() => setMostrarNovo(false)} className="btn btn-ghost">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3">
         <div className="flex items-center justify-between">
