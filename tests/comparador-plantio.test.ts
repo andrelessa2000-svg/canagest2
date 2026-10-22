@@ -1,54 +1,76 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  detalhePlantio,
-  rankearCenarios,
-  simularPlantio,
-  type CenarioPlantio,
+  detalheOperacao,
+  rankearOperacoes,
+  simularOperacao,
+  custoFocoHa,
+  type CenarioOperacao,
 } from "../src/lib/comparador-plantio";
 
-function base(over: Partial<CenarioPlantio> = {}): CenarioPlantio {
+function base(over: Partial<CenarioOperacao> = {}): CenarioOperacao {
   return {
     id: "c1",
-    nome: "Protocolo simples",
+    tipo: "plantio",
     modo: "proprio",
+    nome: "Protocolo simples",
     areaHa: 20,
     produtividade: 80,
     preco: 164,
+    cortes: 5,
+    custosFoco: [{ nome: "Mudas", valor: 2500, unidade: "ha" }],
     custoColheitaHa: 3000,
     custoTratosHa: 800,
-    custosPlantio: [{ nome: "Mudas", valorHa: 2500 }],
-    cortes: 5,
+    custoPlantioHa: 2500,
     ...over,
   };
 }
 
-test("simularPlantio dilui o plantio pelo número de cortes", () => {
-  const r = simularPlantio(base());
-  // plantio 2500/ha / 5 cortes = 500/ha por corte
-  assert.equal(r.custoPlantioHa, 2500);
-  assert.equal(r.custoHa, 3000 + 800 + 500);
+test("plantio: dilui o custo do plantio pelo número de cortes", () => {
+  // custosFoco = 2500/ha; plantio diluído = 2500/5 = 500; + colheita 3000 + tratos 800
+  const r = simularOperacao(base());
+  assert.equal(r.custoFocoHa, 2500);
+  assert.equal(r.custoHa, 500 + 3000 + 800);
   assert.equal(r.receitaHa, 80 * 164);
-  assert.equal(r.lucroHa, 80 * 164 - (3000 + 800 + 500));
+  assert.equal(r.lucroHa, 80 * 164 - 4300);
+});
+
+test("colheita: custo por hectare entra inteiro no corte", () => {
+  const r = simularOperacao(
+    base({
+      tipo: "colheita",
+      modo: "mecanizada-propria",
+      custosFoco: [{ nome: "Colheita mecanizada", valor: 3500, unidade: "ha" }],
+    }),
+  );
+  // colheita 3500 + tratos 800 + plantio diluído 2500/5=500
+  assert.equal(r.custoHa, 3500 + 800 + 500);
+  // lucro = receita − custo
+  assert.equal(r.lucroHa, 80 * 164 - (3500 + 800 + 500));
+});
+
+test("custo total é convertido para por hectare usando a área", () => {
+  const c = base({ custosFoco: [{ nome: "Preparo", valor: 60000, unidade: "total" }] });
+  // 60.000 / 20 ha = 3.000/ha
+  assert.equal(custoFocoHa(c), 3000);
+  const r = simularOperacao(c);
+  assert.equal(r.custoFocoHa, 3000);
 });
 
 test("protocolo mais caro com mais produtividade nem sempre dá maior margem", () => {
-  // Simples: 80 t/ha, plantio barato
-  const simples = simularPlantio(base());
-  // Caro: 110 t/ha, plantio 3× mais caro
-  const cenCaro = base({
-    id: "c2",
-    nome: "Protocolo caro",
-    produtividade: 110,
-    custosPlantio: [
-      { nome: "Mudas selecionadas", valorHa: 6000 },
-      { nome: "Correção de solo", valorHa: 2000 },
-      { nome: "Calagem", valorHa: 1500 },
-    ],
-  });
-  const caro = simularPlantio(cenCaro);
-  // O caro rende mais lucro/ha, mas a margem não sobe na mesma proporção da
-  // produtividade (37,5% a mais de t/ha): o custo extra consome a receita extra.
+  const simples = simularOperacao(base());
+  const caro = simularOperacao(
+    base({
+      id: "c2",
+      nome: "Protocolo caro",
+      produtividade: 110,
+      custosFoco: [
+        { nome: "Mudas selecionadas", valor: 6000, unidade: "ha" },
+        { nome: "Correção de solo", valor: 2000, unidade: "ha" },
+        { nome: "Calagem", valor: 1500, unidade: "ha" },
+      ],
+    }),
+  );
   assert.ok(caro.lucroHa > simples.lucroHa, "caro dá mais lucro/ha");
   assert.equal(
     true,
@@ -57,34 +79,65 @@ test("protocolo mais caro com mais produtividade nem sempre dá maior margem", (
   );
 });
 
-test("rankearCenarios ordena do maior para o menor lucro/ha", () => {
+test("rankearOperacoes ordena do maior para o menor lucro/ha", () => {
   const pior = base({ id: "pior", produtividade: 40 });
   const melhor = base({ id: "melhor", produtividade: 90 });
-  const rank = rankearCenarios([pior, melhor]);
+  const rank = rankearOperacoes([pior, melhor]);
   assert.equal(rank[0].c.id, "melhor");
   assert.equal(rank[1].c.id, "pior");
 });
 
-test("detalhePlantio calcula percentuais e produtividade de equilíbrio", () => {
-  const d = detalhePlantio(
+test("detalheOperacao calcula percentuais e produtividade de equilíbrio", () => {
+  const d = detalheOperacao(
     base({
-      custosPlantio: [
-        { nome: "A", valorHa: 1000 },
-        { nome: "B", valorHa: 3000 },
+      custosFoco: [
+        { nome: "A", valor: 1000, unidade: "ha" },
+        { nome: "B", valor: 3000, unidade: "ha" },
       ],
     }),
   );
   assert.equal(d.itens.length, 2);
   assert.equal(d.itens.find((i) => i.nome === "A")?.percentual, 25);
   assert.equal(d.itens.find((i) => i.nome === "B")?.percentual, 75);
-  // custo/ha por corte com plantio diluído / preço
-  const custoPorCorte = 3000 + 800 + 4000 / 5;
+  // custo/ha por corte = plantio diluído (4000/5) + colheita 3000 + tratos 800
+  const custoPorCorte = 4000 / 5 + 3000 + 800;
   assert.equal(d.produtividadeEquilibrio, custoPorCorte / 164);
 });
 
-test("sem itens de plantio não divide por zero", () => {
-  const r = simularPlantio(base({ custosPlantio: [] }));
-  assert.equal(r.custoPlantioHa, 0);
+test("sem itens de custo não divide por zero", () => {
+  const r = simularOperacao(base({ custosFoco: [] }));
+  assert.equal(r.custoFocoHa, 0);
   assert.equal(Number.isFinite(r.roi), true);
   assert.equal(Number.isFinite(r.margem), true);
+});
+
+test("misto: custo por ha + custo total no mesmo cenário", () => {
+  const c = base({
+    areaHa: 10,
+    custosFoco: [
+      { nome: "Combustível", valor: 120, unidade: "ha" },
+      { nome: "Mão de obra", valor: 800, unidade: "total" },
+    ],
+  });
+  // 120 + 800/10 = 200/ha
+  assert.equal(custoFocoHa(c), 200);
+});
+
+test("manejo manual da colheita pode ser mais barato que mecanizado", () => {
+  const mecanizado = simularOperacao(
+    base({
+      tipo: "colheita",
+      id: "mec",
+      custosFoco: [{ nome: "Colheita mecanizada", valor: 3500, unidade: "ha" }],
+    }),
+  );
+  const manual = simularOperacao(
+    base({
+      tipo: "colheita",
+      id: "man",
+      custosFoco: [{ nome: "Colheita manual", valor: 2800, unidade: "ha" }],
+    }),
+  );
+  assert.ok(manual.custoHa < mecanizado.custoHa);
+  assert.ok(manual.lucroHa > mecanizado.lucroHa);
 });

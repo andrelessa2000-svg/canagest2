@@ -4,19 +4,23 @@ import { useMemo, useSyncExternalStore, useState } from "react";
 import { Copy, Pencil, Plus, Trash2, Trophy } from "lucide-react";
 import { fmtMoney, parseDecimal } from "@/lib/format";
 import {
-  MODOS_EXECUCAO,
-  detalhePlantio,
-  rankearCenarios,
-  simularPlantio,
-  type CenarioPlantio,
-  type ModoExecucao,
+  MODOS_POR_TIPO,
+  TIPOS_OPERACAO_LABEL,
+  detalheOperacao,
+  modoLabel,
+  rankearOperacoes,
+  simularOperacao,
+  type CenarioOperacao,
+  type TipoOperacao,
+  type UnidadeCusto,
 } from "@/lib/comparador-plantio";
 import { Campo } from "./forms";
 import { CelulaMetrica } from "./stat-cells";
 
 /* ---------- Armazenamento local (por aparelho) ---------- */
-const CHAVE = "canagest:projecao-plantio:v1";
-const EVENTO = "canagest:projecao-plantio:mudou";
+const CHAVE = "canagest:projecao-operacoes:v1";
+const CHAVE_ANTIGA = "canagest:projecao-plantio:v1";
+const EVENTO = "canagest:projecao-operacoes:mudou";
 
 function assinar(aoMudar: () => void) {
   window.addEventListener("storage", aoMudar);
@@ -26,37 +30,112 @@ function assinar(aoMudar: () => void) {
     window.removeEventListener(EVENTO, aoMudar);
   };
 }
-const lerBruto = () => window.localStorage.getItem(CHAVE) ?? "[]";
+
+interface CenarioAntigo {
+  id: string;
+  nome: string;
+  modo: string;
+  areaHa: number;
+  produtividade: number;
+  preco: number;
+  custoColheitaHa: number;
+  custoTratosHa: number;
+  custosPlantio?: { nome: string; valorHa: number }[];
+}
+
+/** Converte cenários antigos (só plantio) para o novo modelo. */
+function migrarAntigo(bruto: string): CenarioOperacao[] | null {
+  try {
+    const dados = JSON.parse(bruto);
+    if (!Array.isArray(dados)) return null;
+    const mapa = new Map<string, CenarioOperacao>();
+    for (const d of dados as CenarioAntigo[]) {
+      if (!d || typeof d !== "object") continue;
+      // Se já tem o formato novo, copia direto.
+      if ("tipo" in d && "custosFoco" in d) {
+        if ((d as unknown as CenarioOperacao).id) mapa.set(d.id, d as unknown as CenarioOperacao);
+        continue;
+      }
+      const custosFoco: ItemUI[] =
+        d.custosPlantio && d.custosPlantio.length > 0
+          ? d.custosPlantio.map((i) => ({ nome: i.nome, valor: String(i.valorHa), unidade: "ha" }))
+          : [{ nome: "Plantio", valor: "0", unidade: "ha" }];
+      const cen: CenarioOperacao = {
+        id: d.id,
+        tipo: "plantio",
+        modo: d.modo ?? "proprio",
+        nome: d.nome,
+        areaHa: d.areaHa,
+        produtividade: d.produtividade,
+        preco: d.preco,
+        custoColheitaHa: d.custoColheitaHa,
+        custoTratosHa: d.custoTratosHa,
+        custoPlantioHa: d.custosPlantio?.reduce((s, i) => s + i.valorHa, 0) ?? 0,
+        cortes: 5,
+        custosFoco: custosFoco.map((i) => ({
+          nome: i.nome,
+          valor: Number(i.valor) || 0,
+          unidade: i.unidade,
+        })),
+      };
+      mapa.set(cen.id, cen);
+    }
+    return [...mapa.values()];
+  } catch {
+    return null;
+  }
+}
+
+const lerBruto = () => {
+  const bruto = window.localStorage.getItem(CHAVE);
+  if (bruto !== null) return bruto;
+  // Migração da chave antiga, uma única vez.
+  const antigo = window.localStorage.getItem(CHAVE_ANTIGA);
+  if (antigo !== null) {
+    const migrados = migrarAntigo(antigo);
+    if (migrados) {
+      const json = JSON.stringify(migrados);
+      try {
+        window.localStorage.setItem(CHAVE, json);
+        window.localStorage.removeItem(CHAVE_ANTIGA);
+      } catch {}
+      return json;
+    }
+  }
+  return "[]";
+};
 const lerBrutoServidor = () => "[]";
 
-function gravar(cenarios: CenarioPlantio[]) {
+function gravar(cenarios: CenarioOperacao[]) {
   window.localStorage.setItem(CHAVE, JSON.stringify(cenarios));
   window.dispatchEvent(new Event(EVENTO));
 }
 
-function interpretar(bruto: string): CenarioPlantio[] {
+function interpretar(bruto: string): CenarioOperacao[] {
   try {
     const dados = JSON.parse(bruto);
-    return Array.isArray(dados) ? (dados as CenarioPlantio[]) : [];
+    return Array.isArray(dados) ? (dados as CenarioOperacao[]) : [];
   } catch {
     return [];
   }
 }
 
 /* ---------- Helpers de tipo ---------- */
+type ItemUI = { nome: string; valor: string; unidade: UnidadeCusto };
+
 type Campos = {
+  tipo: TipoOperacao;
   nome: string;
-  modo: ModoExecucao;
+  modo: string;
   areaHa: string;
   produtividade: string;
   preco: string;
   custoColheitaHa: string;
   custoTratosHa: string;
+  custoPlantioHa: string;
   cortes: string;
-  itens: ItemCustoPlantioUI[];
+  itens: ItemUI[];
 };
-
-type ItemCustoPlantioUI = { nome: string; valor: string };
 
 const texto = (n: number) => (n > 0 ? String(n).replace(".", ",") : "");
 const numero = (v: string) => {
@@ -66,42 +145,52 @@ const numero = (v: string) => {
 
 function camposVazios(): Campos {
   return {
+    tipo: "plantio",
     nome: "",
-    modo: "proprio",
+    modo: MODOS_POR_TIPO["plantio"][0].id,
     areaHa: "",
     produtividade: "",
     preco: "",
     custoColheitaHa: "",
     custoTratosHa: "",
+    custoPlantioHa: "",
     cortes: "5",
-    itens: [{ nome: "", valor: "" }],
+    itens: [{ nome: "", valor: "", unidade: "ha" }],
   };
 }
 
-function itemValido(i: ItemCustoPlantioUI): i is { nome: string; valor: string } {
+function itemValido(i: ItemUI): boolean {
   return i.nome.trim().length > 0 && Number(parseDecimal(i.valor)) > 0;
 }
 
-function paraCenario(c: Campos, id: string): CenarioPlantio {
+function paraCenario(c: Campos, id: string): CenarioOperacao {
   return {
     id,
-    nome: c.nome.trim(),
+    tipo: c.tipo,
     modo: c.modo,
+    nome: c.nome.trim(),
     areaHa: numero(c.areaHa),
     produtividade: numero(c.produtividade),
     preco: numero(c.preco),
+    cortes: Math.max(1, Math.round(numero(c.cortes)) || 1),
+    custosFoco: c.itens.filter(itemValido).map((i) => ({
+      nome: i.nome.trim(),
+      valor: numero(i.valor),
+      unidade: i.unidade,
+    })),
     custoColheitaHa: numero(c.custoColheitaHa),
     custoTratosHa: numero(c.custoTratosHa),
-    cortes: Math.max(1, Math.round(numero(c.cortes)) || 1),
-    custosPlantio: c.itens.filter(itemValido).map((i) => ({
-      nome: i.nome.trim(),
-      valorHa: numero(i.valor),
-    })),
+    custoPlantioHa: numero(c.custoPlantioHa),
   };
 }
 
-function paraCampos(c: CenarioPlantio): Campos {
+function paraCampos(c: CenarioOperacao): Campos {
+  const itens: ItemUI[] =
+    c.custosFoco.length > 0
+      ? c.custosFoco.map((i) => ({ nome: i.nome, valor: texto(i.valor), unidade: i.unidade }))
+      : [{ nome: "", valor: "", unidade: "ha" }];
   return {
+    tipo: c.tipo,
     nome: c.nome,
     modo: c.modo,
     areaHa: texto(c.areaHa),
@@ -109,11 +198,9 @@ function paraCampos(c: CenarioPlantio): Campos {
     preco: texto(c.preco),
     custoColheitaHa: texto(c.custoColheitaHa),
     custoTratosHa: texto(c.custoTratosHa),
+    custoPlantioHa: texto(c.custoPlantioHa),
     cortes: String(c.cortes),
-    itens:
-      c.custosPlantio.length > 0
-        ? c.custosPlantio.map((i) => ({ nome: i.nome, valor: texto(i.valorHa) }))
-        : [{ nome: "", valor: "" }],
+    itens,
   };
 }
 
@@ -127,14 +214,24 @@ export function ComparadorPlantioClient() {
   const [campos, setCampos] = useState<Campos>(camposVazios);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
+  // Trocar o tipo reseta o modo para o primeiro da lista.
+  function mudarTipo(tipo: TipoOperacao) {
+    setCampos((atual) => ({ ...atual, tipo, modo: MODOS_POR_TIPO[tipo][0].id }));
+  }
+
   const draft = paraCenario(campos, editandoId ?? "rascunho");
-  const valido = draft.nome.length > 0 && draft.areaHa > 0 && draft.produtividade > 0 && draft.preco > 0 && draft.custosPlantio.length > 0;
-  const previa = simularPlantio(draft);
-  const detalhe = detalhePlantio(draft);
+  const valido =
+    draft.nome.length > 0 &&
+    draft.areaHa > 0 &&
+    draft.produtividade > 0 &&
+    draft.preco > 0 &&
+    draft.custosFoco.length > 0;
+  const previa = simularOperacao(draft);
+  const detalhe = detalheOperacao(draft);
 
   const mudar = (patch: Partial<Campos>) => setCampos((atual) => ({ ...atual, ...patch }));
 
-  function mudarItem(idx: number, patch: Partial<ItemCustoPlantioUI>) {
+  function mudarItem(idx: number, patch: Partial<ItemUI>) {
     setCampos((atual) => ({
       ...atual,
       itens: atual.itens.map((i, k) => (k === idx ? { ...i, ...patch } : i)),
@@ -156,13 +253,13 @@ export function ComparadorPlantioClient() {
     limparFormulario();
   }
 
-  function editar(c: CenarioPlantio) {
+  function editar(c: CenarioOperacao) {
     setCampos(paraCampos(c));
     setEditandoId(c.id);
     document.getElementById("form-cenario")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function duplicar(c: CenarioPlantio) {
+  function duplicar(c: CenarioOperacao) {
     gravar([...cenarios, { ...c, id: crypto.randomUUID(), nome: `${c.nome} (cópia)` }]);
   }
 
@@ -171,7 +268,7 @@ export function ComparadorPlantioClient() {
     if (editandoId === id) limparFormulario();
   }
 
-  const linhas = rankearCenarios(cenarios);
+  const linhas = rankearOperacoes(cenarios);
   const melhor = linhas.length > 0 ? linhas[0].c.id : null;
 
   return (
@@ -180,11 +277,11 @@ export function ComparadorPlantioClient() {
       <section className="card grid gap-2 p-4 sm:p-6">
         <h2 className="font-display text-lg text-ink">Como funciona</h2>
         <p className="text-sm leading-relaxed text-ink-2">
-          Monte o <strong>custo de plantar</strong> (mudas, correção, calagem, adubação, mecanização, mão
-          de obra…) e a <strong>produtividade esperada</strong> de cada cenário — plantio próprio, pela
-          usina, terceirizado, ou protocolos diferentes. O app dilui o plantio pelos cortes e mostra{" "}
-          <strong>custo, receita e margem</strong> lado a lado. Um protocolo caro pode dar mais toneladas,
-          mas a <strong>margem</strong> não necessariamente acompanha.
+          Compare <strong>como fazer uma operação</strong> no canavial — plantio, tratos ou colheita — com
+          modos diferentes (próprio, usina, terceirizado, mecanizada, manual…). Cada custo pode ser
+          informado <strong>por hectare</strong> ou como <strong>valor total</strong> (gastei X com isso,
+          Y com aquilo…). O app soma tudo, dilui o plantio pelos cortes e mostra{" "}
+          <strong>custo, receita e margem</strong> lado a lado.
         </p>
       </section>
 
@@ -192,7 +289,7 @@ export function ComparadorPlantioClient() {
       <section id="form-cenario" aria-labelledby="titulo-cenario" className="card grid scroll-mt-24 gap-5 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="titulo-cenario" className="font-display text-lg text-ink">
-            {editandoId ? "Editando cenário" : "Novo cenário de plantio"}
+            {editandoId ? "Editando cenário" : "Novo cenário"}
           </h2>
           {editandoId && (
             <button type="button" className="btn btn-ghost" onClick={limparFormulario}>
@@ -202,60 +299,89 @@ export function ComparadorPlantioClient() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sm:col-span-2">
-            <Campo label="Nome do cenário" htmlFor="pj-nome">
-              <input
-                id="pj-nome"
-                className="field-input"
-                value={campos.nome}
-                onChange={(e) => mudar({ nome: e.target.value })}
-                placeholder="Ex.: Próprio — protocolo caro"
-              />
-            </Campo>
-          </div>
-          <Campo label="Quem planta" htmlFor="pj-modo">
+          <Campo label="Operação" htmlFor="op-tipo">
             <select
-              id="pj-modo"
+              id="op-tipo"
               className="field-input"
-              value={campos.modo}
-              onChange={(e) => mudar({ modo: e.target.value as ModoExecucao })}
+              value={campos.tipo}
+              onChange={(e) => mudarTipo(e.target.value as TipoOperacao)}
             >
-              {Object.entries(MODOS_EXECUCAO).map(([v, l]) => (
+              {Object.entries(TIPOS_OPERACAO_LABEL).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>
               ))}
             </select>
           </Campo>
-          <Campo label="Área (ha)" htmlFor="pj-area">
-            <input id="pj-area" className="field-input tnum" inputMode="decimal" value={campos.areaHa} onChange={(e) => mudar({ areaHa: e.target.value })} placeholder="20" />
+          <Campo label="Quem faz" htmlFor="op-modo">
+            <select
+              id="op-modo"
+              className="field-input"
+              value={campos.modo}
+              onChange={(e) => mudar({ modo: e.target.value })}
+            >
+              {MODOS_POR_TIPO[campos.tipo].map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.rotulo}
+                </option>
+              ))}
+            </select>
           </Campo>
-          <Campo label="Cortes esperados" htmlFor="pj-cortes" hint="Divide o custo do plantio">
-            <input id="pj-cortes" className="field-input tnum" inputMode="numeric" value={campos.cortes} onChange={(e) => mudar({ cortes: e.target.value })} />
+          <div className="sm:col-span-2">
+            <Campo label="Nome do cenário" htmlFor="op-nome">
+              <input
+                id="op-nome"
+                className="field-input"
+                value={campos.nome}
+                onChange={(e) => mudar({ nome: e.target.value })}
+                placeholder={
+                  campos.tipo === "colheita"
+                    ? "Ex.: Mecanizada vs manual"
+                    : campos.tipo === "tratos"
+                      ? "Ex.: Protocolo caro vs simples"
+                      : "Ex.: Próprio — protocolo caro"
+                }
+              />
+            </Campo>
+          </div>
+          <Campo label="Área (ha)" htmlFor="op-area">
+            <input id="op-area" className="field-input tnum" inputMode="decimal" value={campos.areaHa} onChange={(e) => mudar({ areaHa: e.target.value })} placeholder="20" />
           </Campo>
-          <Campo label="Produtividade (t/ha)" htmlFor="pj-prod" hint="Resultado do protocolo">
-            <input id="pj-prod" className="field-input tnum" inputMode="decimal" value={campos.produtividade} onChange={(e) => mudar({ produtividade: e.target.value })} placeholder="85" />
+          <Campo label="Cortes esperados" htmlFor="op-cortes" hint="Divide plantio e receita ao longo da vida útil">
+            <input id="op-cortes" className="field-input tnum" inputMode="numeric" value={campos.cortes} onChange={(e) => mudar({ cortes: e.target.value })} />
           </Campo>
-          <Campo label="Preço da cana (R$/t)" htmlFor="pj-preco">
-            <input id="pj-preco" className="field-input tnum" inputMode="decimal" value={campos.preco} onChange={(e) => mudar({ preco: e.target.value })} placeholder="164" />
+          <Campo label="Produtividade (t/ha)" htmlFor="op-prod">
+            <input id="op-prod" className="field-input tnum" inputMode="decimal" value={campos.produtividade} onChange={(e) => mudar({ produtividade: e.target.value })} placeholder="85" />
           </Campo>
-          <Campo label="Custo de colheita (R$/ha)" htmlFor="pj-colheita" hint="Por corte">
-            <input id="pj-colheita" className="field-input tnum" inputMode="decimal" value={campos.custoColheitaHa} onChange={(e) => mudar({ custoColheitaHa: e.target.value })} />
-          </Campo>
-          <Campo label="Custo de tratos (R$/ha)" htmlFor="pj-tratos" hint="Por corte">
-            <input id="pj-tratos" className="field-input tnum" inputMode="decimal" value={campos.custoTratosHa} onChange={(e) => mudar({ custoTratosHa: e.target.value })} />
+          <Campo label="Preço da cana (R$/t)" htmlFor="op-preco">
+            <input id="op-preco" className="field-input tnum" inputMode="decimal" value={campos.preco} onChange={(e) => mudar({ preco: e.target.value })} placeholder="164" />
           </Campo>
         </div>
 
-        {/* Itens do plantio */}
+        {/* Custos das outras operações — comum para fechar o cálculo */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Campo label="Custo da colheita (R$/ha)" htmlFor="op-colheita" hint="Por corte" >
+            <input id="op-colheita" className="field-input tnum" inputMode="decimal" value={campos.custoColheitaHa} onChange={(e) => mudar({ custoColheitaHa: e.target.value })} />
+          </Campo>
+          <Campo label="Custo dos tratos (R$/ha)" htmlFor="op-tratos" hint="Por corte">
+            <input id="op-tratos" className="field-input tnum" inputMode="decimal" value={campos.custoTratosHa} onChange={(e) => mudar({ custoTratosHa: e.target.value })} />
+          </Campo>
+          <Campo label="Custo do plantio (R$/ha)" htmlFor="op-plantio" hint="Valor cheio, uma vez">
+            <input id="op-plantio" className="field-input tnum" inputMode="decimal" value={campos.custoPlantioHa} onChange={(e) => mudar({ custoPlantioHa: e.target.value })} />
+          </Campo>
+        </div>
+
+        {/* Itens da operação focada */}
         <div className="grid gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-ink">Custos do plantio (R$/ha)</p>
+            <p className="text-sm font-medium text-ink">
+              Custos da {TIPOS_OPERACAO_LABEL[campos.tipo].toLowerCase()} (R$)
+            </p>
             <button
               type="button"
               className="text-sm font-semibold text-accent hover:text-accent-strong"
               onClick={() =>
-                setCampos((atual) => ({ ...atual, itens: [...atual.itens, { nome: "", valor: "" }] }))
+                setCampos((atual) => ({ ...atual, itens: [...atual.itens, { nome: "", valor: "", unidade: "ha" }] }))
               }
             >
               + Adicionar item
@@ -268,7 +394,7 @@ export function ComparadorPlantioClient() {
                   className="field-input min-w-0 flex-1"
                   value={item.nome}
                   onChange={(e) => mudarItem(idx, { nome: e.target.value })}
-                  placeholder="Ex.: Mudas, Correção de solo, Calagem, Adubação, Gradagem…"
+                  placeholder="Descrição do custo (mudas, combustível, mão de obra…)"
                   maxLength={60}
                 />
                 <input
@@ -278,6 +404,14 @@ export function ComparadorPlantioClient() {
                   onChange={(e) => mudarItem(idx, { valor: e.target.value })}
                   placeholder="0,00"
                 />
+                <select
+                  className="field-input w-40"
+                  value={item.unidade}
+                  onChange={(e) => mudarItem(idx, { unidade: e.target.value as UnidadeCusto })}
+                >
+                  <option value="ha">por hectare</option>
+                  <option value="total">valor total</option>
+                </select>
                 <button
                   type="button"
                   className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
@@ -289,6 +423,10 @@ export function ComparadorPlantioClient() {
               </div>
             ))}
           </div>
+          <p className="text-xs text-ink-3">
+            Informe cada custo por hectare OU o total na área. Ex.: terreno R$ 20.000 (total) + mudas
+            R$ 2.500/ha + correção R$ 30.000 (total).
+          </p>
         </div>
 
         {/* Prévia */}
@@ -296,14 +434,14 @@ export function ComparadorPlantioClient() {
           <p className="eyebrow">Prévia — atualiza enquanto você digita</p>
           <div className="metric-grid grid-cols-2 lg:grid-cols-4">
             <CelulaMetrica rotulo="Lucro" valor={fmtMoney(previa.lucroHa)} legenda={`${fmtMoney(previa.lucro)} total`} destaque />
-            <CelulaMetrica rotulo="Custo plantio" valor={fmtMoney(previa.custoPlantioHa)} legenda="/ha, uma vez" />
-            <CelulaMetrica rotulo="Custo por corte" valor={fmtMoney(previa.custoHa)} legenda="/ha" />
+            <CelulaMetrica rotulo={`Custo da ${TIPOS_OPERACAO_LABEL[campos.tipo].toLowerCase()}`} valor={fmtMoney(previa.custoFocoHa)} legenda="/ha" />
+            <CelulaMetrica rotulo="Custo total" valor={fmtMoney(previa.custoHa)} legenda="/ha por corte" />
             <CelulaMetrica rotulo="Margem" valor={pct(previa.margem)} legenda={`equilíbrio ${t1(detalhe.produtividadeEquilibrio)} t/ha`} />
           </div>
           {detalhe.itens.length > 0 && (
             <p className="text-xs text-ink-3">
-              Maior custo do plantio: <strong>{detalhe.itens.sort((a, b) => b.valorHa - a.valorHa)[0].nome}</strong> (
-              {pct(Math.max(...detalhe.itens.map((i) => i.percentual)))} do total).
+              Maior custo: <strong>{detalhe.itens.sort((a, b) => b.porHa - a.porHa)[0].nome}</strong> (
+              {fmtMoney(detalhe.itens.sort((a, b) => b.porHa - a.porHa)[0].porHa)}/ha).
             </p>
           )}
         </div>
@@ -313,7 +451,7 @@ export function ComparadorPlantioClient() {
             <Plus className="size-4" aria-hidden="true" /> {editandoId ? "Salvar alterações" : "Adicionar à comparação"}
           </button>
           {!valido && (
-            <p className="text-sm text-ink-3">Informe nome, área, produtividade, preço e ao menos um custo de plantio.</p>
+            <p className="text-sm text-ink-3">Informe nome, área, produtividade, preço e ao menos um custo.</p>
           )}
         </div>
       </section>
@@ -333,10 +471,11 @@ export function ComparadorPlantioClient() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Quem planta</th>
+                  <th>Operação</th>
+                  <th>Quem faz</th>
                   <th>Protocolo</th>
                   <th className="num">t/ha</th>
-                  <th className="num">Custo plantio/ha</th>
+                  <th className="num">Custo op./ha</th>
                   <th className="num">Custo corte/ha</th>
                   <th className="num">Receita/ha</th>
                   <th className="num">Lucro/ha</th>
@@ -350,9 +489,11 @@ export function ComparadorPlantioClient() {
               <tbody>
                 {linhas.map(({ c, r }) => (
                   <tr key={c.id}>
-                    <td className="font-semibold text-ink">
+                    <td className="font-semibold text-ink">{TIPOS_OPERACAO_LABEL[c.tipo]}</td>
+                    <td className="text-ink-2">{modoLabel(c.tipo, c.modo)}</td>
+                    <td className="text-ink-2">
                       <span className="inline-flex items-center gap-2">
-                        {MODOS_EXECUCAO[c.modo]}
+                        {c.nome}
                         {c.id === melhor && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-strong">
                             <Trophy className="size-3" aria-hidden="true" /> Melhor
@@ -360,9 +501,8 @@ export function ComparadorPlantioClient() {
                         )}
                       </span>
                     </td>
-                    <td className="text-ink-2">{c.nome}</td>
                     <td className="num">{t1(c.produtividade)}</td>
-                    <td className="num">{fmtMoney(r.custoPlantioHa)}</td>
+                    <td className="num">{fmtMoney(r.custoFocoHa)}</td>
                     <td className="num">{fmtMoney(r.custoHa)}</td>
                     <td className="num">{fmtMoney(r.receitaHa)}</td>
                     <td className={`num font-bold ${r.lucroHa < 0 ? "text-danger-strong" : "text-accent-strong"}`}>{fmtMoney(r.lucroHa)}</td>
@@ -393,10 +533,10 @@ export function ComparadorPlantioClient() {
       {linhas.length > 0 && (
         <section aria-labelledby="titulo-det" className="grid gap-3">
           <h2 id="titulo-det" className="font-display text-lg text-ink">
-            Onde o dinheiro do plantio vai
+            Onde o dinheiro vai
           </h2>
           <p className="text-sm text-ink-2">
-            Composição do custo de plantio do melhor cenário (<strong>{linhas[0].c.nome}</strong>), por hectare.
+            Composição do custo da operação do melhor cenário (<strong>{linhas[0].c.nome}</strong>), por hectare.
           </p>
           <div className="table-wrap">
             <table className="data-table">
@@ -404,17 +544,17 @@ export function ComparadorPlantioClient() {
                 <tr>
                   <th>Item</th>
                   <th className="num">R$/ha</th>
-                  <th className="num">% do plantio</th>
+                  <th className="num">% da operação</th>
                 </tr>
               </thead>
               <tbody>
-                {detalhePlantio(linhas[0].c)
-                  .itens.filter((i) => i.valorHa > 0)
-                  .sort((a, b) => b.valorHa - a.valorHa)
+                {detalheOperacao(linhas[0].c)
+                  .itens.filter((i) => i.porHa > 0)
+                  .sort((a, b) => b.porHa - a.porHa)
                   .map((i) => (
                     <tr key={i.nome}>
                       <td className="text-ink">{i.nome}</td>
-                      <td className="num">{fmtMoney(i.valorHa)}</td>
+                      <td className="num">{fmtMoney(i.porHa)}</td>
                       <td className="num">{pct(i.percentual)}</td>
                     </tr>
                   ))}
