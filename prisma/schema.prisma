@@ -27,6 +27,8 @@ model User {
   tratos       Trato[]
   investimentos Investimento[]
   historicoPrecos HistoricoPreco[]
+  projecaoServicos ProjecaoServico[]
+  projecaoProtocolos ProjecaoProtocolo[]
 }
 
 model Account {
@@ -87,6 +89,8 @@ model Fazenda {
   plantios    Plantio[]
   tratos      Trato[]
   investimentos Investimento[]
+  projecaoServicos ProjecaoServico[]
+  projecaoProtocolos ProjecaoProtocolo[]
 
   @@index([userId, nome])
 }
@@ -275,7 +279,7 @@ model HistoricoPreco {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ano          Int
   mes          Int // 1-12
-  precoMedio   Float? // R$/t do mes — opcional: hoje o comparativo usa o ATR
+  precoMedio   Float? // R$/t do mes — opcional, hoje o comparativo usa o ATR
   atrPorTonelada Float? // kg ATR/t do mes
   precoKgAtr     Float? // R$/kg ATR anunciado pela usina no mes — e o valor que varia
   fonte        String?
@@ -284,4 +288,67 @@ model HistoricoPreco {
 
   @@unique([userId, ano, mes])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------
+// Módulo de Projeções e Comparações de Custos — dados independentes,
+// cadastrados só para análise. Não puxa financeiro nem caderno de campo.
+// ---------------------------------------------------------------
+
+enum TipoServicoAgricola {
+  plantio
+  adubacao
+  herbicida
+  defensivo
+  tratos_culturais
+  preparo_solo
+  cultivo
+  outro
+}
+
+/** Uma comparação de custo de serviço: execução própria vs terceirizada/usina. */
+model ProjecaoServico {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome        String
+  safra       String?
+  fazendaId   String?
+  fazenda     Fazenda? @relation(fields: [fazendaId], references: [id], onDelete: SetNull)
+  tipo        String   // "plantio" | "adubacao" | ... | "outro" (TipoServicoAgricola)
+  areaHa      Float?
+  // Execução: propria | terceirizada | usina
+  tipoExecucao String
+  // Itens de custo: [{ nome, valor, unidade: "ha" | "total" }]
+  custos      Json?
+  // Rentabilidade (opcional): produtividade t/ha e preço R$/t
+  produtividade Float?
+  precoMensal   Float?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([userId, safra])
+  @@index([fazendaId])
+}
+
+/** Um protocolo agrícola completo com rentabilidade (custo × receita × margem). */
+model ProjecaoProtocolo {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome        String
+  safra       String?
+  fazendaId   String?
+  fazenda     Fazenda? @relation(fields: [fazendaId], references: [id], onDelete: SetNull)
+  areaHa      Float
+  produtividade Float // t/ha resultante
+  precoMensal   Float  // R$/t
+  cortes      Int      // quantas safras o canavial produz
+  // Itens de custo do protocolo: [{ nome, valor, unidade: "ha" | "total" }]
+  custos      Json?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([userId, safra])
+  @@index([fazendaId])
 }
