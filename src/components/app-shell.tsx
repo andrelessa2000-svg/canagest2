@@ -59,7 +59,8 @@ const grupos: { titulo: string; itens: Item[] }[] = [
     titulo: "Ferramentas",
     itens: [
       { href: "/simulador/cenarios", rotulo: "Simulador de plantio", icone: SlidersHorizontal },
-      { href: "/simulador/atr", rotulo: "Comparativo de ATR", icone: TrendingUp },
+      { href: "/simulador/projecoes", rotulo: "Projeções de plantio", icone: TrendingUp },
+      { href: "/simulador/atr", rotulo: "Comparativo de ATR", icone: BarChart3 },
       { href: "/analise-talhoes", rotulo: "Análise por talhão", icone: Layers },
       { href: "/calculadoras", rotulo: "Calculadoras", icone: Calculator },
     ],
