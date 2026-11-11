@@ -287,17 +287,19 @@ function itensTalhaoAreaJson() {
 export const TIPOS_TRATO = [
   "adubacao",
   "herbicida",
-  "formicida",
   "insecticida",
+  "foliar",
+  "formicida",
   "cultivo",
   "soqueira",
   "outro",
 ] as const;
 export const TIPOS_TRATO_LABEL: Record<string, string> = {
-  adubacao: "Adubação",
+  adubacao: "Adubação / readubação",
   herbicida: "Herbicida",
-  formicida: "Formicida",
   insecticida: "Inseticida",
+  foliar: "Aplicação foliar",
+  formicida: "Formicida",
   cultivo: "Cultivo",
   soqueira: "Cortador de soqueira",
   outro: "Outro",
