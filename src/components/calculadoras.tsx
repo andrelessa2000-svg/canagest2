@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { fmtMoney, parseDecimal } from "@/lib/format";
+import { fmtMoney, haParaTarefas, parseDecimal } from "@/lib/format";
 import { Campo } from "./forms";
 
 const nf0 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -30,8 +30,11 @@ const paneles = [
   { id: "muda", rotulo: "Muda" },
 ];
 
-export function Calculadoras() {
+export type DonoOpcao = { id: string; nome: string; areaHa: number };
+
+export function Calculadoras({ donos }: { donos?: DonoOpcao[] }) {
   const [activo, setActivo] = useState("area");
+  const listaDonos = donos ?? [];
 
   return (
     <div className="grid gap-5">
@@ -71,7 +74,7 @@ export function Calculadoras() {
         )}
         {activo === "adubo" && (
           <div id="panel-adubo" role="tabpanel" aria-labelledby="tab-adubo" tabIndex={0}>
-            <AbaAdubo />
+            <AbaAdubo donos={listaDonos} />
           </div>
         )}
         {activo === "herbicida" && (
@@ -287,13 +290,19 @@ function AbaArea() {
 
 /* ---------------- Adubo ---------------- */
 
-function AbaAdubo() {
+function AbaAdubo({ donos }: { donos?: DonoOpcao[] }) {
   const [tipo, setTipo] = useState("soca");
-  const [tarefas, setTarefas] = useState("");
+  const [donoId, setDonoId] = useState("");
+  const [manual, setManual] = useState<string | null>(null);
   const [valorAdubo, setValorAdubo] = useState("");
 
+  const listaDonos = donos ?? [];
+  const dono = listaDonos.find((d) => d.id === donoId);
+  const areaAuto = dono ? Math.round(haParaTarefas(dono.areaHa) * 100) / 100 : 0;
+  const tarefasValor = manual !== null ? manual : areaAuto ? String(areaAuto).replace(".", ",") : "";
+
   const sacosTarefa = tipo === "planta" ? 4 : 3;
-  const sacos = num(tarefas) * sacosTarefa;
+  const sacos = num(tarefasValor) * sacosTarefa;
   const kg = sacos * 50;
   const ton = kg / 1000;
   const custo = ton * num(valorAdubo);
@@ -318,16 +327,48 @@ function AbaAdubo() {
             placeholder="Ex.: 2.500"
           />
         </Campo>
-        <Campo label="Área (tarefas)" htmlFor="tarefasAdubo">
+        {listaDonos.length > 0 && (
+          <Campo
+            label="Proprietário (dono)"
+            htmlFor="donoAdubo"
+            hint="Escolha o dono para somar a área das fazendas dele automaticamente."
+          >
+            <select
+              id="donoAdubo"
+              className="field-input"
+              value={donoId}
+              onChange={(e) => {
+                setDonoId(e.target.value);
+                setManual(null);
+              }}
+            >
+              <option value="">Sem dono (área manual)</option>
+              {listaDonos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nome}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        )}
+        <Campo label="Área (tarefas)" htmlFor="tarefasAdubo" hint="1 ha = 3,33 tarefas">
           <input
             id="tarefasAdubo"
             className="field-input tnum"
             inputMode="decimal"
-            value={tarefas}
-            onChange={(e) => setTarefas(e.target.value)}
+            value={tarefasValor}
+            onChange={(e) => setManual(e.target.value)}
+            placeholder={dono ? "Digite para ajustar" : "Ex.: 33,3"}
           />
         </Campo>
       </div>
+      {dono && (
+        <p className="text-xs text-ink-3">
+          {dono.nome}: {dono.areaHa > 0
+            ? `${String(areaAuto).replace(".", ",")} tarefas de área cadastrada — ajuste acima se precisar.`
+            : "sem talhões cadastrados — digite a área."}
+        </p>
+      )}
       <dl className="mt-2 divide-y divide-line rounded-[10px] border border-line bg-surface px-4">
         {linha("Sacos de 50 kg", `${nf0.format(sacos)}`)}
         {linha("Quilogramos", `${nf0.format(kg)} kg`)}

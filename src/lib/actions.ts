@@ -17,6 +17,7 @@ import {
   historicoPrecoSchema,
   plantioSchema,
   primeiraMensagem,
+  proprietarioSchema,
   talhaoSchema,
   tratoSchema,
   usinaSchema,
@@ -51,6 +52,7 @@ export async function criarFazenda(
   const parsed = fazendaSchema.safeParse({
     nome: campo(formData, "nome"),
     ativa: campo(formData, "ativa"),
+    proprietarioId: campo(formData, "proprietarioId"),
   });
 
   if (!parsed.success) {
@@ -63,6 +65,7 @@ export async function criarFazenda(
         userId: await usuarioId(),
         nome: parsed.data.nome,
         ativa: parsed.data.ativa,
+        proprietarioId: parsed.data.proprietarioId,
       },
     });
   } catch (e) {
@@ -83,6 +86,7 @@ export async function atualizarFazenda(
   const parsed = fazendaSchema.safeParse({
     nome: campo(formData, "nome"),
     ativa: campo(formData, "ativa"),
+    proprietarioId: campo(formData, "proprietarioId"),
   });
 
   if (!parsed.success) {
@@ -95,6 +99,7 @@ export async function atualizarFazenda(
       data: {
         nome: parsed.data.nome,
         ativa: parsed.data.ativa,
+        proprietarioId: parsed.data.proprietarioId,
       },
     });
   } catch (e) {
@@ -118,6 +123,67 @@ export async function excluirFazenda(id: string): Promise<void> {
   revalidatePath("/");
   revalidatePath("/fazendas");
   redirect("/fazendas");
+}
+
+export async function criarProprietario(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = proprietarioSchema.safeParse({ nome: campo(formData, "nome") });
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  try {
+    await prisma.proprietario.create({
+      data: { userId: await usuarioId(), nome: parsed.data.nome },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/proprietarios");
+  revalidatePath("/fazendas");
+  return { ok: true };
+}
+
+export async function atualizarProprietario(
+  id: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = proprietarioSchema.safeParse({ nome: campo(formData, "nome") });
+
+  if (!parsed.success) {
+    return { ok: false, error: primeiraMensagem(parsed.error) };
+  }
+
+  try {
+    await prisma.proprietario.update({
+      where: { id, userId: await usuarioId() },
+      data: { nome: parsed.data.nome },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/proprietarios");
+  revalidatePath("/fazendas");
+  return { ok: true };
+}
+
+export async function excluirProprietario(id: string): Promise<void> {
+  try {
+    await prisma.proprietario.delete({ where: { id, userId: await usuarioId() } });
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+  revalidatePath("/proprietarios");
+  revalidatePath("/fazendas");
 }
 
 export async function criarTalhao(

@@ -3,8 +3,17 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { FazendaForm } from "@/components/fazenda-form";
 import { criarFazenda } from "@/lib/actions";
+import { prisma } from "@/lib/db";
+import { userIdAtual } from "@/lib/auth";
 
-export default function NovaFazendaPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NovaFazendaPage() {
+  const proprietarios = await prisma.proprietario.findMany({
+    where: { userId: await userIdAtual() },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
   return (
     <>
       <Link
@@ -19,7 +28,7 @@ export default function NovaFazendaPage() {
         descricao="Informe os dados básicos da propriedade."
       />
       <div className="mx-auto max-w-xl rounded-[10px] border border-line bg-surface p-5 sm:p-8">
-        <FazendaForm acao={criarFazenda} />
+        <FazendaForm acao={criarFazenda} proprietarios={proprietarios} />
       </div>
     </>
   );

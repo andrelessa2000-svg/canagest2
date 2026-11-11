@@ -29,6 +29,7 @@ model User {
   historicoPrecos HistoricoPreco[]
   projecaoServicos ProjecaoServico[]
   projecaoProtocolos ProjecaoProtocolo[]
+  proprietarios Proprietario[]
 }
 
 model Account {
@@ -76,12 +77,25 @@ model PasswordResetToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Proprietario {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome      String
+  criadaEm  DateTime  @default(now())
+  fazendas  Fazenda[]
+
+  @@unique([userId, nome])
+}
+
 model Fazenda {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   nome        String
   ativa       Boolean   @default(true)
+  proprietarioId String?
+  proprietario   Proprietario? @relation(fields: [proprietarioId], references: [id], onDelete: SetNull)
   criadaEm    DateTime  @default(now())
   atualizadaEm DateTime @updatedAt
   talhoes     Talhao[]
@@ -93,6 +107,7 @@ model Fazenda {
   projecaoProtocolos ProjecaoProtocolo[]
 
   @@index([userId, nome])
+  @@index([proprietarioId])
 }
 
 model Talhao {

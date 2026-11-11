@@ -43,9 +43,18 @@ export function tipoLabel(tipo: string): string {
   return TIPOS_COLHEITA[tipo as TipoColheita] ?? tipo;
 }
 
+export const proprietarioSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome do proprietário").max(80),
+});
+
 export const fazendaSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome da fazenda").max(80),
   ativa: ligaField(),
+  proprietarioId: z
+    .union([z.literal(""), z.string().trim().min(1)])
+    .transform((v) => (v === "" ? null : v))
+    .pipe(z.string().cuid().nullable())
+    .catch(null),
 });
 
 export const talhaoSchema = z

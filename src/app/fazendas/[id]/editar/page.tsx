@@ -20,6 +20,12 @@ export default async function EditarFazendaPage({
   });
   if (!fazenda) notFound();
 
+  const proprietarios = await prisma.proprietario.findMany({
+    where: { userId: await userIdAtual() },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
+
   return (
     <>
       <Link
@@ -39,7 +45,9 @@ export default async function EditarFazendaPage({
           inicial={{
             nome: fazenda.nome,
             ativa: fazenda.ativa,
+            proprietarioId: fazenda.proprietarioId,
           }}
+          proprietarios={proprietarios}
         />
       </div>
     </>

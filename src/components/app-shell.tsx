@@ -16,6 +16,7 @@ import {
   Sprout,
   Tractor,
   TrendingUp,
+  UserRound,
   Wallet,
   X,
   type LucideIcon,
@@ -36,6 +37,7 @@ const grupos: { titulo: string; itens: Item[] }[] = [
   {
     titulo: "Cadastro",
     itens: [
+      { href: "/proprietarios", rotulo: "Proprietários", icone: UserRound },
       { href: "/fazendas", rotulo: "Fazendas", icone: Sprout },
       { href: "/usinas", rotulo: "Usinas", icone: Factory },
     ],

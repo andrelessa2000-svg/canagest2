@@ -26,7 +26,10 @@ export default async function FazendasPage({
 
   const fazendas = await prisma.fazenda.findMany({
     where,
-    include: { talhoes: { select: { id: true, areaHa: true } } },
+    include: {
+      talhoes: { select: { id: true, areaHa: true } },
+      proprietario: { select: { nome: true } },
+    },
     orderBy: { nome: "asc" },
   });
 
@@ -96,6 +99,12 @@ export default async function FazendasPage({
                   principal={f.nome}
                   secundario={
                     <>
+                      {f.proprietario && (
+                        <>
+                          <span className="font-medium text-ink-2">{f.proprietario.nome}</span>
+                          <span aria-hidden>·</span>
+                        </>
+                      )}
                       <span>
                         {f.talhoes.length}
                         {f.talhoes.length === 1 ? " talhão" : " talhões"}

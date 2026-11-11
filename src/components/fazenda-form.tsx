@@ -7,12 +7,15 @@ import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 export function FazendaForm({
   acao,
   inicial,
+  proprietarios,
 }: {
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
-  inicial?: { nome: string; ativa?: boolean };
+  inicial?: { nome: string; ativa?: boolean; proprietarioId?: string | null };
+  proprietarios?: { id: string; nome: string }[];
 }) {
   const [state, acaoForm] = useActionState(acao, undefined);
   const [ativa, setAtiva] = useState(inicial?.ativa ?? true);
+  const donos = proprietarios ?? [];
 
   return (
     <form action={acaoForm} className="grid gap-5 pb-4">
@@ -34,6 +37,28 @@ export function FazendaForm({
           placeholder="Ex.: Fazenda Boa Vista"
         />
       </Campo>
+
+      {donos.length > 0 && (
+        <Campo
+          label="Proprietário (dono)"
+          htmlFor="proprietarioId"
+          hint="Gerente de várias fazendas de donos diferentes? Indique de quem é esta fazenda para calcular área e insumos por dono."
+        >
+          <select
+            id="proprietarioId"
+            name="proprietarioId"
+            className="field-input"
+            defaultValue={inicial?.proprietarioId ?? ""}
+          >
+            <option value="">Sem dono informado</option>
+            {donos.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        </Campo>
+      )}
 
       <div>
         <p className="field-label">Estado</p>
