@@ -92,7 +92,7 @@ export function Calculadoras() {
 /* ---------------- Área ---------------- */
 
 const BRAZA_M = 2.2;
-const TAREFA_M2 = 625 * BRAZA_M * BRAZA_M; // 3.025 m²
+const TAREFA_M2 = 3000; // 1 ha = 3,33 tarefas → tarefa = 3.000 m² (regra da fazenda)
 const TAREFA_BRACAS_CORRIDAS = 1250;
 const HA_M2 = 10000;
 const METROS_POR_BRAZA_CORRIDA = 2;
@@ -252,7 +252,7 @@ function AbaArea() {
             </Campo>
           </>
         ) : (
-          <Campo label="Valor" htmlFor="valorArea" hint={tipo === "tarefas" ? "1 tarefa = 3.025 m²" : undefined}>
+          <Campo label="Valor" htmlFor="valorArea" hint={tipo === "tarefas" ? "1 tarefa = 3.000 m² · 1 ha = 3,33 tarefas" : undefined}>
             <input
               id="valorArea"
               className="field-input tnum"

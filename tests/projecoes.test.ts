@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { tarefasParaHa } from "../src/lib/format";
 import {
   calcularAdubo,
   calcularProtocolo,
   calcularServico,
   custoAdubo,
   custoPorHa,
+  quantidadePorRendimento,
   quantidadeProduto,
   rankearProtocolos,
   type ItemCusto,
@@ -164,4 +166,23 @@ test("custo do adubo = toneladas × valor da tonelada", () => {
 test("quantidade de produto = dose por ha × área", () => {
   assert.ok(Math.abs(quantidadeProduto(2.5, 20) - 50) < 1e-9);
   assert.equal(quantidadeProduto(-1, 20), 0);
+});
+
+test("calda: 10 tarefas e rende 1 tarefa por litro = 10 L", () => {
+  const r = quantidadePorRendimento("tarefa-L", 1, 10);
+  assert.equal(r.unidade, "L");
+  assert.ok(Math.abs(r.quantidade - 10) < 1e-9);
+});
+
+test("calda: área em tarefas convertida para ha e rendimento em ha", () => {
+  const rende = tarefasParaHa(10); // 10 tarefas ≈ 3,025 ha → 1 L
+  const r = quantidadePorRendimento("ha-L", rende, 10);
+  assert.equal(r.unidade, "L");
+  assert.ok(Math.abs(r.quantidade - 1) < 1e-9);
+});
+
+test("calda em kg: rende 0,5 ha por kg, 20 tarefas ≈ 12,10 kg", () => {
+  const r = quantidadePorRendimento("ha-kg", 0.5, 20);
+  assert.equal(r.unidade, "kg");
+  assert.ok(Math.abs(r.quantidade - tarefasParaHa(20) / 0.5) < 1e-9);
 });

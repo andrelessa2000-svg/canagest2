@@ -12,6 +12,7 @@
  */
 
 import { SACOS_ADUBO_POR_TAREFA } from "./colheita";
+import { TAREFAS_POR_HA } from "./format";
 
 export type UnidadeCusto = "ha" | "total";
 
@@ -69,6 +70,26 @@ export function custoAdubo(tarefas: number, ciclo: CicloAdubo, precoTonelada: nu
 /** Quantidade de produto (L ou kg) para a área: dose por ha × área em ha. */
 export function quantidadeProduto(dosePorHa: number, areaHa: number): number {
   return Math.max(dosePorHa, 0) * Math.max(areaHa, 0);
+}
+
+/** Como o rendimento do produto é informado: área coberta por litro/quilo. */
+export type ModoProduto = "ha-L" | "ha-kg" | "tarefa-L" | "tarefa-kg";
+
+/**
+ * Quantidade de produto a comprar a partir do rendimento informado
+ * (quantos ha ou tarefas um litro/quilo cobre) e da área em tarefas.
+ */
+export function quantidadePorRendimento(
+  modo: ModoProduto,
+  rende: number, // ha ou tarefas cobertos por 1 L/kg
+  areaTarefas: number,
+): { unidade: "L" | "kg"; quantidade: number } {
+  const unidade: "L" | "kg" = modo.endsWith("L") ? "L" : "kg";
+  const area =
+    modo.startsWith("ha")
+      ? Math.max(areaTarefas, 0) / TAREFAS_POR_HA
+      : Math.max(areaTarefas, 0);
+  return { unidade, quantidade: rende > 0 ? area / rende : 0 };
 }
 
 /* ============================================================

@@ -71,8 +71,8 @@ test("sem nenhum talhão cadastrado o resultado é vazio (sem dividir por zero)"
 });
 
 test("areaColhida é gravada em TAREFAS e deve virar hectares", () => {
-  const ha = areaColhidaHa({ areaColhida: 33.058 }, "f1", talhoes);
-  assert.ok(Math.abs(ha - 10) < 1e-6);
+  const ha = areaColhidaHa({ areaColhida: 33.3333 }, "f1", talhoes);
+  assert.ok(Math.abs(ha - 10) < 1e-3);
 });
 
 test("área colhida cai para talhoesColhidos e depois para a fazenda toda", () => {
@@ -81,7 +81,7 @@ test("área colhida cai para talhoesColhidos e depois para a fazenda toda", () =
 });
 
 test("área de plantio/trato: tarefas, areaHa, fazenda inteira ou talhões", () => {
-  assert.ok(Math.abs(areaRegistroHa({ tarefas: 33.058 }, "f1", talhoes) - 10) < 1e-6);
+  assert.ok(Math.abs(areaRegistroHa({ tarefas: 33.3333 }, "f1", talhoes) - 10) < 1e-3);
   assert.equal(areaRegistroHa({ areaHa: 7 }, "f1", talhoes), 7);
   assert.equal(areaRegistroHa({ escopo: "fazenda" }, "f1", talhoes), 60);
   assert.equal(areaRegistroHa({ escopo: "talhao", talhoesIds: ["a", "c"] }, "f1", talhoes), 30);

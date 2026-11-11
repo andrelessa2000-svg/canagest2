@@ -8,7 +8,7 @@ import {
   calcularProtocolo,
   calcularServico,
   custoAdubo,
-  quantidadeProduto,
+  quantidadePorRendimento,
   rankearProtocolos,
   TIPOS_EXECUCAO_LABEL,
   TIPOS_SERVICO_LABEL,
@@ -28,14 +28,14 @@ import {
   excluirProjecaoServico,
   type ActionState,
 } from "@/lib/actions-projecoes";
-import { fmtMoney, parseDecimal, tarefasParaHa } from "@/lib/format";
+import { fmtMoney, haParaTarefas, parseDecimal } from "@/lib/format";
 import { Abas } from "./abas";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { ConfirmDelete } from "./confirm-delete";
 import { CelulaMetrica } from "./stat-cells";
 import { CampoSafra } from "./campo-safra";
 
-type Fazenda = { id: string; nome: string };
+type Fazenda = { id: string; nome: string; areaHa: number };
 
 export type ServicoRow = ServicoComparacao & {
   id: string;
@@ -61,10 +61,75 @@ const fmtN = (v: number, dec = 2) => v.toFixed(dec).replace(".", ",");
 
 type AdicionarCusto = (nome: string, valor: number) => void;
 
-/** Adubo: sacos de 50 kg por tarefa (planta 4, soca 3) → toneladas → custo pela tonelada. */
-function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
-  const [ciclo, setCiclo] = useState<CicloAdubo>("planta");
+type ModoProduto = "ha-L" | "ha-kg" | "tarefa-L" | "tarefa-kg";
+
+const MODO_PRODUTO_LABEL: Record<ModoProduto, string> = {
+  "ha-L": "ha por litro",
+  "ha-kg": "ha por quilo",
+  "tarefa-L": "tarefas por litro",
+  "tarefa-kg": "tarefas por quilo",
+};
+
+/** Fazenda + área em tarefas: ao escolher a fazenda, preenche a área pela soma dos talhões. */
+function AreaFazenda({
+  fazendas,
+  idPrefix,
+  fazendaId,
+  onFazenda,
+  tarefas,
+  onTarefas,
+}: {
+  fazendas: Fazenda[];
+  idPrefix: string;
+  fazendaId: string;
+  onFazenda: (id: string) => void;
+  tarefas: string;
+  onTarefas: (v: string) => void;
+}) {
+  return (
+    <>
+      <Campo label="Fazenda" htmlFor={`${idPrefix}-fazenda`}>
+        <select
+          id={`${idPrefix}-fazenda`}
+          className="field-input"
+          value={fazendaId}
+          onChange={(e) => {
+            const id = e.target.value;
+            onFazenda(id);
+            const f = fazendas.find((x) => x.id === id);
+            if (f) {
+              const tarefasF = Math.round(haParaTarefas(f.areaHa) * 100) / 100;
+              onTarefas(numStr(tarefasF));
+            }
+          }}
+        >
+          <option value="">— escolher e digitar a área —</option>
+          {fazendas.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.nome} ({fmtN(haParaTarefas(f.areaHa), 1)} tarefas)
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo label="Área (tarefas)" htmlFor={`${idPrefix}-tarefas`} hint="Preenchida pela fazenda; pode ajustar">
+        <input
+          id={`${idPrefix}-tarefas`}
+          className="field-input tnum"
+          inputMode="decimal"
+          value={tarefas}
+          onChange={(e) => onTarefas(e.target.value)}
+          placeholder="Ex.: 10"
+        />
+      </Campo>
+    </>
+  );
+}
+
+/** Adubação: um único produto (adubo N-P-K), em sacos de 50 kg por tarefa. */
+function CalcAdubo({ fazendas, onAdicionar }: { fazendas: Fazenda[]; onAdicionar: AdicionarCusto }) {
+  const [fazendaId, setFazendaId] = useState("");
   const [tarefas, setTarefas] = useState("");
+  const [ciclo, setCiclo] = useState<CicloAdubo>("planta");
   const [precoT, setPrecoT] = useState("");
 
   const t = Number(parseDecimal(tarefas)) || 0;
@@ -76,10 +141,22 @@ function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
   return (
     <details className="rounded-[10px] border border-line bg-surface-muted p-4">
       <summary className="cursor-pointer select-none text-sm font-semibold text-ink">
-        Calculadora de adubo (por tarefa)
+        Calculadora de adubação (adubo N-P-K)
       </summary>
       <div className="mt-3 grid gap-3">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <p className="text-xs text-ink-3">
+          A adubação usa um único produto: o adubo N-P-K. Escolha a fazenda e a área vem dos talhões
+          cadastrados.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AreaFazenda
+            fazendas={fazendas}
+            idPrefix="calc-adubo"
+            fazendaId={fazendaId}
+            onFazenda={setFazendaId}
+            tarefas={tarefas}
+            onTarefas={setTarefas}
+          />
           <Campo label="Tipo de cana" htmlFor="calc-adubo-ciclo">
             <select
               id="calc-adubo-ciclo"
@@ -87,21 +164,11 @@ function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
               value={ciclo}
               onChange={(e) => setCiclo(e.target.value as CicloAdubo)}
             >
-              <option value="planta">Cana planta — 4 sacos/tarefa</option>
-              <option value="soca">Cana soca — 3 sacos/tarefa</option>
+              <option value="planta">Cana planta — 4 sacos de 50 kg/tarefa</option>
+              <option value="soca">Cana soca — 3 sacos de 50 kg/tarefa</option>
             </select>
           </Campo>
-          <Campo label="Área (tarefas)" htmlFor="calc-adubo-tarefas">
-            <input
-              id="calc-adubo-tarefas"
-              className="field-input tnum"
-              inputMode="decimal"
-              value={tarefas}
-              onChange={(e) => setTarefas(e.target.value)}
-              placeholder="Ex.: 6,67"
-            />
-          </Campo>
-          <Campo label="Valor da tonelada (R$)" htmlFor="calc-adubo-preco">
+          <Campo label="Valor da tonelada de adubo (R$)" htmlFor="calc-adubo-preco">
             <input
               id="calc-adubo-preco"
               className="field-input tnum"
@@ -122,11 +189,7 @@ function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
             <dd className="font-semibold tnum text-ink">{fmtN(a.toneladas, 3)} t</dd>
           </div>
           <div className="flex items-center justify-between py-2 text-sm">
-            <dt className="text-ink-2">Área equivalente</dt>
-            <dd className="tnum text-ink-2">{t > 0 ? `${fmtN(tarefasParaHa(t))} ha` : "—"}</dd>
-          </div>
-          <div className="flex items-center justify-between py-2 text-sm">
-            <dt className="text-ink-2">Custo do adubo</dt>
+            <dt className="text-ink-2">Valor a pagar</dt>
             <dd className="font-bold tnum text-accent-strong">{fmtMoney(total)}</dd>
           </div>
         </dl>
@@ -136,7 +199,7 @@ function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
             disabled={!valido}
             className="text-sm font-semibold text-accent hover:text-accent-strong disabled:cursor-not-allowed disabled:text-ink-3"
             onClick={() =>
-              onAdicionar(`Adubo ${fmtN(a.toneladas, 2)} t (${fmtN(a.sacos, 1)} sacos)`, total)
+              onAdicionar(`Adubo N-P-K ${fmtN(a.toneladas, 2)} t (${fmtN(a.sacos, 1)} sacos)`, total)
             }
           >
             + Adicionar adubo como custo
@@ -150,98 +213,159 @@ function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
   );
 }
 
-/** Aplicação de produto (herbicida, inseticida, foliar…): dose por ha × área × preço do produto. */
-function CalcProduto({ onAdicionar, areaHa }: { onAdicionar: AdicionarCusto; areaHa: number }) {
-  const [unidade, setUnidade] = useState<"L" | "kg">("L");
-  const [dose, setDose] = useState("");
-  const [preco, setPreco] = useState("");
+type ProdutoCalda = { nome: string; modo: ModoProduto; rende: string; preco: string };
 
-  const d = Number(parseDecimal(dose)) || 0;
-  const p = Number(parseDecimal(preco)) || 0;
-  const quant = quantidadeProduto(d, areaHa);
-  const total = quant * p;
-  const valido = d > 0 && p > 0 && areaHa > 0;
+/** Calda (mistura de produtos): herbicida, inseticida, fungicida, adubo foliar… */
+function CalcProduto({ fazendas, onAdicionar }: { fazendas: Fazenda[]; onAdicionar: AdicionarCusto }) {
+  const [fazendaId, setFazendaId] = useState("");
+  const [tarefas, setTarefas] = useState("");
+  const [produtos, setProdutos] = useState<ProdutoCalda[]>([
+    { nome: "", modo: "tarefa-L", rende: "", preco: "" },
+  ]);
+
+  const t = Number(parseDecimal(tarefas)) || 0;
+
+  function calcRow(r: ProdutoCalda) {
+    const rende = Number(parseDecimal(r.rende)) || 0;
+    const preco = Number(parseDecimal(r.preco)) || 0;
+    const { unidade, quantidade } = quantidadePorRendimento(r.modo, rende, t);
+    const custo = quantidade * preco;
+    const valido = r.nome.trim() !== "" && rende > 0 && preco > 0 && t > 0;
+    return { unidade, quantidade, custo, valido };
+  }
+
+  const linhas = produtos.map((r) => ({ r, c: calcRow(r) }));
+  const totalCalda = linhas.reduce((s, x) => s + x.c.custo, 0);
+  const algumValido = linhas.some((x) => x.c.valido);
+
+  function mudar(idx: number, patch: Partial<ProdutoCalda>) {
+    setProdutos((atual) => atual.map((r, k) => (k === idx ? { ...r, ...patch } : r)));
+  }
+
+  function adicionarCalda() {
+    for (const x of linhas) {
+      if (!x.c.valido) continue;
+      const areaRotulo = x.r.modo.startsWith("ha") ? "ha" : "tarefas";
+      const rende = Number(parseDecimal(x.r.rende)) || 0;
+      onAdicionar(
+        `${x.r.nome.trim()} ${fmtN(x.c.quantidade, 1)} ${x.c.unidade} (${fmtN(rende, 2)} ${areaRotulo}/${x.c.unidade})`,
+        x.c.custo,
+      );
+    }
+  }
 
   return (
     <details className="rounded-[10px] border border-line bg-surface-muted p-4">
       <summary className="cursor-pointer select-none text-sm font-semibold text-ink">
-        Calculadora de aplicação de produto
+        Calculadora de calda (herbicida, inseticida, foliar…)
       </summary>
       <div className="mt-3 grid gap-3">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Campo label="Dose por hectare" htmlFor="calc-prod-dose">
+        <p className="text-xs text-ink-3">
+          A calda é a mistura de vários produtos. Para cada um, informe quantos hectares (ou tarefas) um
+          litro/quilo cobre e o valor do litro/quilo.
+        </p>
+        <AreaFazenda
+          fazendas={fazendas}
+          idPrefix="calc-prod"
+          fazendaId={fazendaId}
+          onFazenda={setFazendaId}
+          tarefas={tarefas}
+          onTarefas={setTarefas}
+        />
+        {produtos.map((r, idx) => (
+          <div key={idx} className="flex flex-wrap items-center gap-2">
             <input
-              id="calc-prod-dose"
-              className="field-input tnum"
-              inputMode="decimal"
-              value={dose}
-              onChange={(e) => setDose(e.target.value)}
-              placeholder="Ex.: 2,5"
+              className="field-input min-w-0 flex-1"
+              value={r.nome}
+              onChange={(e) => mudar(idx, { nome: e.target.value })}
+              placeholder="Nome do produto (ex.: herbicida X)"
+              maxLength={60}
             />
-          </Campo>
-          <Campo label="Unidade" htmlFor="calc-prod-un">
             <select
-              id="calc-prod-un"
-              className="field-input"
-              value={unidade}
-              onChange={(e) => setUnidade(e.target.value as "L" | "kg")}
+              className="field-input w-40"
+              value={r.modo}
+              onChange={(e) => mudar(idx, { modo: e.target.value as ModoProduto })}
             >
-              <option value="L">Litros (L/ha)</option>
-              <option value="kg">Quilos (kg/ha)</option>
+              {Object.entries(MODO_PRODUTO_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
             </select>
-          </Campo>
-          <Campo label={`Preço do produto (R$/${unidade})`} htmlFor="calc-prod-preco">
             <input
-              id="calc-prod-preco"
-              className="field-input tnum"
+              className="field-input tnum w-24"
               inputMode="decimal"
-              value={preco}
-              onChange={(e) => setPreco(e.target.value)}
-              placeholder="Ex.: 45,90"
+              value={r.rende}
+              onChange={(e) => mudar(idx, { rende: e.target.value })}
+              placeholder="Rende"
             />
-          </Campo>
+            <input
+              className="field-input tnum w-28"
+              inputMode="decimal"
+              value={r.preco}
+              onChange={(e) => mudar(idx, { preco: e.target.value })}
+              placeholder="0,00"
+            />
+            <button
+              type="button"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-danger-strong/25 hover:bg-danger-soft hover:text-danger-strong"
+              onClick={() => setProdutos((a) => a.filter((_, k) => k !== idx))}
+              aria-label="Remover produto da calda"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+        ))}
+        <div>
+          <button
+            type="button"
+            className="text-sm font-semibold text-accent hover:text-accent-strong"
+            onClick={() => setProdutos((a) => [...a, { nome: "", modo: "tarefa-L", rende: "", preco: "" }])}
+          >
+            + Adicionar produto na calda
+          </button>
         </div>
         <dl className="divide-y divide-line rounded-[10px] border border-line bg-surface px-4">
           <div className="flex items-center justify-between py-2 text-sm">
-            <dt className="text-ink-2">Área usada (do formulário)</dt>
-            <dd className="tnum text-ink">{areaHa > 0 ? `${fmtN(areaHa)} ha` : "informe acima"}</dd>
+            <dt className="text-ink-2">Área da aplicação</dt>
+            <dd className="tnum text-ink">{t > 0 ? `${fmtN(t, 1)} tarefas` : "escolha a fazenda"}</dd>
           </div>
+          {linhas.map(({ r, c }, k) =>
+            c.quantidade > 0 ? (
+              <div key={k} className="flex items-center justify-between py-2 text-sm">
+                <dt className="text-ink-2">{r.nome.trim() || "Produto"} a comprar</dt>
+                <dd className="font-semibold tnum text-ink">
+                  {fmtN(c.quantidade, 1)} {c.unidade}
+                </dd>
+              </div>
+            ) : null,
+          )}
           <div className="flex items-center justify-between py-2 text-sm">
-            <dt className="text-ink-2">Produto necessário</dt>
-            <dd className="font-semibold tnum text-ink">{fmtN(quant)} {unidade}</dd>
-          </div>
-          <div className="flex items-center justify-between py-2 text-sm">
-            <dt className="text-ink-2">Custo do produto</dt>
-            <dd className="font-bold tnum text-accent-strong">{fmtMoney(total)}</dd>
+            <dt className="text-ink-2">Valor a pagar (calda)</dt>
+            <dd className="font-bold tnum text-accent-strong">{fmtMoney(totalCalda)}</dd>
           </div>
         </dl>
         <div>
           <button
             type="button"
-            disabled={!valido}
+            disabled={!algumValido}
             className="text-sm font-semibold text-accent hover:text-accent-strong disabled:cursor-not-allowed disabled:text-ink-3"
-            onClick={() =>
-              onAdicionar(`Produto ${fmtN(quant, 1)} ${unidade} (${fmtN(d, 2)} ${unidade}/ha)`, total)
-            }
+            onClick={adicionarCalda}
           >
-            + Adicionar produto como custo
+            + Adicionar produtos da calda como custos
           </button>
-          <p className="mt-1 text-xs text-ink-3">
-            Vale para herbicida, inseticida, fungicida, aplicação foliar e outros produtos em L ou kg por
-            hectare.
-          </p>
         </div>
       </div>
     </details>
   );
 }
 
-/** As duas calculadoras, lado a lado; cada uma adiciona um item na lista de custos. */
-function CalculadorasInsumo({ onAdicionar, areaHa }: { onAdicionar: AdicionarCusto; areaHa: number }) {
+/** As duas calculadoras, lado a lado; cada uma adiciona itens na lista de custos. */
+function CalculadorasInsumo({ fazendas, onAdicionar }: { fazendas: Fazenda[]; onAdicionar: AdicionarCusto }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <CalcAdubo onAdicionar={onAdicionar} />
-      <CalcProduto onAdicionar={onAdicionar} areaHa={areaHa} />
+      <CalcAdubo fazendas={fazendas} onAdicionar={onAdicionar} />
+      <CalcProduto fazendas={fazendas} onAdicionar={onAdicionar} />
     </div>
   );
 }
@@ -430,10 +554,10 @@ function FormServico({
 
       {/* Calculadoras de insumo */}
       <CalculadorasInsumo
+        fazendas={fazendas}
         onAdicionar={(nome, valor) =>
           setItens((a) => [...a, { nome, valor: numStr(Math.round(valor * 100) / 100), unidade: "total" }])
         }
-        areaHa={Number(parseDecimal(area)) || 0}
       />
 
       {/* Prévia */}
@@ -699,10 +823,10 @@ function FormProtocolo({
 
       {/* Calculadoras de insumo */}
       <CalculadorasInsumo
+        fazendas={fazendas}
         onAdicionar={(nome, valor) =>
           setItens((a) => [...a, { nome, valor: numStr(Math.round(valor * 100) / 100), unidade: "total" }])
         }
-        areaHa={Number(parseDecimal(area)) || 0}
       />
 
       {/* Prévia */}

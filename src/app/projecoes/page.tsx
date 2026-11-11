@@ -22,7 +22,7 @@ export default async function ProjecoesPage() {
   const [fazendas, servicosRaw, protocolosRaw] = await Promise.all([
     prisma.fazenda.findMany({
       where: { userId },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
       orderBy: { nome: "asc" },
     }),
     prisma.projecaoServico.findMany({
@@ -80,7 +80,15 @@ export default async function ProjecoesPage() {
         titulo="Projeções e comparações de custos"
         descricao="Planeje safras futuras: compare serviços agrícolas (execução própria vs terceirizada/usina) e descubra qual protocolo tem a maior rentabilidade. Dados independentes — nada é puxado do financeiro nem do caderno de campo."
       />
-      <ProjecoesClient fazendas={fazendas} servicos={servicos} protocolos={protocolos} />
+      <ProjecoesClient
+        fazendas={fazendas.map((f) => ({
+          id: f.id,
+          nome: f.nome,
+          areaHa: f.talhoes.reduce((s, t) => s + t.areaHa, 0),
+        }))}
+        servicos={servicos}
+        protocolos={protocolos}
+      />
     </>
   );
 }

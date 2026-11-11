@@ -16,8 +16,8 @@ export function parseDecimal(input: string): number {
   return Number(t);
 }
 
-// 1 tarefa = 3.025 m² -> 10.000 m² / 3.025 = 3,3058 tarefas por hectare
-export const TAREFAS_POR_HA = 3.3058;
+// 1 ha = 3,33 tarefas (tarefa = 3.000 m²) — regra usada nas contas da fazenda
+export const TAREFAS_POR_HA = 10 / 3;
 
 export const UNIDADES_AREA = ["ha", "tarefas"] as const;
 export type UnidadeArea = (typeof UNIDADES_AREA)[number];
