@@ -1,9 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  calcularAdubo,
   calcularProtocolo,
   calcularServico,
+  custoAdubo,
   custoPorHa,
+  quantidadeProduto,
   rankearProtocolos,
   type ItemCusto,
 } from "../src/lib/projecoes";
@@ -134,4 +137,31 @@ test("sem itens não divide por zero", () => {
   assert.equal(r.custoPlantioHa, 0);
   assert.equal(Number.isFinite(r.margem), true);
   assert.equal(Number.isFinite(r.roi), true);
+});
+
+/* ---------- Insumos ---------- */
+
+test("adubo cana planta: 5 tarefas × 4 sacos de 50 kg = 1 t", () => {
+  const a = calcularAdubo(5, "planta");
+  assert.equal(a.sacosPorTarefa, 4);
+  assert.ok(Math.abs(a.sacos - 20) < 1e-9);
+  assert.ok(Math.abs(a.kg - 1000) < 1e-9);
+  assert.ok(Math.abs(a.toneladas - 1) < 1e-9);
+});
+
+test("adubo cana soca: 6,67 tarefas × 3 sacos ≈ 1 t", () => {
+  const a = calcularAdubo(6.67, "soca");
+  assert.equal(a.sacosPorTarefa, 3);
+  assert.ok(Math.abs(a.sacos - 20.01) < 1e-9);
+  assert.ok(Math.abs(a.toneladas - 1.0005) < 1e-9);
+});
+
+test("custo do adubo = toneladas × valor da tonelada", () => {
+  const c = custoAdubo(5, "planta", 2500);
+  assert.ok(Math.abs(c - 2500) < 1e-9);
+});
+
+test("quantidade de produto = dose por ha × área", () => {
+  assert.ok(Math.abs(quantidadeProduto(2.5, 20) - 50) < 1e-9);
+  assert.equal(quantidadeProduto(-1, 20), 0);
 });

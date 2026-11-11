@@ -4,11 +4,15 @@ import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { Info, Pencil, Trash2 } from "lucide-react";
 import {
+  calcularAdubo,
   calcularProtocolo,
   calcularServico,
+  custoAdubo,
+  quantidadeProduto,
   rankearProtocolos,
   TIPOS_EXECUCAO_LABEL,
   TIPOS_SERVICO_LABEL,
+  type CicloAdubo,
   type ItemCusto,
   type ProtocoloProj,
   type ServicoComparacao,
@@ -24,7 +28,7 @@ import {
   excluirProjecaoServico,
   type ActionState,
 } from "@/lib/actions-projecoes";
-import { fmtMoney, parseDecimal } from "@/lib/format";
+import { fmtMoney, parseDecimal, tarefasParaHa } from "@/lib/format";
 import { Abas } from "./abas";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { ConfirmDelete } from "./confirm-delete";
@@ -50,6 +54,197 @@ export type ProtocoloRow = ProtocoloProj & {
 
 const numStr = (v: number | null | undefined) =>
   v == null ? "" : String(v).replace(".", ",");
+
+const fmtN = (v: number, dec = 2) => v.toFixed(dec).replace(".", ",");
+
+/* ---------- Calculadoras de insumo ---------- */
+
+type AdicionarCusto = (nome: string, valor: number) => void;
+
+/** Adubo: sacos de 50 kg por tarefa (planta 4, soca 3) → toneladas → custo pela tonelada. */
+function CalcAdubo({ onAdicionar }: { onAdicionar: AdicionarCusto }) {
+  const [ciclo, setCiclo] = useState<CicloAdubo>("planta");
+  const [tarefas, setTarefas] = useState("");
+  const [precoT, setPrecoT] = useState("");
+
+  const t = Number(parseDecimal(tarefas)) || 0;
+  const preco = Number(parseDecimal(precoT)) || 0;
+  const a = calcularAdubo(t, ciclo);
+  const total = custoAdubo(t, ciclo, preco);
+  const valido = t > 0 && preco > 0;
+
+  return (
+    <details className="rounded-[10px] border border-line bg-surface-muted p-4">
+      <summary className="cursor-pointer select-none text-sm font-semibold text-ink">
+        Calculadora de adubo (por tarefa)
+      </summary>
+      <div className="mt-3 grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Campo label="Tipo de cana" htmlFor="calc-adubo-ciclo">
+            <select
+              id="calc-adubo-ciclo"
+              className="field-input"
+              value={ciclo}
+              onChange={(e) => setCiclo(e.target.value as CicloAdubo)}
+            >
+              <option value="planta">Cana planta — 4 sacos/tarefa</option>
+              <option value="soca">Cana soca — 3 sacos/tarefa</option>
+            </select>
+          </Campo>
+          <Campo label="Área (tarefas)" htmlFor="calc-adubo-tarefas">
+            <input
+              id="calc-adubo-tarefas"
+              className="field-input tnum"
+              inputMode="decimal"
+              value={tarefas}
+              onChange={(e) => setTarefas(e.target.value)}
+              placeholder="Ex.: 6,67"
+            />
+          </Campo>
+          <Campo label="Valor da tonelada (R$)" htmlFor="calc-adubo-preco">
+            <input
+              id="calc-adubo-preco"
+              className="field-input tnum"
+              inputMode="decimal"
+              value={precoT}
+              onChange={(e) => setPrecoT(e.target.value)}
+              placeholder="Ex.: 2.500"
+            />
+          </Campo>
+        </div>
+        <dl className="divide-y divide-line rounded-[10px] border border-line bg-surface px-4">
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Sacos de 50 kg</dt>
+            <dd className="font-semibold tnum text-ink">{fmtN(a.sacos)}</dd>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Toneladas a comprar</dt>
+            <dd className="font-semibold tnum text-ink">{fmtN(a.toneladas, 3)} t</dd>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Área equivalente</dt>
+            <dd className="tnum text-ink-2">{t > 0 ? `${fmtN(tarefasParaHa(t))} ha` : "—"}</dd>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Custo do adubo</dt>
+            <dd className="font-bold tnum text-accent-strong">{fmtMoney(total)}</dd>
+          </div>
+        </dl>
+        <div>
+          <button
+            type="button"
+            disabled={!valido}
+            className="text-sm font-semibold text-accent hover:text-accent-strong disabled:cursor-not-allowed disabled:text-ink-3"
+            onClick={() =>
+              onAdicionar(`Adubo ${fmtN(a.toneladas, 2)} t (${fmtN(a.sacos, 1)} sacos)`, total)
+            }
+          >
+            + Adicionar adubo como custo
+          </button>
+          <p className="mt-1 text-xs text-ink-3">
+            Regra da casa: cana planta 5 tarefas = 1 t; cana soca 6,67 tarefas = 1 t.
+          </p>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+/** Aplicação de produto (herbicida, inseticida, foliar…): dose por ha × área × preço do produto. */
+function CalcProduto({ onAdicionar, areaHa }: { onAdicionar: AdicionarCusto; areaHa: number }) {
+  const [unidade, setUnidade] = useState<"L" | "kg">("L");
+  const [dose, setDose] = useState("");
+  const [preco, setPreco] = useState("");
+
+  const d = Number(parseDecimal(dose)) || 0;
+  const p = Number(parseDecimal(preco)) || 0;
+  const quant = quantidadeProduto(d, areaHa);
+  const total = quant * p;
+  const valido = d > 0 && p > 0 && areaHa > 0;
+
+  return (
+    <details className="rounded-[10px] border border-line bg-surface-muted p-4">
+      <summary className="cursor-pointer select-none text-sm font-semibold text-ink">
+        Calculadora de aplicação de produto
+      </summary>
+      <div className="mt-3 grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Campo label="Dose por hectare" htmlFor="calc-prod-dose">
+            <input
+              id="calc-prod-dose"
+              className="field-input tnum"
+              inputMode="decimal"
+              value={dose}
+              onChange={(e) => setDose(e.target.value)}
+              placeholder="Ex.: 2,5"
+            />
+          </Campo>
+          <Campo label="Unidade" htmlFor="calc-prod-un">
+            <select
+              id="calc-prod-un"
+              className="field-input"
+              value={unidade}
+              onChange={(e) => setUnidade(e.target.value as "L" | "kg")}
+            >
+              <option value="L">Litros (L/ha)</option>
+              <option value="kg">Quilos (kg/ha)</option>
+            </select>
+          </Campo>
+          <Campo label={`Preço do produto (R$/${unidade})`} htmlFor="calc-prod-preco">
+            <input
+              id="calc-prod-preco"
+              className="field-input tnum"
+              inputMode="decimal"
+              value={preco}
+              onChange={(e) => setPreco(e.target.value)}
+              placeholder="Ex.: 45,90"
+            />
+          </Campo>
+        </div>
+        <dl className="divide-y divide-line rounded-[10px] border border-line bg-surface px-4">
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Área usada (do formulário)</dt>
+            <dd className="tnum text-ink">{areaHa > 0 ? `${fmtN(areaHa)} ha` : "informe acima"}</dd>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Produto necessário</dt>
+            <dd className="font-semibold tnum text-ink">{fmtN(quant)} {unidade}</dd>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <dt className="text-ink-2">Custo do produto</dt>
+            <dd className="font-bold tnum text-accent-strong">{fmtMoney(total)}</dd>
+          </div>
+        </dl>
+        <div>
+          <button
+            type="button"
+            disabled={!valido}
+            className="text-sm font-semibold text-accent hover:text-accent-strong disabled:cursor-not-allowed disabled:text-ink-3"
+            onClick={() =>
+              onAdicionar(`Produto ${fmtN(quant, 1)} ${unidade} (${fmtN(d, 2)} ${unidade}/ha)`, total)
+            }
+          >
+            + Adicionar produto como custo
+          </button>
+          <p className="mt-1 text-xs text-ink-3">
+            Vale para herbicida, inseticida, fungicida, aplicação foliar e outros produtos em L ou kg por
+            hectare.
+          </p>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+/** As duas calculadoras, lado a lado; cada uma adiciona um item na lista de custos. */
+function CalculadorasInsumo({ onAdicionar, areaHa }: { onAdicionar: AdicionarCusto; areaHa: number }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      <CalcAdubo onAdicionar={onAdicionar} />
+      <CalcProduto onAdicionar={onAdicionar} areaHa={areaHa} />
+    </div>
+  );
+}
 
 /* ---------- Serviço ---------- */
 
@@ -142,6 +337,10 @@ function FormServico({
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-ink-3">
+            Principais tratos culturais: adubação e herbicida. Cortador de soqueira, controle de praga e
+            aplicação foliar têm tipos próprios; o que não couber, use Outro.
+          </p>
         </Campo>
         <Campo label="Quem executa" htmlFor="srv-execucao">
           <select
@@ -228,6 +427,14 @@ function FormServico({
         ))}
         <input type="hidden" name="custos" value={JSON.stringify(custos)} />
       </div>
+
+      {/* Calculadoras de insumo */}
+      <CalculadorasInsumo
+        onAdicionar={(nome, valor) =>
+          setItens((a) => [...a, { nome, valor: numStr(Math.round(valor * 100) / 100), unidade: "total" }])
+        }
+        areaHa={Number(parseDecimal(area)) || 0}
+      />
 
       {/* Prévia */}
       <div className="metric-grid grid-cols-2 lg:grid-cols-4">
@@ -489,6 +696,14 @@ function FormProtocolo({
         ))}
         <input type="hidden" name="custos" value={JSON.stringify(custos)} />
       </div>
+
+      {/* Calculadoras de insumo */}
+      <CalculadorasInsumo
+        onAdicionar={(nome, valor) =>
+          setItens((a) => [...a, { nome, valor: numStr(Math.round(valor * 100) / 100), unidade: "total" }])
+        }
+        areaHa={Number(parseDecimal(area)) || 0}
+      />
 
       {/* Prévia */}
       <div aria-live="polite" className="grid gap-3">

@@ -4,12 +4,14 @@
  * Módulo puro (sem banco, sem React), testável isoladamente.
  *
  * Duas análises independentes:
- *  1. Custo de servirÇO agrícola (execução própria vs terceirizada/usina).
+ *  1. Custo de serviço agrícola (execução própria vs terceirizada/usina).
  *  2. Rentabilidade de protocolo agrícola (custo × produtividade × preço).
  *
  * Itens de custo: cada um pode ser por hectare ("ha") ou valor total ("total"),
  * convertido pela área. Nada aqui toca no financeiro nem no caderno de campo.
  */
+
+import { SACOS_ADUBO_POR_TAREFA } from "./colheita";
 
 export type UnidadeCusto = "ha" | "total";
 
@@ -35,6 +37,41 @@ export function custoPorHa(itens: ItemCusto[], areaHa: number): number {
 }
 
 /* ============================================================
+   Insumos: adubo (por tarefa) e aplicação de produto (dose/ha)
+   ============================================================ */
+
+export type CicloAdubo = "planta" | "soca";
+
+export type ResultadoAdubo = {
+  sacosPorTarefa: number;
+  sacos: number;
+  kg: number;
+  toneladas: number;
+};
+
+/**
+ * Quantidade de adubo para a área em tarefas.
+ * Regra da casa (mesma da colheita): cana planta 4 sacos de 50 kg por tarefa
+ * (5 tarefas = 1 t); cana soca 3 sacos por tarefa (6,67 tarefas ≈ 1 t).
+ */
+export function calcularAdubo(tarefas: number, ciclo: CicloAdubo): ResultadoAdubo {
+  const sacosPorTarefa = SACOS_ADUBO_POR_TAREFA[ciclo];
+  const sacos = Math.max(tarefas, 0) * sacosPorTarefa;
+  const kg = sacos * 50;
+  return { sacosPorTarefa, sacos, kg, toneladas: kg / 1000 };
+}
+
+/** Custo do adubo: toneladas necessárias × valor da tonelada. */
+export function custoAdubo(tarefas: number, ciclo: CicloAdubo, precoTonelada: number): number {
+  return calcularAdubo(tarefas, ciclo).toneladas * Math.max(precoTonelada, 0);
+}
+
+/** Quantidade de produto (L ou kg) para a área: dose por ha × área em ha. */
+export function quantidadeProduto(dosePorHa: number, areaHa: number): number {
+  return Math.max(dosePorHa, 0) * Math.max(areaHa, 0);
+}
+
+/* ============================================================
    1. Comparação de custo de serviço agrícola
    ============================================================ */
 
@@ -50,13 +87,13 @@ export type TipoServicoProj =
 
 export const TIPOS_SERVICO_LABEL: Record<TipoServicoProj, string> = {
   plantio: "Plantio",
-  adubacao: "Adubação",
+  adubacao: "Adubação / readubação",
   herbicida: "Herbicida",
-  defensivo: "Defensivo",
-  "tratos-culturais": "Tratos culturais",
+  defensivo: "Inseticida / fungicida (praga e doença)",
+  "tratos-culturais": "Cortador de soqueira e outros tratos",
   "preparo-solo": "Preparo do solo",
   cultivo: "Cultivo",
-  outro: "Outro",
+  outro: "Outro (ex.: aplicação foliar)",
 };
 
 export type TipoExecucao = "propria" | "terceirizada" | "usina";
