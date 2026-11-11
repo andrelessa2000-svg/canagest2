@@ -159,9 +159,9 @@ export function calcularProtocolo(p: ProtocoloProj): ResultadoProtocolo {
 }
 
 /** Ordena protocolos pelo maior lucro/ha — primeiro é o de maior rentabilidade. */
-export function rankearProtocolos(
-  protocolos: ProtocoloProj[],
-): { p: ProtocoloProj; r: ResultadoProtocolo }[] {
+export function rankearProtocolos<T extends ProtocoloProj>(
+  protocolos: T[],
+): { p: T; r: ResultadoProtocolo }[] {
   return protocolos
     .map((p) => ({ p, r: calcularProtocolo(p) }))
     .sort((a, b) => b.r.lucroHa - a.r.lucroHa);

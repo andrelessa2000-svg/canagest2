@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
-import { Info, Trash2 } from "lucide-react";
+import { Info, Pencil, Trash2 } from "lucide-react";
 import {
   calcularProtocolo,
   calcularServico,
@@ -16,6 +16,8 @@ import {
   type TipoServicoProj,
 } from "@/lib/projecoes";
 import {
+  atualizarProjecaoProtocolo,
+  atualizarProjecaoServico,
   criarProjecaoProtocolo,
   criarProjecaoServico,
   excluirProjecaoProtocolo,
@@ -31,18 +33,60 @@ import { CampoSafra } from "./campo-safra";
 
 type Fazenda = { id: string; nome: string };
 
+export type ServicoRow = ServicoComparacao & {
+  id: string;
+  safra: string | null;
+  fazendaId: string | null;
+  tipoExecucao: TipoExecucao;
+  criadoEm: Date;
+};
+
+export type ProtocoloRow = ProtocoloProj & {
+  id: string;
+  safra: string | null;
+  fazendaId: string | null;
+  criadoEm: Date;
+};
+
+const numStr = (v: number | null | undefined) =>
+  v == null ? "" : String(v).replace(".", ",");
+
 /* ---------- Serviço ---------- */
 
-function FormServico({ fazendas }: { fazendas: Fazenda[] }) {
-  const [state, acaoForm] = useActionState<ActionState | undefined, FormData>(criarProjecaoServico, undefined);
-  const [tipo, setTipo] = useState<TipoServicoProj>("plantio");
-  const [execucao, setExecucao] = useState<TipoExecucao>("propria");
-  const [itens, setItens] = useState<{ nome: string; valor: string; unidade: "ha" | "total" }[]>([
-    { nome: "", valor: "", unidade: "ha" },
-  ]);
-  const [area, setArea] = useState("");
-  const [prod, setProd] = useState("");
-  const [preco, setPreco] = useState("");
+function FormServico({
+  fazendas,
+  inicial,
+  onConcluir,
+  onCancelar,
+}: {
+  fazendas: Fazenda[];
+  inicial?: ServicoRow;
+  onConcluir?: () => void;
+  onCancelar?: () => void;
+}) {
+  const [state, acaoForm] = useActionState<ActionState | undefined, FormData>(
+    (prev, fd) => (inicial ? atualizarProjecaoServico(prev, fd) : criarProjecaoServico(prev, fd)),
+    undefined,
+  );
+  const [tipo, setTipo] = useState<TipoServicoProj>((inicial?.tipo as TipoServicoProj) ?? "plantio");
+  const [execucao, setExecucao] = useState<TipoExecucao>(inicial?.tipoExecucao ?? "propria");
+  const [itens, setItens] = useState<{ nome: string; valor: string; unidade: "ha" | "total" }[]>(
+    inicial
+      ? inicial.custos.map((c) => ({
+          nome: c.nome,
+          valor: numStr(c.valor),
+          unidade: c.unidade,
+        }))
+      : [{ nome: "", valor: "", unidade: "ha" }],
+  );
+  const [area, setArea] = useState(numStr(inicial?.areaHa));
+  const [prod, setProd] = useState(numStr(inicial?.produtividade));
+  const [preco, setPreco] = useState(numStr(inicial?.preco));
+
+  // Ao salvar com sucesso em modo edição, volta para o modo de cadastro
+  useEffect(() => {
+    if (state?.ok) onConcluir?.();
+  }, [state, onConcluir]);
 
   function mudarItem(idx: number, patch: Partial<{ nome: string; valor: string; unidade: "ha" | "total" }>) {
     setItens((atual) => atual.map((i, k) => (k === idx ? { ...i, ...patch } : i)));
@@ -66,11 +110,22 @@ function FormServico({ fazendas }: { fazendas: Fazenda[] }) {
   return (
     <form action={acaoForm} className="grid gap-5">
       <AlertaFormulario mensagem={state && !state.ok ? state.error : undefined} />
+      {state?.ok && state.mensagem && (
+        <p className="rounded-md border border-accent/30 bg-accent-soft px-3 py-2 text-sm font-medium text-accent-strong">
+          {state.mensagem}
+        </p>
+      )}
+      {inicial && (
+        <p className="text-sm font-medium text-accent">
+          Editando: {inicial.nome} — as alterações substituem os dados salvos.
+        </p>
+      )}
+      {inicial && <input type="hidden" name="id" value={inicial.id} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Campo label="Nome da comparação" htmlFor="srv-nome">
-            <input id="srv-nome" name="nome" className="field-input" placeholder="Ex.: Plantio da safra 2027" maxLength={80} required />
+            <input id="srv-nome" name="nome" className="field-input" defaultValue={inicial?.nome ?? ""} placeholder="Ex.: Plantio da safra 2027" maxLength={80} required />
           </Campo>
         </div>
         <Campo label="Tipo de serviço" htmlFor="srv-tipo">
@@ -103,9 +158,9 @@ function FormServico({ fazendas }: { fazendas: Fazenda[] }) {
             ))}
           </select>
         </Campo>
-        <CampoSafra defaultValue="" usadas={[]} id="srv-safra" />
+        <CampoSafra defaultValue={inicial?.safra ?? ""} usadas={[]} id="srv-safra" />
         <Campo label="Fazenda (opcional)" htmlFor="srv-fazenda">
-          <select id="srv-fazenda" name="fazendaId" className="field-input" defaultValue="">
+          <select id="srv-fazenda" name="fazendaId" className="field-input" defaultValue={inicial?.fazendaId ?? ""}>
             <option value="">Todas / sem fazenda</option>
             {fazendas.map((f) => (
               <option key={f.id} value={f.id}>
@@ -186,8 +241,17 @@ function FormServico({ fazendas }: { fazendas: Fazenda[] }) {
         )}
       </div>
 
-      <div className="flex justify-end">
-        <BotaoSubmit>Salvar comparação de serviço</BotaoSubmit>
+      <div className="flex justify-end gap-2">
+        {inicial && onCancelar && (
+          <button
+            type="button"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:bg-surface-muted"
+            onClick={onCancelar}
+          >
+            Cancelar
+          </button>
+        )}
+        <BotaoSubmit>{inicial ? "Salvar alterações" : "Salvar comparação de serviço"}</BotaoSubmit>
       </div>
     </form>
   );
@@ -196,9 +260,11 @@ function FormServico({ fazendas }: { fazendas: Fazenda[] }) {
 function ListaServicos({
   servicos,
   idFazenda,
+  onEditar,
 }: {
-  servicos: (ServicoComparacao & { id: string; safra: string | null; fazendaId: string | null; tipoExecucao: TipoExecucao; criadoEm: Date })[];
+  servicos: ServicoRow[];
   idFazenda: (id: string) => string;
+  onEditar: (s: ServicoRow) => void;
 }) {
   return (
     <div className="grid gap-3">
@@ -247,6 +313,14 @@ function ListaServicos({
                     )}
                     <td>
                       <div className="flex justify-end">
+                        <button
+                          type="button"
+                          className="mr-1 inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-accent/25 hover:bg-accent-soft hover:text-accent-strong"
+                          onClick={() => onEditar(s)}
+                          aria-label="Editar comparação"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
                         <ConfirmDelete
                           action={excluirProjecaoServico.bind(null, s.id)}
                           titulo="Excluir comparação?"
@@ -270,15 +344,39 @@ function ListaServicos({
 
 /* ---------- Protocolo ---------- */
 
-function FormProtocolo({ fazendas }: { fazendas: Fazenda[] }) {
-  const [state, acaoForm] = useActionState<ActionState | undefined, FormData>(criarProjecaoProtocolo, undefined);
-  const [itens, setItens] = useState<{ nome: string; valor: string; unidade: "ha" | "total" }[]>([
-    { nome: "", valor: "", unidade: "ha" },
-  ]);
-  const [area, setArea] = useState("");
-  const [prod, setProd] = useState("");
-  const [preco, setPreco] = useState("");
-  const [cortes, setCortes] = useState("5");
+function FormProtocolo({
+  fazendas,
+  inicial,
+  onConcluir,
+  onCancelar,
+}: {
+  fazendas: Fazenda[];
+  inicial?: ProtocoloRow;
+  onConcluir?: () => void;
+  onCancelar?: () => void;
+}) {
+  const [state, acaoForm] = useActionState<ActionState | undefined, FormData>(
+    (prev, fd) => (inicial ? atualizarProjecaoProtocolo(prev, fd) : criarProjecaoProtocolo(prev, fd)),
+    undefined,
+  );
+  const [itens, setItens] = useState<{ nome: string; valor: string; unidade: "ha" | "total" }[]>(
+    inicial
+      ? inicial.custos.map((c) => ({
+          nome: c.nome,
+          valor: numStr(c.valor),
+          unidade: c.unidade,
+        }))
+      : [{ nome: "", valor: "", unidade: "ha" }],
+  );
+  const [area, setArea] = useState(numStr(inicial?.areaHa));
+  const [prod, setProd] = useState(numStr(inicial?.produtividade));
+  const [preco, setPreco] = useState(numStr(inicial?.preco));
+  const [cortes, setCortes] = useState(inicial ? String(inicial.cortes) : "5");
+
+  // Ao salvar com sucesso em modo edição, volta para o modo de cadastro
+  useEffect(() => {
+    if (state?.ok) onConcluir?.();
+  }, [state, onConcluir]);
 
   function mudarItem(idx: number, patch: Partial<{ nome: string; valor: string; unidade: "ha" | "total" }>) {
     setItens((atual) => atual.map((i, k) => (k === idx ? { ...i, ...patch } : i)));
@@ -300,16 +398,27 @@ function FormProtocolo({ fazendas }: { fazendas: Fazenda[] }) {
   return (
     <form action={acaoForm} className="grid gap-5">
       <AlertaFormulario mensagem={state && !state.ok ? state.error : undefined} />
+      {state?.ok && state.mensagem && (
+        <p className="rounded-md border border-accent/30 bg-accent-soft px-3 py-2 text-sm font-medium text-accent-strong">
+          {state.mensagem}
+        </p>
+      )}
+      {inicial && (
+        <p className="text-sm font-medium text-accent">
+          Editando: {inicial.nome} — as alterações substituem os dados salvos.
+        </p>
+      )}
+      {inicial && <input type="hidden" name="id" value={inicial.id} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Campo label="Nome do protocolo" htmlFor="ptc-nome">
-            <input id="ptc-nome" name="nome" className="field-input" placeholder="Ex.: Protocolo caro vs simples" maxLength={80} required />
+            <input id="ptc-nome" name="nome" className="field-input" defaultValue={inicial?.nome ?? ""} placeholder="Ex.: Protocolo caro vs simples" maxLength={80} required />
           </Campo>
         </div>
-        <CampoSafra defaultValue="" usadas={[]} id="ptc-safra" />
+        <CampoSafra defaultValue={inicial?.safra ?? ""} usadas={[]} id="ptc-safra" />
         <Campo label="Fazenda (opcional)" htmlFor="ptc-fazenda">
-          <select id="ptc-fazenda" name="fazendaId" className="field-input" defaultValue="">
+          <select id="ptc-fazenda" name="fazendaId" className="field-input" defaultValue={inicial?.fazendaId ?? ""}>
             <option value="">Todas / sem fazenda</option>
             {fazendas.map((f) => (
               <option key={f.id} value={f.id}>
@@ -392,8 +501,17 @@ function FormProtocolo({ fazendas }: { fazendas: Fazenda[] }) {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <BotaoSubmit>Salvar protocolo</BotaoSubmit>
+      <div className="flex justify-end gap-2">
+        {inicial && onCancelar && (
+          <button
+            type="button"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:bg-surface-muted"
+            onClick={onCancelar}
+          >
+            Cancelar
+          </button>
+        )}
+        <BotaoSubmit>{inicial ? "Salvar alterações" : "Salvar protocolo"}</BotaoSubmit>
       </div>
     </form>
   );
@@ -402,9 +520,11 @@ function FormProtocolo({ fazendas }: { fazendas: Fazenda[] }) {
 function ListaProtocolos({
   protocolos,
   idFazenda,
+  onEditar,
 }: {
-  protocolos: (ProtocoloProj & { id: string; safra: string | null; fazendaId: string | null; criadoEm: Date })[];
+  protocolos: ProtocoloRow[];
   idFazenda: (id: string) => string;
+  onEditar: (p: ProtocoloRow) => void;
 }) {
   const rank = rankearProtocolos(protocolos);
   const melhor = rank.length > 0 ? rank[0].p.id : null;
@@ -459,6 +579,14 @@ function ListaProtocolos({
                   <td className="num">{r.roi.toFixed(0).replace(".", ",")}%</td>
                   <td>
                     <div className="flex justify-end">
+                      <button
+                        type="button"
+                        className="mr-1 inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-ink-3 transition-colors hover:border-accent/25 hover:bg-accent-soft hover:text-accent-strong"
+                        onClick={() => onEditar(p)}
+                        aria-label="Editar protocolo"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
                       <ConfirmDelete
                         action={excluirProjecaoProtocolo.bind(null, p.id)}
                         titulo="Excluir protocolo?"
@@ -487,10 +615,27 @@ export function ProjecoesClient({
   protocolos,
 }: {
   fazendas: Fazenda[];
-  servicos: (ServicoComparacao & { id: string; safra: string | null; fazendaId: string | null; tipoExecucao: TipoExecucao; criadoEm: Date })[];
-  protocolos: (ProtocoloProj & { id: string; safra: string | null; fazendaId: string | null; criadoEm: Date })[];
+  servicos: ServicoRow[];
+  protocolos: ProtocoloRow[];
 }) {
   const idFazenda = (id: string) => fazendas.find((f) => f.id === id)?.nome ?? "—";
+
+  const [editServico, setEditServico] = useState<ServicoRow | null>(null);
+  const [editProtocolo, setEditProtocolo] = useState<ProtocoloRow | null>(null);
+
+  function editarServico(s: ServicoRow) {
+    setEditServico(s);
+    requestAnimationFrame(() =>
+      document.getElementById("form-servico")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
+
+  function editarProtocolo(p: ProtocoloRow) {
+    setEditProtocolo(p);
+    requestAnimationFrame(() =>
+      document.getElementById("form-protocolo")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -511,7 +656,7 @@ export function ProjecoesClient({
             rotulo: "Comparação de serviços",
             conteudo: (
               <div className="grid gap-6">
-                <section className="card grid gap-5 p-4 sm:p-6">
+                <section id="form-servico" className="card grid gap-5 p-4 sm:p-6">
                   <div>
                     <h2 className="font-display text-lg text-ink">Comparar custo de um serviço</h2>
                     <p className="text-sm text-ink-2">
@@ -519,9 +664,15 @@ export function ProjecoesClient({
                       usina) e compare. Cada custo pode ser por hectare ou valor total.
                     </p>
                   </div>
-                  <FormServico fazendas={fazendas} />
+                  <FormServico
+                    key={editServico?.id ?? "novo"}
+                    fazendas={fazendas}
+                    inicial={editServico ?? undefined}
+                    onConcluir={() => setEditServico(null)}
+                    onCancelar={() => setEditServico(null)}
+                  />
                 </section>
-                <ListaServicos servicos={servicos} idFazenda={idFazenda} />
+                <ListaServicos servicos={servicos} idFazenda={idFazenda} onEditar={editarServico} />
               </div>
             ),
           },
@@ -530,7 +681,7 @@ export function ProjecoesClient({
             rotulo: "Rentabilidade de protocolos",
             conteudo: (
               <div className="grid gap-6">
-                <section className="card grid gap-5 p-4 sm:p-6">
+                <section id="form-protocolo" className="card grid gap-5 p-4 sm:p-6">
                   <div>
                     <h2 className="font-display text-lg text-ink">Comparar rentabilidade de protocolos</h2>
                     <p className="text-sm text-ink-2">
@@ -538,9 +689,15 @@ export function ProjecoesClient({
                       margem não necessariamente acompanha. Cadastre dois ou mais e veja o melhor.
                     </p>
                   </div>
-                  <FormProtocolo fazendas={fazendas} />
+                  <FormProtocolo
+                    key={editProtocolo?.id ?? "novo"}
+                    fazendas={fazendas}
+                    inicial={editProtocolo ?? undefined}
+                    onConcluir={() => setEditProtocolo(null)}
+                    onCancelar={() => setEditProtocolo(null)}
+                  />
                 </section>
-                <ListaProtocolos protocolos={protocolos} idFazenda={idFazenda} />
+                <ListaProtocolos protocolos={protocolos} idFazenda={idFazenda} onEditar={editarProtocolo} />
               </div>
             ),
           },

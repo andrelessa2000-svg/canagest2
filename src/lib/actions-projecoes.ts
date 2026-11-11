@@ -39,11 +39,8 @@ function dadosServico(d: ProjecaoServicoInput) {
   };
 }
 
-export async function criarProjecaoServico(
-  prev: ActionState | undefined,
-  formData: FormData,
-): Promise<ActionState> {
-  const parsed = projecaoServicoSchema.safeParse({
+function parseServico(formData: FormData) {
+  return projecaoServicoSchema.safeParse({
     nome: campo(formData, "nome"),
     safra: campo(formData, "safra"),
     fazendaId: campo(formData, "fazendaId"),
@@ -54,7 +51,13 @@ export async function criarProjecaoServico(
     preco: campo(formData, "preco"),
     custos: campo(formData, "custos"),
   });
+}
 
+export async function criarProjecaoServico(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = parseServico(formData);
   if (!parsed.success) return { ok: false, error: primeiraMensagem(parsed.error) };
 
   try {
@@ -68,6 +71,30 @@ export async function criarProjecaoServico(
 
   revalidatePath("/projecoes");
   return { ok: true, mensagem: "Comparação de serviço salva." };
+}
+
+export async function atualizarProjecaoServico(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = campo(formData, "id");
+  if (!id) return { ok: false, error: "Registro não encontrado." };
+
+  const parsed = parseServico(formData);
+  if (!parsed.success) return { ok: false, error: primeiraMensagem(parsed.error) };
+
+  try {
+    await prisma.projecaoServico.update({
+      where: { id, userId: await userIdAtual() },
+      data: dadosServico(parsed.data),
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/projecoes");
+  return { ok: true, mensagem: "Comparação de serviço atualizada." };
 }
 
 export async function excluirProjecaoServico(id: string): Promise<ActionState> {
@@ -95,11 +122,8 @@ function dadosProtocolo(d: ProjecaoProtocoloInput) {
   };
 }
 
-export async function criarProjecaoProtocolo(
-  prev: ActionState | undefined,
-  formData: FormData,
-): Promise<ActionState> {
-  const parsed = projecaoProtocoloSchema.safeParse({
+function parseProtocolo(formData: FormData) {
+  return projecaoProtocoloSchema.safeParse({
     nome: campo(formData, "nome"),
     safra: campo(formData, "safra"),
     fazendaId: campo(formData, "fazendaId"),
@@ -109,7 +133,13 @@ export async function criarProjecaoProtocolo(
     cortes: campo(formData, "cortes"),
     custos: campo(formData, "custos"),
   });
+}
 
+export async function criarProjecaoProtocolo(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = parseProtocolo(formData);
   if (!parsed.success) return { ok: false, error: primeiraMensagem(parsed.error) };
 
   try {
@@ -123,6 +153,30 @@ export async function criarProjecaoProtocolo(
 
   revalidatePath("/projecoes");
   return { ok: true, mensagem: "Protocolo salvo." };
+}
+
+export async function atualizarProjecaoProtocolo(
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = campo(formData, "id");
+  if (!id) return { ok: false, error: "Registro não encontrado." };
+
+  const parsed = parseProtocolo(formData);
+  if (!parsed.success) return { ok: false, error: primeiraMensagem(parsed.error) };
+
+  try {
+    await prisma.projecaoProtocolo.update({
+      where: { id, userId: await userIdAtual() },
+      data: dadosProtocolo(parsed.data),
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/projecoes");
+  return { ok: true, mensagem: "Protocolo atualizado." };
 }
 
 export async function excluirProjecaoProtocolo(id: string): Promise<ActionState> {
