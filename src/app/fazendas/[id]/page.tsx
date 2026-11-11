@@ -12,10 +12,11 @@ import {
   fmtTons,
 } from "@/lib/format";
 import { tipoLabel } from "@/lib/validators";
-import { excluirFazenda } from "@/lib/actions";
+import { definirProprietario, excluirFazenda } from "@/lib/actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { SelecionarDono } from "@/components/selecionar-dono";
 import { CelulaMetrica, GradeMetricas, LinhaLink } from "@/components/stat-cells";
 import { userIdAtual } from "@/lib/auth";
 
@@ -29,7 +30,7 @@ export default async function FazendaPage({
   const { id } = await params;
   const userId = await userIdAtual();
 
-  const [fazenda, colheitas, resumen] = await Promise.all([
+  const [fazenda, colheitas, resumen, donos] = await Promise.all([
     prisma.fazenda.findUnique({
       where: { id, userId },
       include: {
@@ -48,6 +49,11 @@ export default async function FazendaPage({
       where: { userId, fazendaId: id },
       _sum: { toneladas: true },
       _count: true,
+    }),
+    prisma.proprietario.findMany({
+      where: { userId },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
     }),
   ]);
 
@@ -120,6 +126,23 @@ export default async function FazendaPage({
           legenda="média colhida"
         />
       </GradeMetricas>
+
+      {donos.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-line bg-surface px-4 py-3">
+          <p className="text-sm font-medium text-ink">Proprietário (dono)</p>
+          <SelecionarDono
+            fazendaId={fazenda.id}
+            atual={fazenda.proprietarioId}
+            donos={donos}
+            definir={definirProprietario}
+            ariaLabel="Proprietário da fazenda"
+            largura="w-56"
+          />
+          <p className="text-xs text-ink-3">
+            Escolha de quem é esta fazenda — o app soma a área e os insumos por dono.
+          </p>
+        </div>
+      )}
 
       <section className="mt-10 grid gap-3">
         <h2 className="font-display text-xl text-ink">Talhões</h2>

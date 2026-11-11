@@ -125,6 +125,38 @@ export async function excluirFazenda(id: string): Promise<void> {
   redirect("/fazendas");
 }
 
+export async function definirProprietario(
+  fazendaId: string,
+  prev: ActionState | undefined,
+  formData: FormData,
+): Promise<ActionState> {
+  const valor = campo(formData, "proprietarioId");
+  const donoId = valor === "" ? null : valor;
+
+  if (donoId) {
+    const dono = await prisma.proprietario.findFirst({
+      where: { id: donoId, userId: await usuarioId() },
+    });
+    if (!dono) {
+      return { ok: false, error: "Proprietário não encontrado." };
+    }
+  }
+
+  try {
+    await prisma.fazenda.update({
+      where: { id: fazendaId, userId: await usuarioId() },
+      data: { proprietarioId: donoId },
+    });
+  } catch (e) {
+    console.error(e);
+    return falha(e);
+  }
+
+  revalidatePath("/fazendas");
+  revalidatePath(`/fazendas/${fazendaId}`);
+  return { ok: true };
+}
+
 export async function criarProprietario(
   prev: ActionState | undefined,
   formData: FormData,

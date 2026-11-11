@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { fmtCount, fmtHa, fmtTarefas } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { LinhaLink } from "@/components/stat-cells";
+import { SelecionarDono } from "@/components/selecionar-dono";
+import { definirProprietario } from "@/lib/actions";
 import { userIdAtual } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +25,21 @@ export default async function FazendasPage({
         ? { userId, ativa: true }
         : { userId };
 
-  const fazendas = await prisma.fazenda.findMany({
-    where,
-    include: {
-      talhoes: { select: { id: true, areaHa: true } },
-      proprietario: { select: { nome: true } },
-    },
-    orderBy: { nome: "asc" },
-  });
+  const [fazendas, donos] = await Promise.all([
+    prisma.fazenda.findMany({
+      where,
+      include: {
+        talhoes: { select: { id: true, areaHa: true } },
+        proprietario: { select: { nome: true } },
+      },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.proprietario.findMany({
+      where: { userId },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+  ]);
 
   const areaColhivel = fazendas.reduce(
     (acc, f) => acc + f.talhoes.reduce((a, t) => a + t.areaHa, 0),
@@ -93,36 +101,57 @@ export default async function FazendasPage({
             {fazendas.map((f) => {
               const area = f.talhoes.reduce((a, t) => a + t.areaHa, 0);
               return (
-                <LinhaLink
-                  key={f.id}
-                  href={`/fazendas/${f.id}`}
-                  principal={f.nome}
-                  secundario={
-                    <>
-                      {f.proprietario && (
-                        <>
-                          <span className="font-medium text-ink-2">{f.proprietario.nome}</span>
-                          <span aria-hidden>·</span>
-                        </>
-                      )}
-                      <span>
-                        {f.talhoes.length}
-                        {f.talhoes.length === 1 ? " talhão" : " talhões"}
+                <li key={f.id} className="flex items-center gap-2">
+                  <Link
+                    href={`/fazendas/${f.id}`}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg py-3 pl-2 pr-1 transition-colors hover:bg-surface-muted"
+                  >
+                    <span className="grid min-w-0 gap-0.5">
+                      <span className="truncate text-[0.9375rem] font-semibold text-ink">
+                        {f.nome}
                       </span>
-                      <span aria-hidden>·</span>
-                      <span>{fmtTarefas(area)}</span>
-                      {!f.ativa && (
-                        <span className="rounded-md border border-dashed border-line-strong bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
-                          Inactiva
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+                        {f.proprietario && (
+                          <>
+                            <span className="font-medium text-ink-2">{f.proprietario.nome}</span>
+                            <span aria-hidden>·</span>
+                          </>
+                        )}
+                        <span>
+                          {f.talhoes.length}
+                          {f.talhoes.length === 1 ? " talhão" : " talhões"}
                         </span>
-                      )}
-                    </>
-                  }
-                  destaque={fmtHa(area)}
-                />
+                        <span aria-hidden>·</span>
+                        <span>{fmtTarefas(area)}</span>
+                        {!f.ativa && (
+                          <span className="rounded-md border border-dashed border-line-strong bg-surface-muted px-1.5 py-0.5 font-semibold text-ink-2">
+                            Inactiva
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="tnum shrink-0 text-[0.9375rem] font-bold text-ink">
+                      {fmtHa(area)}
+                    </span>
+                  </Link>
+                  {donos.length > 0 && (
+                    <SelecionarDono
+                      fazendaId={f.id}
+                      atual={f.proprietarioId}
+                      donos={donos}
+                      definir={definirProprietario}
+                      ariaLabel={`Proprietário de ${f.nome}`}
+                    />
+                  )}
+                </li>
               );
             })}
           </ul>
+          {donos.length > 0 && (
+            <p className="px-1 text-xs text-ink-3">
+              Escolha o dono de cada fazenda no quadro ao lado do nome — salva na hora.
+            </p>
+          )}
           <p className="px-1 text-xs text-ink-3">
             {fmtCount(fazendas.length)} fazendas · {fmtHa(areaColhivel)} em talhões (
             {fmtTarefas(areaColhivel)})
