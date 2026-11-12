@@ -799,9 +799,13 @@ type RateioFazendas =
   | { ok: false; error: string }
   | {
       ok: true;
-      donoNome: string;
       totalTarefas: number;
-      porFazenda: { fazendaId: string; tarefas: number; share: number }[];
+      porFazenda: {
+        fazendaId: string;
+        donoNome: string | null;
+        tarefas: number;
+        share: number;
+      }[];
     };
 
 async function fazendasRateio(fazendasIdsJson: string): Promise<RateioFazendas> {
@@ -813,7 +817,7 @@ async function fazendasRateio(fazendasIdsJson: string): Promise<RateioFazendas> 
     ids = [];
   }
   if (ids.length === 0) {
-    return { ok: false, error: "Marque ao menos uma fazenda do dono." };
+    return { ok: false, error: "Marque ao menos uma fazenda." };
   }
   if (new Set(ids).size !== ids.length) {
     return { ok: false, error: "Há fazendas repetidas na seleção." };
@@ -824,20 +828,17 @@ async function fazendasRateio(fazendasIdsJson: string): Promise<RateioFazendas> 
     select: {
       id: true,
       nome: true,
-      proprietario: { select: { id: true, nome: true } },
+      proprietario: { select: { nome: true } },
       talhoes: { select: { areaHa: true } },
     },
   });
   if (farms.length !== ids.length) {
     return { ok: false, error: "Alguma fazenda selecionada não existe." };
   }
-  const dono = farms[0]?.proprietario;
-  if (!dono || farms.some((f) => f.proprietario?.id !== dono.id)) {
-    return { ok: false, error: "As fazendas escolhidas têm donos diferentes — faça um registro por dono." };
-  }
 
   const porFazenda = farms.map((f) => ({
     fazendaId: f.id,
+    donoNome: f.proprietario?.nome ?? null,
     tarefas: Math.round(haParaTarefas(f.talhoes.reduce((a, t) => a + t.areaHa, 0)) * 100) / 100,
   }));
   const totalTarefas = porFazenda.reduce((a, x) => a + x.tarefas, 0);
@@ -847,7 +848,6 @@ async function fazendasRateio(fazendasIdsJson: string): Promise<RateioFazendas> 
 
   return {
     ok: true,
-    donoNome: dono.nome,
     totalTarefas,
     porFazenda: porFazenda.map((x) => ({ ...x, share: x.tarefas / totalTarefas })),
   };
@@ -857,7 +857,8 @@ function arred(x: number) {
   return Math.round(x * 100) / 100;
 }
 
-function obsDoDono(donoNome: string, observacao: string | undefined) {
+function obsDoDono(donoNome: string | null, observacao: string | undefined) {
+  if (!donoNome) return observacao || undefined;
   const prefixo = `Dono ${donoNome}`;
   return observacao ? `${prefixo} — ${observacao}` : prefixo;
 }
@@ -872,7 +873,6 @@ async function tratosPorProprietario(
 
   const data = new Date(`${d.data}T12:00:00`);
   const userId = await usuarioId();
-  const observacao = obsDoDono(rateio.donoNome, d.observacao);
 
   const dados = rateio.porFazenda.map((x) => ({
     userId,
@@ -889,7 +889,7 @@ async function tratosPorProprietario(
       const q = typeof p.quantidade === "number" ? p.quantidade : 0;
       return { ...p, quantidade: arred(q * x.share) };
     }),
-    observacao,
+    observacao: obsDoDono(x.donoNome, d.observacao),
   }));
 
   await prisma.trato.createMany({ data: dados });
@@ -906,7 +906,6 @@ async function plantiosPorProprietario(
 
   const data = new Date(`${d.data}T12:00:00`);
   const userId = await usuarioId();
-  const observacao = obsDoDono(rateio.donoNome, d.observacao);
 
   // Área (ha) de cada fazenda — para a coluna areaHa e o rateio dos insumos por share.
   const areasHa = await prisma.fazenda.findMany({
@@ -928,7 +927,7 @@ async function plantiosPorProprietario(
     projecao: d.projecao,
     areaHa: arred(areaHaPor.get(x.fazendaId) ?? 0),
     insumos: d.insumos.map((i) => ({ ...i, quantidade: arred(i.quantidade * x.share) })),
-    observacao,
+    observacao: obsDoDono(x.donoNome, d.observacao),
   }));
 
   await prisma.plantio.createMany({ data: dados });
@@ -946,7 +945,6 @@ async function colheitasPorProprietario(
 
   const data = new Date(`${d.data}T12:00:00`);
   const userId = await usuarioId();
-  const observacao = obsDoDono(rateio.donoNome, d.observacao);
 
   await prisma.$transaction(
     rateio.porFazenda.map((x) =>
@@ -970,7 +968,7 @@ async function colheitasPorProprietario(
           alocacoes: [],
           escopo: "fazenda",
           areaColhida: d.areaColhida !== null ? arred(d.areaColhida * x.share) : null,
-          observacao,
+          observacao: obsDoDono(x.donoNome, d.observacao),
           custo: {
             create: {
               ctc: arred(custo.ctc * x.share),

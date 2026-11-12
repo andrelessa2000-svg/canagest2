@@ -56,10 +56,11 @@ export async function cargarCascata(): Promise<Cascata> {
     }),
     prisma.fazenda.findMany({
       where: { userId },
-      select: { id: true, ativa: true },
+      select: { id: true, nome: true, ativa: true },
     }),
   ]);
 
+  const nomesFazendas = new Map(fazendasEstado.map((f) => [f.id, f.nome]));
   const fazendasInactivas = new Set(
     fazendasEstado.filter((f) => !f.ativa).map((f) => f.id),
   );
@@ -87,6 +88,27 @@ export async function cargarCascata(): Promise<Cascata> {
   for (const [fazendaId, v] of projInvest) projPorFazenda.set(fazendaId, (projPorFazenda.get(fazendaId) ?? 0) + v);
 
   const mapa = new Map<string, FilaCascata>();
+
+  const filaVazia = (fazendaId: string, fazendaNome: string): FilaCascata => ({
+    fazendaId,
+    fazendaNome,
+    toneladas: 0,
+    tarefas: 0,
+    receita: 0,
+    ctc: 0,
+    arrendamento: 0,
+    dividas: 0,
+    lucroBruto: 0,
+    tratos: 0,
+    plantio: 0,
+    proj: 0,
+    lucroNeto: 0,
+    lucroNetoEstimado: 0,
+    toneladasProj: 0,
+    tarefasProj: 0,
+    receitaProj: 0,
+    custosProj: 0,
+  });
 
   for (const c of colheitas) {
     const areaFazendaHa = c.fazenda.talhoes.reduce((a, t) => a + t.areaHa, 0);
@@ -118,26 +140,7 @@ export async function cargarCascata(): Promise<Cascata> {
       continue;
     }
 
-    const fila = mapa.get(c.fazendaId) ?? {
-      fazendaId: c.fazenda.id,
-      fazendaNome: c.fazenda.nome,
-      toneladas: 0,
-      tarefas: 0,
-      receita: 0,
-      ctc: 0,
-      arrendamento: 0,
-      dividas: 0,
-      lucroBruto: 0,
-      tratos: 0,
-      plantio: 0,
-      proj: 0,
-      lucroNeto: 0,
-      lucroNetoEstimado: 0,
-      toneladasProj: 0,
-      tarefasProj: 0,
-      receitaProj: 0,
-      custosProj: 0,
-    };
+    const fila = mapa.get(c.fazendaId) ?? filaVazia(c.fazenda.id, c.fazenda.nome);
     fila.toneladas += r.toneladas;
     fila.tarefas += areaTarefas;
     fila.receita += r.receita;
@@ -145,6 +148,17 @@ export async function cargarCascata(): Promise<Cascata> {
     fila.arrendamento += r.arrendamento;
     fila.dividas += r.dividas;
     mapa.set(c.fazendaId, fila);
+  }
+
+  // Fazendas com trato ou plantio real (não projeção) também ganham linha,
+  // mesmo sem colheita registrada — o custo aparece e o resultado pode ser negativo.
+  for (const fazendaId of new Set([
+    ...tratosPorFazenda.keys(),
+    ...plantioPorFazenda.keys(),
+  ])) {
+    if (mapa.has(fazendaId)) continue;
+    const nome = nomesFazendas.get(fazendaId);
+    if (nome) mapa.set(fazendaId, filaVazia(fazendaId, nome));
   }
 
   const filas = [...mapa.values()].map((f) => {
@@ -157,47 +171,25 @@ export async function cargarCascata(): Promise<Cascata> {
     return f;
   });
 
-  const vacio = (nome: string): FilaCascata => ({
-    fazendaId: "",
-    fazendaNome: nome,
-    toneladas: 0,
-    tarefas: 0,
-    receita: 0,
-    ctc: 0,
-    arrendamento: 0,
-    dividas: 0,
-    lucroBruto: 0,
-    tratos: 0,
-    plantio: 0,
-    proj: 0,
-    lucroNeto: 0,
-    lucroNetoEstimado: 0,
-    toneladasProj: 0,
-    tarefasProj: 0,
-    receitaProj: 0,
-    custosProj: 0,
-  });
-
   const total = filas.reduce((acc, f) => {
-    const t = { ...acc };
-    t.toneladas += f.toneladas;
-    t.tarefas += f.tarefas;
-    t.receita += f.receita;
-    t.ctc += f.ctc;
-    t.arrendamento += f.arrendamento;
-    t.dividas += f.dividas;
-    t.lucroBruto += f.lucroBruto;
-    t.tratos += f.tratos;
-    t.plantio += f.plantio;
-    t.proj += f.proj;
-    t.lucroNeto += f.lucroNeto;
-    t.lucroNetoEstimado += f.lucroNetoEstimado;
-    t.toneladasProj += f.toneladasProj;
-    t.tarefasProj += f.tarefasProj;
-    t.receitaProj += f.receitaProj;
-    t.custosProj += f.custosProj;
-    return t;
-  }, vacio("TOTAL"));
+    acc.toneladas += f.toneladas;
+    acc.tarefas += f.tarefas;
+    acc.receita += f.receita;
+    acc.ctc += f.ctc;
+    acc.arrendamento += f.arrendamento;
+    acc.dividas += f.dividas;
+    acc.lucroBruto += f.lucroBruto;
+    acc.tratos += f.tratos;
+    acc.plantio += f.plantio;
+    acc.proj += f.proj;
+    acc.lucroNeto += f.lucroNeto;
+    acc.lucroNetoEstimado += f.lucroNetoEstimado;
+    acc.toneladasProj += f.toneladasProj;
+    acc.tarefasProj += f.tarefasProj;
+    acc.receitaProj += f.receitaProj;
+    acc.custosProj += f.custosProj;
+    return acc;
+  }, filaVazia("", "TOTAL"));
 
   return { filas, total };
 }

@@ -319,7 +319,7 @@ export const ESCOPOS_TRATO_LABEL: Record<string, string> = {
   fazenda: "Fazenda inteira",
   talhao: "Talhão específico",
   parte: "Parte do talhão",
-  proprietario: "Fazendas de um dono (por proprietário)",
+  proprietario: "Fazendas de donos (rateio por área)",
 };
 
 const produtoSchema = z.object({
