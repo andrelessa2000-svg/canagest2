@@ -14,27 +14,45 @@ export const dynamic = "force-dynamic";
 export default async function PlantioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reg?: string }>;
+  searchParams: Promise<{ reg?: string; dono?: string }>;
 }) {
-  const { reg } = await searchParams;
+  const { reg, dono } = await searchParams;
+  const userId = await userIdAtual();
+
+  const [donos, fazendasTodas] = await Promise.all([
+    prisma.proprietario.findMany({
+      where: { userId },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.fazenda.findMany({
+      where: { userId },
+      select: { id: true, proprietarioId: true },
+    }),
+  ]);
+  const fazendasDoDono = dono
+    ? fazendasTodas.filter((f) => f.proprietarioId === dono).map((f) => f.id)
+    : null;
+
   const [plantios, talhoesTodos] = await Promise.all([
     prisma.plantio.findMany({
       where: {
-        userId: await userIdAtual(),
+        userId,
         ...(reg === "proj"
           ? { projecao: true }
           : reg === "real"
             ? { projecao: false }
             : {}),
+        ...(fazendasDoDono ? { fazendaId: { in: fazendasDoDono } } : {}),
       },
       include: {
-        fazenda: { select: { nome: true } },
+        fazenda: { select: { nome: true, proprietario: { select: { nome: true } } } },
         talhao: { select: { nome: true } },
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
     prisma.talhao.findMany({
-      where: { userId: await userIdAtual() },
+      where: { userId },
       select: { id: true, nome: true },
     }),
   ]);
@@ -99,6 +117,30 @@ export default async function PlantioPage({
         ))}
       </div>
 
+      {donos.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          <Link
+            href={`/plantio${reg ? `?reg=${reg}` : ""}`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              !dono ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+            }`}
+          >
+            Todos os donos
+          </Link>
+          {donos.map((p) => (
+            <Link
+              key={p.id}
+              href={`/plantio?dono=${p.id}${reg ? `&reg=${reg}` : ""}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                dono === p.id ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+              }`}
+            >
+              {p.nome}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {plantios.length === 0 ? (
         <EmptyState
           icone={Sprout}
@@ -115,6 +157,9 @@ export default async function PlantioPage({
                 <span className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
                     {p.fazenda.nome}
+                    {p.fazenda.proprietario && (
+                      <span className="font-normal text-ink-3"> — {p.fazenda.proprietario.nome}</span>
+                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(p.data)}</span>

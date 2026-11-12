@@ -134,7 +134,7 @@ export const colheitaSchema = z.object({
   talhaoId: z.string().optional(),
   talhoesIds: itensStringJson(),
   alocacoes: alocacoesJson(),
-  escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }).default("fazenda"),
+  escopo: z.enum(["fazenda", "talhao", "parte", "proprietario"], { error: "Selecione o escopo" }).default("fazenda"),
   safra: safraSchema,
   projecao: ligaField(),
   talhoesColhidos: itensTalhaoAreaJson(),
@@ -176,7 +176,7 @@ export const plantioSchema = z.object({
   talhoesIds: itensStringJson(),
   alocacoes: alocacoesJson(),
   insumos: insumosJson(),
-  escopo: z.enum(["fazenda", "talhao", "parte"], { error: "Selecione o escopo" }),
+  escopo: z.enum(["fazenda", "talhao", "parte", "proprietario"], { error: "Selecione o escopo" }),
   tarefas: numeroOpcional("Tarefas"),
   safra: safraSchema,
   tipo: z.enum(TIPOS_PLANTIO, { error: "Selecione o tipo de plantio" }),
@@ -314,11 +314,12 @@ export const TIPOS_TRATO_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
-export const ESCOPOS_TRATO = ["fazenda", "talhao", "parte"] as const;
+export const ESCOPOS_TRATO = ["fazenda", "talhao", "parte", "proprietario"] as const;
 export const ESCOPOS_TRATO_LABEL: Record<string, string> = {
   fazenda: "Fazenda inteira",
   talhao: "Talhão específico",
   parte: "Parte do talhão",
+  proprietario: "Fazendas de um dono (por proprietário)",
 };
 
 const produtoSchema = z.object({

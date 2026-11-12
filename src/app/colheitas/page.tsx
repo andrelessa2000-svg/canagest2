@@ -33,6 +33,7 @@ type Filtros = {
   ate?: string;
   reg?: string;
   safra?: string;
+  dono?: string;
 };
 
 export default async function ColheitasPage({
@@ -40,12 +41,29 @@ export default async function ColheitasPage({
 }: {
   searchParams: Promise<Filtros>;
 }) {
-  const { fazenda, usina, tipo, de, ate, reg, safra } = await searchParams;
+  const { fazenda, usina, tipo, de, ate, reg, safra, dono } = await searchParams;
+  const userId = await userIdAtual();
+
+  const [donos, fazendasTodas] = await Promise.all([
+    prisma.proprietario.findMany({
+      where: { userId },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+    prisma.fazenda.findMany({
+      where: { userId },
+      select: { id: true, proprietarioId: true },
+    }),
+  ]);
+  const fazendasDoDono = dono
+    ? fazendasTodas.filter((f) => f.proprietarioId === dono).map((f) => f.id)
+    : null;
 
   const where = {
-    userId: await userIdAtual(),
+    userId,
     ...(reg === "proj" ? { projecao: true } : reg === "real" ? { projecao: false } : {}),
     ...(fazenda ? { fazendaId: fazenda } : {}),
+    ...(fazendasDoDono ? { fazendaId: { in: fazendasDoDono } } : {}),
     ...(usina ? { usinaId: usina } : {}),
     ...(tipo ? { tipo } : {}),
     ...(safra ? { safra: normalizarSafra(safra) ?? "__nenhuma__" } : {}),
@@ -63,19 +81,19 @@ export default async function ColheitasPage({
     prisma.colheita.findMany({
       where,
       include: {
-        fazenda: { select: { id: true, nome: true } },
+        fazenda: { select: { id: true, nome: true, proprietario: { select: { nome: true } } } },
         usina: { select: { nome: true, modelo: true } },
         custo: true,
       },
       orderBy: [{ data: "desc" }, { criadaEm: "desc" }],
     }),
     prisma.fazenda.findMany({
-      where: { userId: await userIdAtual() },
+      where: { userId },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
-      where: { userId: await userIdAtual() },
+      where: { userId },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
@@ -113,7 +131,7 @@ export default async function ColheitasPage({
     { toneladas: 0, receita: 0, despesas: 0, lucro: 0 },
   );
 
-  const temFiltro = Boolean(reg || fazenda || usina || tipo || de || ate || safra);
+  const temFiltro = Boolean(reg || fazenda || usina || tipo || de || ate || safra || dono);
 
   const regs = [
     { id: "", rotulo: "Caderno de campo" },
@@ -147,11 +165,36 @@ export default async function ColheitasPage({
         ))}
       </div>
 
+      {donos.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          <Link
+            href="/colheitas"
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              !dono ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+            }`}
+          >
+            Todos os donos
+          </Link>
+          {donos.map((p) => (
+            <Link
+              key={p.id}
+              href={`/colheitas?dono=${p.id}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                dono === p.id ? "bg-accent text-surface" : "bg-surface-muted text-ink-2"
+              }`}
+            >
+              {p.nome}
+            </Link>
+          ))}
+        </div>
+      )}
+
       <form
         action="/colheitas"
         method="get"
         className="ledger-panel mb-5 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
       >
+        {dono && <input type="hidden" name="dono" value={dono} />}
         <label className="grid gap-1">
           <span className="field-label">Fazenda</span>
           <select name="fazenda" defaultValue={fazenda ?? ""} className="field-input">
@@ -243,6 +286,9 @@ export default async function ColheitasPage({
                 <Link href={`/colheitas/${c.id}`} className="grid min-w-0 flex-1 gap-0.5">
                   <span className="truncate text-sm font-medium text-ink">
                     {c.fazenda.nome}
+                    {c.fazenda.proprietario && (
+                      <span className="font-normal text-ink-3"> — {c.fazenda.proprietario.nome}</span>
+                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span>{fmtDate(c.data)}</span>

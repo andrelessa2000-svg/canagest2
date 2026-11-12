@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
-import { parseDecimal } from "./format";
+import { haParaTarefas, parseDecimal } from "./format";
 import { userIdAtual } from "./auth";
 import { MESES } from "./historico-preco";
 import { MENSAGEM_SAFRA_INVALIDA, normalizarSafra } from "./safra";
@@ -511,20 +511,34 @@ export async function criarColheita(
     return { ok: false, error: erroUsina };
   }
 
-  let criada!: { id: string; fazendaId: string };
+  let redirecionar = "/colheitas";
   try {
-    criada = await prisma.$transaction(async (tx) => {
-      const c = await tx.colheita.create({
-        data: { userId: await usuarioId(), ...dadosColheita(parsedColheita.data) },
+    if (parsedColheita.data.escopo === "proprietario") {
+      const resultado = await colheitasPorProprietario(
+        parsedColheita.data,
+        parsedCusto.data,
+        campo(formData, "fazendasIds"),
+      );
+      if (!resultado.ok) {
+        return { ok: false, error: resultado.error };
+      }
+      redirecionar = "/colheitas";
+    } else {
+      const criada = await prisma.$transaction(async (tx) => {
+        const c = await tx.colheita.create({
+          data: { userId: await usuarioId(), ...dadosColheita(parsedColheita.data) },
+        });
+        await tx.custoColheita.create({
+          data: {
+            colheitaId: c.id,
+            ...dadosCustoColheita(parsedCusto.data),
+          },
+        });
+        return { id: c.id, fazendaId: c.fazendaId };
       });
-      await tx.custoColheita.create({
-        data: {
-          colheitaId: c.id,
-          ...dadosCustoColheita(parsedCusto.data),
-        },
-      });
-      return { id: c.id, fazendaId: c.fazendaId };
-    });
+      redirecionar = `/colheitas/${criada.id}`;
+      revalidatePath(`/fazendas/${criada.fazendaId}`);
+    }
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -532,8 +546,7 @@ export async function criarColheita(
 
   revalidatePath("/");
   revalidatePath("/colheitas");
-  revalidatePath(`/fazendas/${criada.fazendaId}`);
-  redirect(`/colheitas/${criada.id}`);
+  redirect(redirecionar);
 }
 
 export async function atualizarColheita(
@@ -541,7 +554,12 @@ export async function atualizarColheita(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsedColheita = colheitaSchema.safeParse(camposColheita(formData));
+  const bruto = camposColheita(formData);
+  // Edição é sempre de um registro por fazenda; escopo por dono não se divide aqui.
+  if (bruto.escopo === "proprietario") {
+    bruto.escopo = "fazenda";
+  }
+  const parsedColheita = colheitaSchema.safeParse(bruto);
   const parsedCusto = custoColheitaSchema.safeParse(camposCustoColheita(formData));
 
   if (!parsedColheita.success) {
@@ -669,9 +687,19 @@ export async function criarPlantio(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.plantio.create({
-      data: { userId: await usuarioId(), ...dadosPlantio(parsed.data) },
-    });
+    if (parsed.data.escopo === "proprietario") {
+      const resultado = await plantiosPorProprietario(
+        parsed.data,
+        campo(formData, "fazendasIds"),
+      );
+      if (!resultado.ok) {
+        return { ok: false, error: resultado.error };
+      }
+    } else {
+      await prisma.plantio.create({
+        data: { userId: await usuarioId(), ...dadosPlantio(parsed.data) },
+      });
+    }
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -687,7 +715,12 @@ export async function atualizarPlantio(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = plantioSchema.safeParse(camposPlantio(formData));
+  const bruto = camposPlantio(formData);
+  // Edição é sempre de um registro por fazenda; escopo por dono não se divide aqui.
+  if (bruto.escopo === "proprietario") {
+    bruto.escopo = "fazenda";
+  }
+  const parsed = plantioSchema.safeParse(bruto);
   if (!parsed.success) {
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
@@ -760,6 +793,209 @@ function dadosTrato(d: TratoInput) {
   };
 }
 
+// Escopo "proprietario": um registro para várias fazendas do mesmo dono.
+// Valida a seleção e calcula o rateio (share) pela área em tarefas de cada fazenda.
+type RateioFazendas =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      donoNome: string;
+      totalTarefas: number;
+      porFazenda: { fazendaId: string; tarefas: number; share: number }[];
+    };
+
+async function fazendasRateio(fazendasIdsJson: string): Promise<RateioFazendas> {
+  let ids: string[];
+  try {
+    const parsedIds: unknown = JSON.parse(fazendasIdsJson || "[]");
+    ids = Array.isArray(parsedIds) ? parsedIds.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    ids = [];
+  }
+  if (ids.length === 0) {
+    return { ok: false, error: "Marque ao menos uma fazenda do dono." };
+  }
+  if (new Set(ids).size !== ids.length) {
+    return { ok: false, error: "Há fazendas repetidas na seleção." };
+  }
+
+  const farms = await prisma.fazenda.findMany({
+    where: { userId: await usuarioId(), id: { in: ids } },
+    select: {
+      id: true,
+      nome: true,
+      proprietario: { select: { id: true, nome: true } },
+      talhoes: { select: { areaHa: true } },
+    },
+  });
+  if (farms.length !== ids.length) {
+    return { ok: false, error: "Alguma fazenda selecionada não existe." };
+  }
+  const dono = farms[0]?.proprietario;
+  if (!dono || farms.some((f) => f.proprietario?.id !== dono.id)) {
+    return { ok: false, error: "As fazendas escolhidas têm donos diferentes — faça um registro por dono." };
+  }
+
+  const porFazenda = farms.map((f) => ({
+    fazendaId: f.id,
+    tarefas: Math.round(haParaTarefas(f.talhoes.reduce((a, t) => a + t.areaHa, 0)) * 100) / 100,
+  }));
+  const totalTarefas = porFazenda.reduce((a, x) => a + x.tarefas, 0);
+  if (totalTarefas <= 0) {
+    return { ok: false, error: "As fazendas escolhidas não têm talhões cadastrados (área zero)." };
+  }
+
+  return {
+    ok: true,
+    donoNome: dono.nome,
+    totalTarefas,
+    porFazenda: porFazenda.map((x) => ({ ...x, share: x.tarefas / totalTarefas })),
+  };
+}
+
+function arred(x: number) {
+  return Math.round(x * 100) / 100;
+}
+
+function obsDoDono(donoNome: string, observacao: string | undefined) {
+  const prefixo = `Dono ${donoNome}`;
+  return observacao ? `${prefixo} — ${observacao}` : prefixo;
+}
+
+// Divide um trato por proprietário em um registro por fazenda (área/valor/produtos proporcionais).
+async function tratosPorProprietario(
+  d: TratoInput,
+  fazendasIdsJson: string,
+): Promise<{ ok: false; error: string } | { ok: true; count: number }> {
+  const rateio = await fazendasRateio(fazendasIdsJson);
+  if (!rateio.ok) return rateio;
+
+  const data = new Date(`${d.data}T12:00:00`);
+  const userId = await usuarioId();
+  const observacao = obsDoDono(rateio.donoNome, d.observacao);
+
+  const dados = rateio.porFazenda.map((x) => ({
+    userId,
+    fazendaId: x.fazendaId,
+    talhaoId: null,
+    safra: d.safra,
+    tipo: d.tipo,
+    escopo: "fazenda",
+    tarefas: x.tarefas,
+    data,
+    valor: arred(d.valor * x.share),
+    projecao: d.projecao,
+    produtos: d.produtos.map((p) => {
+      const q = typeof p.quantidade === "number" ? p.quantidade : 0;
+      return { ...p, quantidade: arred(q * x.share) };
+    }),
+    observacao,
+  }));
+
+  await prisma.trato.createMany({ data: dados });
+  return { ok: true, count: dados.length };
+}
+
+// Divide um plantio por proprietário: área/tarefas/valor/insumos proporcionais por fazenda.
+async function plantiosPorProprietario(
+  d: PlantioInput,
+  fazendasIdsJson: string,
+): Promise<{ ok: false; error: string } | { ok: true; count: number }> {
+  const rateio = await fazendasRateio(fazendasIdsJson);
+  if (!rateio.ok) return rateio;
+
+  const data = new Date(`${d.data}T12:00:00`);
+  const userId = await usuarioId();
+  const observacao = obsDoDono(rateio.donoNome, d.observacao);
+
+  // Área (ha) de cada fazenda — para a coluna areaHa e o rateio dos insumos por share.
+  const areasHa = await prisma.fazenda.findMany({
+    where: { userId, id: { in: rateio.porFazenda.map((x) => x.fazendaId) } },
+    select: { id: true, talhoes: { select: { areaHa: true } } },
+  });
+  const areaHaPor = new Map(areasHa.map((f) => [f.id, f.talhoes.reduce((a, t) => a + t.areaHa, 0)]));
+
+  const dados = rateio.porFazenda.map((x) => ({
+    userId,
+    fazendaId: x.fazendaId,
+    talhaoId: null,
+    safra: d.safra,
+    tipo: d.tipo,
+    escopo: "fazenda",
+    tarefas: x.tarefas,
+    data,
+    valor: arred(d.valor * x.share),
+    projecao: d.projecao,
+    areaHa: arred(areaHaPor.get(x.fazendaId) ?? 0),
+    insumos: d.insumos.map((i) => ({ ...i, quantidade: arred(i.quantidade * x.share) })),
+    observacao,
+  }));
+
+  await prisma.plantio.createMany({ data: dados });
+  return { ok: true, count: dados.length };
+}
+
+// Divide uma colheita por proprietário: toneladas/área/valores proporcionais; preços (R$/t, ATR) permanecem.
+async function colheitasPorProprietario(
+  d: ColheitaInput,
+  custo: z.infer<typeof custoColheitaSchema>,
+  fazendasIdsJson: string,
+): Promise<{ ok: false; error: string } | { ok: true; count: number }> {
+  const rateio = await fazendasRateio(fazendasIdsJson);
+  if (!rateio.ok) return rateio;
+
+  const data = new Date(`${d.data}T12:00:00`);
+  const userId = await usuarioId();
+  const observacao = obsDoDono(rateio.donoNome, d.observacao);
+
+  await prisma.$transaction(
+    rateio.porFazenda.map((x) =>
+      prisma.colheita.create({
+        data: {
+          userId,
+          fazendaId: x.fazendaId,
+          usinaId: d.usinaId,
+          data,
+          tipo: d.tipo,
+          safra: d.safra,
+          projecao: d.projecao,
+          talhoesColhidos: [],
+          toneladas: arred(d.toneladas * x.share),
+          precoCana: d.precoCana,
+          agio: d.agio,
+          atrPorTonelada: d.atrPorTonelada,
+          precoKgAtr: d.precoKgAtr,
+          talhaoId: null,
+          talhoesIds: [],
+          alocacoes: [],
+          escopo: "fazenda",
+          areaColhida: d.areaColhida !== null ? arred(d.areaColhida * x.share) : null,
+          observacao,
+          custo: {
+            create: {
+              ctc: arred(custo.ctc * x.share),
+              arrendar: custo.arrendar,
+              tonsPorTarefa: custo.tonsPorTarefa,
+              tarefasArrendadas:
+                custo.tarefasArrendadas !== null
+                  ? arred(custo.tarefasArrendadas * x.share)
+                  : null,
+              dividas:
+                custo.dividas && custo.dividas.length > 0
+                  ? (custo.dividas.map((i) => ({
+                      ...i,
+                      valorTotal: arred(i.valorTotal * x.share),
+                    })) as unknown as Prisma.InputJsonValue)
+                  : Prisma.DbNull,
+            },
+          },
+        },
+      }),
+    ),
+  );
+  return { ok: true, count: rateio.porFazenda.length };
+}
+
 export async function criarTrato(
   prev: ActionState | undefined,
   formData: FormData,
@@ -769,9 +1005,19 @@ export async function criarTrato(
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }
   try {
-    await prisma.trato.create({
-      data: { userId: await usuarioId(), ...dadosTrato(parsed.data) },
-    });
+    if (parsed.data.escopo === "proprietario") {
+      const resultado = await tratosPorProprietario(
+        parsed.data,
+        campo(formData, "fazendasIds"),
+      );
+      if (!resultado.ok) {
+        return { ok: false, error: resultado.error };
+      }
+    } else {
+      await prisma.trato.create({
+        data: { userId: await usuarioId(), ...dadosTrato(parsed.data) },
+      });
+    }
   } catch (e) {
     console.error(e);
     return falha(e);
@@ -787,7 +1033,12 @@ export async function atualizarTrato(
   prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = tratoSchema.safeParse(camposTrato(formData));
+  const bruto = camposTrato(formData);
+  // Edição é sempre de um registro por fazenda; escopo por dono não se divide aqui.
+  if (bruto.escopo === "proprietario") {
+    bruto.escopo = "fazenda";
+  }
+  const parsed = tratoSchema.safeParse(bruto);
   if (!parsed.success) {
     return { ok: false, error: primeiraMensagem(parsed.error) };
   }

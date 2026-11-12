@@ -21,7 +21,12 @@ import { SelectorRegistro } from "./selector-registro";
 import { SeletorPorcoes, alocacoesDeJson, alocacoesParaJson, type Alocacao } from "./seletor-porcoes";
 import { EditorDespesas, despesasDeJson, despesasParaJson, type Despesa } from "./editor-despesas";
 
-export type FazendaOpcao = { id: string; nome: string; areaHa: number };
+export type FazendaOpcao = {
+  id: string;
+  nome: string;
+  areaHa: number;
+  proprietarioId?: string | null;
+};
 export type UsinaOpcao = { id: string; nome: string; modelo: string };
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
 
@@ -66,6 +71,7 @@ export function ColheitaForm({
   usinas,
   talhoes = [],
   safras = [],
+  proprietarios = [],
   inicial,
   modo = "criar",
   cancelarHref = "/colheitas",
@@ -75,6 +81,7 @@ export function ColheitaForm({
   usinas: UsinaOpcao[];
   talhoes?: TalhaoOpcao[];
   safras?: string[];
+  proprietarios?: { id: string; nome: string }[];
   inicial?: Partial<Campos> & {
     talhaoId?: string | null;
     talhoesIds?: unknown;
@@ -84,6 +91,9 @@ export function ColheitaForm({
   cancelarHref?: string;
 }) {
   const [state, acaoForm] = useActionState(acao, undefined);
+  // Escopo por proprietário: dono escolhido e fazendas marcadas (undefined = todas).
+  const [donoId, setDonoId] = useState("");
+  const [fazendasSel, setFazendasSel] = useState<string[] | undefined>(undefined);
 
   const fazendaSel =
     inicial?.fazendaId ?? (fazendas.length === 1 ? fazendas[0].id : "") ?? "";
@@ -172,20 +182,41 @@ export function ColheitaForm({
     ? talhoes.filter((t) => t.fazendaId === c.fazendaId)
     : [];
 
+  // Escopo por proprietário: fazendas do dono com área em tarefas.
+  const escopoDono = c.escopo === "proprietario" && proprietarios.length > 0;
+  const fazendasDoDono =
+    escopoDono && donoId
+      ? fazendas.filter((f) => f.proprietarioId === donoId)
+      : [];
+  const fazendasEscolhidas =
+    escopoDono && donoId
+      ? fazendasDoDono.filter(
+          (f) => fazendasSel === undefined || fazendasSel.includes(f.id),
+        )
+      : [];
+  const totalDonoTarefas =
+    Math.round(
+      fazendasEscolhidas.reduce((a, f) => a + areaTarefas(f.areaHa), 0) * 100,
+    ) / 100;
+
   // Escopo "fazenda" cobre todos os talhões; nos demais, usa as porções escolhidas.
   const { alocacoes, talhoesIds, tarefasTotais } = alocacoesParaJson(
     porcoes,
     talhoesFazenda,
   );
   const tarefasColhidas =
-    c.escopo === "fazenda"
-      ? areaTarefas(fazendas.find((f) => f.id === c.fazendaId)?.areaHa ?? 0)
-      : tarefasTotais;
+    escopoDono
+      ? totalDonoTarefas
+      : c.escopo === "fazenda"
+        ? areaTarefas(fazendas.find((f) => f.id === c.fazendaId)?.areaHa ?? 0)
+        : tarefasTotais;
 
-  // En escopos de talhão/parte la "área colhida" proviene de las porciones;
-  // en "fazenda" el usuario puede ajustarla manualmente.
+  // Em escopos de talhão/parte la "área colhida" proviene de las porciones;
+  // em "fazenda" el usuario puede ajustarla manualmente; por dono ela é a soma das fazendas.
   const areaColhidaValor =
-    c.escopo === "fazenda" ? c.areaColhida : tarefasColhidas > 0 ? String(tarefasColhidas) : "";
+    escopoDono
+      ? totalDonoTarefas > 0 ? String(totalDonoTarefas) : ""
+      : c.escopo === "fazenda" ? c.areaColhida : tarefasColhidas > 0 ? String(tarefasColhidas) : "";
 
   const resultado = useMemo(
     () =>
@@ -200,10 +231,11 @@ export function ColheitaForm({
         ctc: opcional(c.ctc) ?? 0,
         arrendar: c.arrendar,
         tonsPorTarefa: opcional(c.tonsPorTarefa),
-        tarefasArrendadas: opcional(c.tarefasArrendadas),
+        tarefasArrendadas:
+          escopoDono && totalDonoTarefas > 0 ? totalDonoTarefas : opcional(c.tarefasArrendadas),
         dividas: dividas.map((d) => ({ nome: d.nome, valor: Number(parseDecimal(d.valor)) || 0 })),
       }),
-    [modelo, c, dividas],
+    [modelo, c, dividas, escopoDono, totalDonoTarefas],
   );
 
   const linhasDespesas = [
@@ -224,6 +256,20 @@ export function ColheitaForm({
     };
   }).filter((r) => r.areaColhida > 0);
 
+  // Rateio entre as fazendas do dono (escopo "proprietario").
+  const rateioDono = fazendasEscolhidas.map((f) => {
+    const tarefas = areaTarefas(f.areaHa);
+    const prop = totalDonoTarefas > 0 ? tarefas / totalDonoTarefas : 0;
+    return {
+      id: f.id,
+      nome: f.nome,
+      tarefas,
+      share: prop,
+      toneladas: n(c.toneladas) * prop,
+      receita: resultado.receita * prop,
+    };
+  });
+
   return (
     <form action={acaoForm} className="grid gap-6 pb-4">
       <AlertaFormulario mensagem={state && !state.ok ? state.error : undefined} />
@@ -232,28 +278,119 @@ export function ColheitaForm({
       <section className="ledger-panel grid gap-4 p-5 sm:p-6">
         <h2 className="font-display text-lg text-ink">Identificação</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Campo
-            label="Fazenda"
-            htmlFor="fazendaId"
-            hint={fazendaAtual ? `${fazendaAtual.nome} · ${areaTarefas(fazendaAtual.areaHa)} tarefas` : undefined}
-          >
-            <select
-              id="fazendaId"
-              name="fazendaId"
-              className="field-input"
-              value={c.fazendaId}
-              onChange={(e) => trocarFazenda(e.target.value)}
+          {escopoDono ? (
+            <>
+              <Campo
+                label="Proprietário (dono)"
+                htmlFor="donoId"
+                hint="A colheita vale para as fazendas dele que você marcar abaixo; o app grava um registro por fazenda."
+              >
+                <select
+                  id="donoId"
+                  name="donoId"
+                  className="field-input"
+                  value={donoId}
+                  onChange={(e) => {
+                    setDonoId(e.target.value);
+                    setFazendasSel(undefined);
+                  }}
+                >
+                  <option value="" disabled>
+                    Selecione…
+                  </option>
+                  {proprietarios.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo
+                label="Fazendas a colher"
+                htmlFor="fazendasDono"
+                hint={
+                  donoId && fazendasDoDono.length === 0
+                    ? "Este dono não tem fazendas cadastradas."
+                    : `${fazendasEscolhidas.length} de ${fazendasDoDono.length} fazendas marcadas · ${String(totalDonoTarefas).replace(".", ",")} tarefas`
+                }
+              >
+                <div
+                  id="fazendasDono"
+                  className="max-h-44 overflow-y-auto rounded-[10px] border border-line bg-surface px-3 py-2"
+                >
+                  {fazendasDoDono.length === 0 ? (
+                    <p className="text-xs text-ink-3">
+                      {donoId
+                        ? "Cadastre fazendas para este dono primeiro."
+                        : "Escolha o dono para listar as fazendas."}
+                    </p>
+                  ) : (
+                    <ul className="grid gap-1">
+                      <li>
+                        <label className="flex items-center gap-2 text-xs font-semibold text-ink-2">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-[var(--accent)]"
+                            checked={fazendasSel === undefined || fazendasSel.length === fazendasDoDono.length}
+                            onChange={(e) =>
+                              setFazendasSel(e.target.checked ? undefined : [])
+                            }
+                          />
+                          Todas as fazendas
+                        </label>
+                      </li>
+                      {fazendasDoDono.map((f) => (
+                        <li key={f.id}>
+                          <label className="flex items-center gap-2 text-sm text-ink">
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-[var(--accent)]"
+                              checked={fazendasSel === undefined || fazendasSel.includes(f.id)}
+                              onChange={(e) => {
+                                const atual = fazendasSel ?? fazendasDoDono.map((x) => x.id);
+                                setFazendasSel(
+                                  e.target.checked
+                                    ? [...atual, f.id]
+                                    : atual.filter((x) => x !== f.id),
+                                );
+                              }}
+                            />
+                            <span className="truncate">{f.nome}</span>
+                            <span className="ml-auto shrink-0 text-xs text-ink-3 tnum">
+                              {String(areaTarefas(f.areaHa)).replace(".", ",")} tarefas
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Campo>
+            </>
+          ) : (
+            <Campo
+              label="Fazenda"
+              htmlFor="fazendaId"
+              hint={fazendaAtual ? `${fazendaAtual.nome} · ${areaTarefas(fazendaAtual.areaHa)} tarefas` : undefined}
             >
-              <option value="" disabled>
-                Selecione a fazenda⬦
-              </option>
-              {fazendas.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nome}
+              <select
+                id="fazendaId"
+                name="fazendaId"
+                className="field-input"
+                value={c.fazendaId}
+                onChange={(e) => trocarFazenda(e.target.value)}
+              >
+                <option value="" disabled>
+                  Selecione a fazenda⬦
                 </option>
-              ))}
-            </select>
-          </Campo>
+                {fazendas.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
 
           <Campo label="Usina" htmlFor="usinaId">
             <select
@@ -446,21 +583,41 @@ export function ColheitaForm({
             name="escopo"
             className="field-input"
             value={c.escopo}
-            onChange={(e) => set("escopo", e.target.value)}
+            onChange={(e) => {
+              set("escopo", e.target.value);
+              setFazendasSel(undefined);
+            }}
           >
-            {Object.entries(ESCOPOS_TRATO_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
+            {Object.entries(ESCOPOS_TRATO_LABEL)
+              .filter(([v]) => v !== "proprietario" || proprietarios.length > 0)
+              .map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
           </select>
         </Campo>
 
-        {c.escopo === "fazenda" && fazendaAtual ? (
+        {escopoDono && (
+          <>
+            <input type="hidden" name="fazendaId" value={fazendasEscolhidas[0]?.id ?? ""} />
+            <input
+              type="hidden"
+              name="fazendasIds"
+              value={JSON.stringify(fazendasEscolhidas.map((f) => f.id))}
+            />
+          </>
+        )}
+
+        {escopoDono && donoId ? (
+          <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
+            {fazendasEscolhidas.length} fazendas de {donoId ? (proprietarios.find((p) => p.id === donoId)?.nome ?? "dono") : ""} · {String(totalDonoTarefas).replace(".", ",")} tarefas — registro por fazenda, com toneladas, área e valores rateados proporcionalmente.
+          </p>
+        ) : c.escopo === "fazenda" && fazendaAtual ? (
           <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-2">
             {fazendaAtual.nome} · {fmtTarefas(fazendaAtual.areaHa)} — registro em toda a fazenda
           </p>
-        ) : (
+        ) : !escopoDono ? (
           <>
             <p className="text-xs text-ink-3">
               Pode marcar <strong>vários talhões</strong> de uma vez: talhões inteiros, partes de
@@ -478,12 +635,47 @@ export function ColheitaForm({
               />
             )}
           </>
-        )}
+        ) : null}
 
         <input type="hidden" name="alocacoes" value={JSON.stringify(alocacoes)} />
         <input type="hidden" name="talhoesIds" value={JSON.stringify(talhoesIds)} />
 
-        {rateio.length > 0 && (
+        {escopoDono && rateioDono.length > 0 && (
+          <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+            <table className="w-full min-w-[420px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+                  <th className="px-3 py-2 font-semibold">Fazenda</th>
+                  <th className="px-3 py-2 text-right font-semibold">Tarefas</th>
+                  <th className="px-3 py-2 text-right font-semibold">Rateio</th>
+                  <th className="px-3 py-2 text-right font-semibold">Toneladas</th>
+                  <th className="px-3 py-2 text-right font-semibold">Receita</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rateioDono.map((r) => (
+                  <tr key={r.id} className="border-b border-line">
+                    <td className="px-3 py-2 font-medium text-ink">{r.nome}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {String(r.tarefas).replace(".", ",")}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {(r.share * 100).toFixed(1).replace(".", ",")}%
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {r.toneladas.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      {fmtMoney(r.receita)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!escopoDono && rateio.length > 0 && (
           <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
             <table className="w-full min-w-[460px] text-left text-sm">
               <thead>
@@ -551,14 +743,21 @@ export function ColheitaForm({
             <Campo
               label="Tarefas arrendadas"
               htmlFor="tarefasArrendadas"
-              hint={c.areaColhida ? `Padrão: área colhida (${c.areaColhida})` : undefined}
+              hint={
+                escopoDono
+                  ? `Rateado entre as fazendas do dono (total: ${String(totalDonoTarefas).replace(".", ",")})`
+                  : c.areaColhida
+                    ? `Padrão: área colhida (${c.areaColhida})`
+                    : undefined
+              }
             >
               <input
                 id="tarefasArrendadas"
                 name="tarefasArrendadas"
                 className="field-input tnum"
                 inputMode="decimal"
-                value={c.tarefasArrendadas}
+                value={escopoDono ? (totalDonoTarefas > 0 ? String(totalDonoTarefas) : "") : c.tarefasArrendadas}
+                readOnly={escopoDono}
                 onChange={(e) => set("tarefasArrendadas", e.target.value)}
                 placeholder="Ex.: 100"
               />

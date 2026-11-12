@@ -14,11 +14,16 @@ export default async function NovaColheitaPage({
 }: {
   searchParams: Promise<{ fazenda?: string }>;
 }) {
-  const [{ fazenda }, fazendasRaw, usinas, talhoes, safras] = await Promise.all([
+  const [{ fazenda }, fazendasRaw, usinas, talhoes, safras, proprietarios] = await Promise.all([
     searchParams,
     prisma.fazenda.findMany({
       where: { userId: await userIdAtual() },
-      select: { id: true, nome: true, talhoes: { select: { areaHa: true } } },
+      select: {
+        id: true,
+        nome: true,
+        proprietarioId: true,
+        talhoes: { select: { areaHa: true } },
+      },
       orderBy: { nome: "asc" },
     }),
     prisma.usina.findMany({
@@ -32,6 +37,11 @@ export default async function NovaColheitaPage({
       orderBy: { nome: "asc" },
     }),
     safrasDoUsuario(),
+    prisma.proprietario.findMany({
+      where: { userId: await userIdAtual() },
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
   ]);
 
 
@@ -39,6 +49,7 @@ export default async function NovaColheitaPage({
     id: f.id,
     nome: f.nome,
     areaHa: f.talhoes.reduce((a, t) => a + t.areaHa, 0),
+    proprietarioId: f.proprietarioId,
   }));
 
   const fazendaValida = fazendas.some((f) => f.id === fazenda);
@@ -69,6 +80,7 @@ export default async function NovaColheitaPage({
             usinas={usinas}
             talhoes={talhoes}
             safras={safras}
+            proprietarios={proprietarios}
             inicial={inicial}
           />
         )}

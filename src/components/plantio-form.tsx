@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { fmtMoney, fmtTarefas, parseDecimal, toDateInputValue } from "@/lib/format";
+import { fmtMoney, fmtTarefas, haParaTarefas, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
@@ -32,7 +32,12 @@ const TIPOS_MAQUINA_LABEL: Record<string, string> = {
 
 type Operacao = { nome: string; maquinaValor: string; maquinaTipo: string; maquinaQtd: string; maodeobra: string; insumo: string };
 
-export type FazendaOpcao = { id: string; nome: string; areaHa: number };
+export type FazendaOpcao = {
+  id: string;
+  nome: string;
+  areaHa: number;
+  proprietarioId?: string | null;
+};
 export type TalhaoOpcao = { id: string; nome: string; fazendaId: string; areaHa: number };
 
 type Inicial = {
@@ -57,17 +62,22 @@ export function PlantioForm({
   fazendas,
   talhoes,
   safras,
+  proprietarios = [],
   inicial,
 }: {
   acao: (prev: ActionState | undefined, formData: FormData) => Promise<ActionState>;
   fazendas: FazendaOpcao[];
   talhoes: TalhaoOpcao[];
   safras: string[];
+  proprietarios?: { id: string; nome: string }[];
   inicial?: Inicial;
 }) {
   const [state, action] = useActionState(acao, undefined);
   const [fazendaId, setFazendaId] = useState(inicial?.fazendaId ?? "");
   const [escopo, setEscopo] = useState(inicial?.escopo ?? "fazenda");
+  const [donoId, setDonoId] = useState("");
+  // undefined = todas as fazendas do dono marcadas; array = seleção explícita.
+  const [fazendasSel, setFazendasSel] = useState<string[] | undefined>(undefined);
   const [porcoes, setPorcoes] = useState<Alocacao[]>(
     inicial?.alocacoes
       ? alocacoesDeJson(inicial.alocacoes)
@@ -107,52 +117,167 @@ export function PlantioForm({
 
   const { alocacoes, talhoesIds, tarefasTotais } = alocacoesParaJson(porcoes, talhoesFazenda);
   const escopoTalhoes = escopo === "talhao" || escopo === "parte";
+  const escopoDono = escopo === "proprietario" && proprietarios.length > 0;
+
+  // Escopo por proprietário: fazendas do dono com área em tarefas.
+  const tarefasFazenda = (f: FazendaOpcao) =>
+    Math.round(haParaTarefas(f.areaHa) * 100) / 100;
+  const fazendasDoDono =
+    escopoDono && donoId
+      ? fazendas.filter((f) => f.proprietarioId === donoId)
+      : [];
+  const fazendasEscolhidas =
+    escopoDono && donoId
+      ? fazendasDoDono.filter(
+          (f) => fazendasSel === undefined || fazendasSel.includes(f.id),
+        )
+      : [];
+  const totalDonoTarefas =
+    Math.round(
+      fazendasEscolhidas.reduce((a, f) => a + tarefasFazenda(f), 0) * 100,
+    ) / 100;
 
   return (
     <form action={action} className="grid gap-5 pb-4">
       <AlertaFormulario mensagem={state && !state.ok ? state.error : undefined} />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Campo label="Fazenda" htmlFor="fazendaId">
-          <select
-            id="fazendaId"
-            name="fazendaId"
-            className="field-input"
-            required
-            value={fazendaId}
-              onChange={(e) => {
-              setFazendaId(e.target.value);
-              setPorcoes([]);
-            }}
-          >
-            <option value="" disabled>
-              Selecione…
-            </option>
-            {fazendas.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome}
+        {escopoDono ? (
+          <>
+            <Campo
+              label="Proprietário (dono)"
+              htmlFor="donoId"
+              hint="O plantio vale para as fazendas dele que você marcar abaixo; o app grava um registro por fazenda."
+            >
+              <select
+                id="donoId"
+                name="donoId"
+                className="field-input"
+                value={donoId}
+                onChange={(e) => {
+                  setDonoId(e.target.value);
+                  setFazendasSel(undefined);
+                }}
+              >
+                <option value="" disabled>
+                  Selecione…
+                </option>
+                {proprietarios.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo
+              label="Fazendas a plantar"
+              htmlFor="fazendasDono"
+              hint={
+                donoId && fazendasDoDono.length === 0
+                  ? "Este dono não tem fazendas cadastradas."
+                  : `${fazendasEscolhidas.length} de ${fazendasDoDono.length} fazendas marcadas · ${String(totalDonoTarefas).replace(".", ",")} tarefas`
+              }
+            >
+              <div
+                id="fazendasDono"
+                className="max-h-44 overflow-y-auto rounded-[10px] border border-line bg-surface px-3 py-2"
+              >
+                {fazendasDoDono.length === 0 ? (
+                  <p className="text-xs text-ink-3">
+                    {donoId
+                      ? "Cadastre fazendas para este dono primeiro."
+                      : "Escolha o dono para listar as fazendas."}
+                  </p>
+                ) : (
+                  <ul className="grid gap-1">
+                    <li>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-ink-2">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-[var(--accent)]"
+                          checked={fazendasSel === undefined || fazendasSel.length === fazendasDoDono.length}
+                          onChange={(e) =>
+                            setFazendasSel(e.target.checked ? undefined : [])
+                          }
+                        />
+                        Todas as fazendas
+                      </label>
+                    </li>
+                    {fazendasDoDono.map((f) => (
+                      <li key={f.id}>
+                        <label className="flex items-center gap-2 text-sm text-ink">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-[var(--accent)]"
+                            checked={fazendasSel === undefined || fazendasSel.includes(f.id)}
+                            onChange={(e) => {
+                              const atual = fazendasSel ?? fazendasDoDono.map((x) => x.id);
+                              setFazendasSel(
+                                e.target.checked
+                                  ? [...atual, f.id]
+                                  : atual.filter((x) => x !== f.id),
+                              );
+                            }}
+                          />
+                          <span className="truncate">{f.nome}</span>
+                          <span className="ml-auto shrink-0 text-xs text-ink-3 tnum">
+                            {String(tarefasFazenda(f)).replace(".", ",")} tarefas
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Campo>
+          </>
+        ) : (
+          <Campo label="Fazenda" htmlFor="fazendaId">
+            <select
+              id="fazendaId"
+              name="fazendaId"
+              className="field-input"
+              required
+              value={fazendaId}
+                onChange={(e) => {
+                setFazendaId(e.target.value);
+                setPorcoes([]);
+              }}
+            >
+              <option value="" disabled>
+                Selecione…
               </option>
-            ))}
-          </select>
-        </Campo>
+              {fazendas.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        )}
 
         <Campo
           label="Escopo"
           htmlFor="escopo"
-          hint="Fazenda inteira, talhões específicos ou parte de um talhão."
+          hint="Fazenda inteira, talhões específicos, parte de um talhão ou as fazendas de um dono."
         >
           <select
             id="escopo"
             name="escopo"
             className="field-input"
             value={escopo}
-            onChange={(e) => setEscopo(e.target.value)}
+            onChange={(e) => {
+              setEscopo(e.target.value);
+              setFazendasSel(undefined);
+            }}
           >
-            {Object.entries(ESCOPOS_TRATO_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
+            {Object.entries(ESCOPOS_TRATO_LABEL)
+              .filter(([v]) => v !== "proprietario" || proprietarios.length > 0)
+              .map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
           </select>
         </Campo>
       </div>
@@ -188,9 +313,18 @@ export function PlantioForm({
       <input type="hidden" name="insumos" value={JSON.stringify(insumosParaJson(insumos))} />
       <input
         type="hidden"
-        name="tarefas"
-        value={escopoTalhoes ? String(tarefasTotais) : (inicial?.tarefas ?? "")}
+        name="fazendasIds"
+        value={escopoDono ? JSON.stringify(fazendasEscolhidas.map((f) => f.id)) : "[]"}
       />
+      {escopoDono && (
+        <input type="hidden" name="fazendaId" value={fazendasEscolhidas[0]?.id ?? ""} />
+      )}
+      <input
+        type="hidden"
+        name="tarefas"
+        value={escopoDono ? "" : escopoTalhoes ? String(tarefasTotais) : (inicial?.tarefas ?? "")}
+      />
+      {escopoDono && <input type="hidden" name="areaHa" value="" />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <CampoSafra defaultValue={inicial?.safra} usadas={safras} id="safra-plantio" />
@@ -369,30 +503,34 @@ export function PlantioForm({
           </div>
         )}
 
-        <div className="sm:col-span-2">
-          <SeletorInsumos
-            id="insumos-plantio"
-            talhoes={talhoesFazenda}
-            value={insumos}
-            onChange={setInsumos}
-            alocacoes={porcoes.filter((p) => p.completo || p.tarefas)}
-          />
-        </div>
+        {!escopoDono && (
+          <div className="sm:col-span-2">
+            <SeletorInsumos
+              id="insumos-plantio"
+              talhoes={talhoesFazenda}
+              value={insumos}
+              onChange={setInsumos}
+              alocacoes={porcoes.filter((p) => p.completo || p.tarefas)}
+            />
+          </div>
+        )}
 
-        <Campo
-          label="Área (ha, opcional)"
-          htmlFor="areaHa"
-          hint="Útil para calcular a média de custo por ha dos plantios."
-        >
-          <input
-            id="areaHa"
-            name="areaHa"
-            className="field-input tnum"
-            inputMode="decimal"
-            defaultValue={inicial?.areaHa ?? ""}
-            placeholder="Ex.: 20"
-          />
-        </Campo>
+        {escopoDono ? null : (
+          <Campo
+            label="Área (ha, opcional)"
+            htmlFor="areaHa"
+            hint="Útil para calcular a média de custo por ha dos plantios."
+          >
+            <input
+              id="areaHa"
+              name="areaHa"
+              className="field-input tnum"
+              inputMode="decimal"
+              defaultValue={inicial?.areaHa ?? ""}
+              placeholder="Ex.: 20"
+            />
+          </Campo>
+        )}
 
         <div className="sm:col-span-2">
           <p className="field-label">Tipo de registro</p>

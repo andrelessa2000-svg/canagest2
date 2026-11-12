@@ -39,6 +39,9 @@ export default async function EditarPlantioPage({
 
   if (!plantio) notFound();
 
+  // Registro por fazenda nunca guarda escopo "proprietario" — normaliza por segurança.
+  const escopoInicial = plantio.escopo === "proprietario" ? "fazenda" : plantio.escopo;
+
   const talhoesIdsInicial =
     (plantio.talhoesIds as string[] | null) ??
     (plantio.talhaoId ? [plantio.talhaoId] : []);
@@ -64,7 +67,7 @@ export default async function EditarPlantioPage({
           safras={safras}
           inicial={{
             fazendaId: plantio.fazendaId,
-            escopo: plantio.escopo,
+            escopo: escopoInicial,
             talhoesIds: talhoesIdsInicial,
             alocacoes: plantio.alocacoes,
             insumos: plantio.insumos,

@@ -92,7 +92,7 @@ export default async function EditarColheitaPage({
             precoKgAtr: numero(colheita.precoKgAtr),
             ctc: numero(custo?.ctc),
             areaColhida: numero(colheita.areaColhida),
-            escopo: colheita.escopo ?? "fazenda",
+            escopo: colheita.escopo === "proprietario" ? "fazenda" : (colheita.escopo ?? "fazenda"),
             talhaoId: colheita.talhaoId,
             talhoesIds: colheita.talhoesIds,
             alocacoes: colheita.alocacoes,
