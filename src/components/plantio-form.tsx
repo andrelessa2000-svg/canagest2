@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import { ESCOPOS_TRATO_LABEL, TIPOS_PLANTIO_LABEL } from "@/lib/validators";
-import { fmtMoney, fmtTarefas, haParaTarefas, parseDecimal, toDateInputValue } from "@/lib/format";
+import { fmtCount, fmtMoney, fmtTarefas, haParaTarefas, parseDecimal, toDateInputValue } from "@/lib/format";
 import { AlertaFormulario, BotaoSubmit, Campo } from "./forms";
 import { CampoSafra } from "./campo-safra";
 import { SelectorRegistro } from "./selector-registro";
@@ -15,6 +15,7 @@ import {
   alocacoesParaJson,
   type Alocacao,
 } from "./seletor-porcoes";
+import { ResumoPorDono, type LinhaResumoDono } from "./resumo-por-dono";
 
 function num(v: string): number {
   const p = parseDecimal(v);
@@ -103,6 +104,9 @@ export function PlantioForm({
   );
   const totalPlantio = totalMaquina + totalOperacoes;
 
+  // Base do rateio: valor digitado, senão o total da calculadora.
+  const totalBase = num(valor) > 0 ? num(valor) : totalPlantio;
+
   function setOperacao(idx: number, campo: keyof Operacao, v: string) {
     setOperacoes(operacoes.map((o, k) => (k === idx ? { ...o, [campo]: v } : o)));
   }
@@ -157,6 +161,32 @@ export function PlantioForm({
         : base.filter((x) => !ids.includes(x)),
     );
   }
+
+  // Resumo por dono: área, insumos e valor de cada proprietário no rateio.
+  const resumoDono: LinhaResumoDono[] = escopoDono
+    ? gruposDono
+        .map((g) => {
+          const escolhidas = g.fazendas.filter(
+            (f) => fazendasSel === undefined || fazendasSel.includes(f.id),
+          );
+          const tarefas =
+            Math.round(escolhidas.reduce((a, f) => a + tarefasFazenda(f), 0) * 100) / 100;
+          const share = totalDonoTarefas > 0 ? tarefas / totalDonoTarefas : 0;
+          const itens = insumos
+            .filter((i) => num(i.quantidade) > 0)
+            .map(
+              (i) =>
+                `${fmtCount(num(i.quantidade) * share)} ${i.unidade} · ${i.nome || "insumo"}`,
+            );
+          return {
+            dono: g.dono,
+            tarefas,
+            valor: totalBase * share,
+            detalhes: itens.length > 0 ? itens.join(" · ") : undefined,
+          };
+        })
+        .filter((x) => x.tarefas > 0)
+    : [];
 
   return (
     <form action={action} className="grid gap-5 pb-4">
@@ -555,6 +585,14 @@ export function PlantioForm({
           </Campo>
         </div>
       </div>
+
+      {escopoDono && resumoDono.length > 0 ? (
+        <ResumoPorDono
+          linhas={resumoDono}
+          totalTarefas={totalDonoTarefas}
+          totalValor={totalBase}
+        />
+      ) : null}
 
       <div className="flex justify-end">
         <BotaoSubmit>{inicial ? "Salvar alterações" : "Registrar plantio"}</BotaoSubmit>

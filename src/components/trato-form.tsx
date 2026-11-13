@@ -17,6 +17,7 @@ import {
 } from "./seletor-porcoes";
 import { SeletorInsumos, insumosDeJson, insumosParaJson, type Insumo } from "./seletor-insumos";
 import { CelulaMetrica } from "./stat-cells";
+import { ResumoPorDono, type LinhaResumoDono } from "./resumo-por-dono";
 
 const nf3 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
 
@@ -216,6 +217,45 @@ export function TratoForm({
     return { unidade, quantidade, custo: quantidade * num(l.valorUnitario) };
   });
   const totalHerbicida = calcLinha.reduce((a, x) => a + x.custo, 0);
+
+  // Resumo por dono: quanto da área, do produto e do valor cai para cada proprietário.
+  const ehAdubacao = tipo === "adubacao";
+  const ehCalda =
+    tipo === "herbicida" || tipo === "insecticida" || tipo === "foliar" || tipo === "formicida";
+  const totalBase =
+    num(valor) > 0
+      ? num(valor)
+      : ehAdubacao
+        ? totalAdubo
+        : ehCalda
+          ? totalHerbicida
+          : 0;
+  const resumoDono: LinhaResumoDono[] = escopoDono
+    ? gruposDono
+        .map((g) => {
+          const tarefas =
+            Math.round(
+              g.fazendas
+                .filter(
+                  (f) => fazendasSel === undefined || fazendasSel.includes(f.id),
+                )
+                .reduce((a, f) => a + tarefasFazenda(f), 0) * 100,
+            ) / 100;
+          const share = totalDonoTarefas > 0 ? tarefas / totalDonoTarefas : 0;
+          let detalhes: string | undefined;
+          if (ehAdubacao && sacosPorTarefa > 0) {
+            const sacosDono = Math.round(sacos * share);
+            detalhes = `${fmtCount(sacosDono)} sacos de ${pesoSaco || "50"} kg`;
+          } else if (ehCalda) {
+            const itens = calcLinha
+              .filter((x) => x.quantidade > 0)
+              .map((x) => `${fmtCount(x.quantidade * share)} ${x.unidade}`);
+            if (itens.length > 0) detalhes = itens.join(" · ");
+          }
+          return { dono: g.dono, tarefas, valor: totalBase * share, detalhes };
+        })
+        .filter((x) => x.tarefas > 0)
+    : [];
 
   function setProduto(idx: number, campo: keyof Produto, val: string) {
     setProdutos(produtos.map((p, k) => (k === idx ? { ...p, [campo]: val } : p)));
@@ -736,6 +776,14 @@ export function TratoForm({
             </div>
           ))}
         </section>
+      ) : null}
+
+      {escopoDono && resumoDono.length > 0 ? (
+        <ResumoPorDono
+          linhas={resumoDono}
+          totalTarefas={totalDonoTarefas}
+          totalValor={totalBase}
+        />
       ) : null}
 
       <div className="flex justify-end">
