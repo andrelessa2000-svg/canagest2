@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Download, Filter } from "lucide-react";
+import { BarChart3, Download, Droplets, Filter, Sprout } from "lucide-react";
 import { prisma } from "@/lib/db";
 import {
   fmtCount,
@@ -35,9 +35,193 @@ function categoriaDespesas(rotulo: string, valor: number, cor: string) {
   return { rotulo, valor, cor };
 }
 
+type Cascata = Awaited<ReturnType<typeof cargarCascata>>;
+
+function CascataSecao({ cascata }: { cascata: Cascata }) {
+  const custosCascata =
+    cascata.total.ctc +
+    cascata.total.arrendamento +
+    cascata.total.dividas +
+    cascata.total.tratos +
+    cascata.total.plantio +
+    cascata.total.proj;
+  const custoTonelada = cascata.total.toneladas > 0 ? custosCascata / cascata.total.toneladas : 0;
+  const custoTarefa = cascata.total.tarefas > 0 ? custosCascata / cascata.total.tarefas : 0;
+
+  return (
+    <section className="mt-10 grid gap-3">
+      <h2 className="font-display text-xl text-ink">Relatório em cascata</h2>
+      <p className="text-sm leading-relaxed text-ink-2">
+        Receita da colheita − (CTC + arrendamento + insumos + despesas com usina) ={" "}
+        <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos reais −
+        plantio reais = <span className="font-semibold text-ink">lucro líquido</span>. Lucro líquido −
+        investimentos futuros (registrados no módulo Financeiro, até a próxima safra) ={" "}
+        <span className="font-semibold text-ink">lucro líquido estimado</span>.
+      </p>
+      <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
+        <table className="w-full min-w-[860px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
+              <th className="px-3 py-2 font-semibold">Fazenda</th>
+              <th className="px-3 py-2 text-right font-semibold">Receita</th>
+              <th className="px-3 py-2 text-right font-semibold">Lucro bruto</th>
+              <th className="px-3 py-2 text-right font-semibold">Tratos</th>
+              <th className="px-3 py-2 text-right font-semibold">Plantio</th>
+              <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
+              <th className="px-3 py-2 text-right font-semibold">Projeções</th>
+              <th className="px-3 py-2 text-right font-semibold">Lucro líquido estimado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cascata.filas.map((f) => (
+              <tr key={f.fazendaId} className="border-b border-line">
+                <td className="px-3 py-2 font-medium text-ink">{f.fazendaNome}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(f.lucroBruto)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.tratos)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.plantio)}</td>
+                <td
+                  className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                    f.lucroNeto < 0 ? "text-danger-strong" : "text-accent"
+                  }`}
+                >
+                  {fmtMoney(f.lucroNeto)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-2">
+                  {fmtMoney(f.proj)}
+                </td>
+                <td
+                  className={`px-3 py-2 text-right font-bold tabular-nums ${
+                    f.lucroNetoEstimado < 0 ? "text-danger-strong" : "text-accent"
+                  }`}
+                >
+                  {fmtMoney(f.lucroNetoEstimado)}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-b border-line bg-surface-muted">
+              <td className="px-3 py-2 font-bold text-ink">TOTAL</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.receita)}</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroBruto)}</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.tratos)}</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.plantio)}</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">
+                {fmtMoney(cascata.total.proj)}
+              </td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums text-ink">
+                {fmtMoney(cascata.total.lucroNetoEstimado)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-3">
+        <CelulaMetrica
+          rotulo="Custo por tonelada"
+          valor={fmtMoney(custoTonelada)}
+          legenda="despesas ÷ toneladas"
+        />
+        <CelulaMetrica
+          rotulo="Custo por tarefa"
+          valor={fmtMoney(custoTarefa)}
+          legenda="despesas ÷ tarefas"
+        />
+        <CelulaMetrica
+          rotulo="Lucro líquido estimado"
+          valor={fmtMoney(cascata.total.lucroNetoEstimado)}
+          legenda="após custos reais e projeções"
+          destaque
+        />
+      </div>
+    </section>
+  );
+}
+
+async function SemColheitas({
+  tratos,
+  plantios,
+}: {
+  tratos: { valor: number; projecao: boolean }[];
+  plantios: { valor: number; projecao: boolean }[];
+}) {
+  const cascata = await cargarCascata();
+  const tratosReal = tratos.filter((t) => !t.projecao).reduce((a, t) => a + t.valor, 0);
+  const tratosProj = tratos.filter((t) => t.projecao).reduce((a, t) => a + t.valor, 0);
+  const plantiosReal = plantios.filter((p) => !p.projecao).reduce((a, p) => a + p.valor, 0);
+  const plantiosProj = plantios.filter((p) => p.projecao).reduce((a, p) => a + p.valor, 0);
+  const nReg = tratos.length + plantios.length;
+
+  return (
+    <>
+      <PageHeader
+        rotulo="relatório"
+        titulo="Relatórios"
+        descricao="Análise completa da produção, produtividade e resultado."
+        acao={
+          <>
+            <Link href="/relatorios/tratos" className="btn btn-ghost">
+              <Droplets className="size-4" /> Tratos
+            </Link>
+            <Link href="/relatorios/plantios" className="btn btn-ghost">
+              <Sprout className="size-4" /> Plantios
+            </Link>
+            <Link href="/relatorios/insumos" className="btn btn-ghost">
+              <Filter className="size-4" /> Insumos e gastos
+            </Link>
+            <Link href="/relatorios/csv" className="btn btn-soft">
+              <Download className="size-4" /> CSV
+            </Link>
+            <PrintButton />
+          </>
+        }
+      />
+
+      <div className="ledger-panel grid gap-3 p-5 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="grid gap-1">
+          <p className="font-display text-lg text-ink">Nenhuma colheita registrada ainda</p>
+          <p className="text-sm leading-relaxed text-ink-2">
+            Receita, lucro e produtividade aparecem quando houver colheitas. Enquanto isso, os
+            relatórios já mostram os gastos com tratos e plantio.
+          </p>
+        </div>
+        <Link href="/colheitas/nova" className="btn btn-secondary">
+          Registrar colheita
+        </Link>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <CelulaMetrica
+          rotulo="Gasto real com tratos"
+          valor={fmtMoney(tratosReal)}
+          legenda="caderno de campo"
+        />
+        <CelulaMetrica
+          rotulo="Gasto real com plantio"
+          valor={fmtMoney(plantiosReal)}
+          legenda="caderno de campo"
+        />
+        <CelulaMetrica
+          rotulo="Projeções"
+          valor={fmtMoney(tratosProj + plantiosProj)}
+          legenda="tratos e plantio projetados"
+        />
+        <CelulaMetrica
+          rotulo="Total gasto real"
+          valor={fmtMoney(tratosReal + plantiosReal)}
+          legenda={`${fmtCount(nReg)} registros`}
+          destaque
+        />
+      </div>
+
+      <CascataSecao cascata={cascata} />
+    </>
+  );
+}
+
 export default async function RelatoriosPage() {
   const userId = await userIdAtual();
-  const [colheitas, fazendas] = await Promise.all([
+  const [colheitas, fazendas, tratosResumo, plantiosResumo] = await Promise.all([
     prisma.colheita.findMany({
       where: { userId },
       include: {
@@ -58,9 +242,11 @@ export default async function RelatoriosPage() {
       },
       orderBy: { nome: "asc" },
     }),
+    prisma.trato.findMany({ where: { userId }, select: { valor: true, projecao: true } }),
+    prisma.plantio.findMany({ where: { userId }, select: { valor: true, projecao: true } }),
   ]);
 
-  if (colheitas.length === 0) {
+  if (colheitas.length === 0 && tratosResumo.length === 0 && plantiosResumo.length === 0) {
     return (
       <>
         <PageHeader
@@ -71,12 +257,16 @@ export default async function RelatoriosPage() {
         <EmptyState
           icone={BarChart3}
           titulo="Nada para analisar ainda"
-          descricao="Registre colheitas para que os relatórios e gráficos sejam gerados."
+          descricao="Registre colheitas, tratos ou plantios para que os relatórios e gráficos sejam gerados."
           ctaTexto="Registrar colheita"
           ctaHref="/colheitas/nova"
         />
       </>
     );
+  }
+
+  if (colheitas.length === 0) {
+    return <SemColheitas tratos={tratosResumo} plantios={plantiosResumo} />;
   }
 
   const linhas = colheitas.map((c) => {
@@ -293,16 +483,6 @@ export default async function RelatoriosPage() {
     })
     .filter((g) => g.vazios.length > 0);
 
-  const custosCascata =
-    cascata.total.ctc +
-    cascata.total.arrendamento +
-    cascata.total.dividas +
-    cascata.total.tratos +
-    cascata.total.plantio +
-    cascata.total.proj;
-  const custoTonelada = cascata.total.toneladas > 0 ? custosCascata / cascata.total.toneladas : 0;
-  const custoTarefa = cascata.total.tarefas > 0 ? custosCascata / cascata.total.tarefas : 0;
-
   return (
     <>
       <PageHeader
@@ -311,6 +491,12 @@ export default async function RelatoriosPage() {
         descricao="Safra, produtividade e resultado — valores e gráficos para imprimir."
         acao={
           <>
+            <Link href="/relatorios/tratos" className="btn btn-ghost">
+              <Droplets className="size-4" /> Tratos
+            </Link>
+            <Link href="/relatorios/plantios" className="btn btn-ghost">
+              <Sprout className="size-4" /> Plantios
+            </Link>
             <Link href="/relatorios/insumos" className="btn btn-ghost">
               <Filter className="size-4" /> Insumos e gastos
             </Link>
@@ -480,93 +666,7 @@ export default async function RelatoriosPage() {
         </div>
       </section>
 
-      {/* Relatório em cascata */}
-      <section className="mt-10 grid gap-3">
-        <h2 className="font-display text-xl text-ink">Relatório em cascata</h2>
-        <p className="text-sm leading-relaxed text-ink-2">
-          Receita da colheita − (CTC + arrendamento + insumos + despesas com usina) ={" "}
-          <span className="font-semibold text-ink">lucro bruto</span>. Lucro bruto − tratos reais −
-          plantio reais = <span className="font-semibold text-ink">lucro líquido</span>. Lucro líquido −
-          investimentos futuros (registrados no módulo Financeiro, até a próxima safra) ={" "}
-          <span className="font-semibold text-ink">lucro líquido estimado</span>.
-        </p>
-        <div className="overflow-x-auto rounded-[10px] border border-line bg-surface">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
-                <th className="px-3 py-2 font-semibold">Fazenda</th>
-                <th className="px-3 py-2 text-right font-semibold">Receita</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro bruto</th>
-                <th className="px-3 py-2 text-right font-semibold">Tratos</th>
-                <th className="px-3 py-2 text-right font-semibold">Plantio</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro líquido</th>
-                <th className="px-3 py-2 text-right font-semibold">Projeções</th>
-                <th className="px-3 py-2 text-right font-semibold">Lucro líquido estimado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cascata.filas.map((f) => (
-                <tr key={f.fazendaId} className="border-b border-line">
-                  <td className="px-3 py-2 font-medium text-ink">{f.fazendaNome}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink">{fmtMoney(f.receita)}</td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(f.lucroBruto)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.tratos)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">{fmtMoney(f.plantio)}</td>
-                  <td
-                    className={`px-3 py-2 text-right font-semibold tabular-nums ${
-                      f.lucroNeto < 0 ? "text-danger-strong" : "text-accent"
-                    }`}
-                  >
-                    {fmtMoney(f.lucroNeto)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-ink-2">
-                    {fmtMoney(f.proj)}
-                  </td>
-                  <td
-                    className={`px-3 py-2 text-right font-bold tabular-nums ${
-                      f.lucroNetoEstimado < 0 ? "text-danger-strong" : "text-accent"
-                    }`}
-                  >
-                    {fmtMoney(f.lucroNetoEstimado)}
-                  </td>
-                </tr>
-              ))}
-              <tr className="border-b border-line bg-surface-muted">
-                <td className="px-3 py-2 font-bold text-ink">TOTAL</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.receita)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroBruto)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.tratos)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.plantio)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">{fmtMoney(cascata.total.lucroNeto)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink">
-                  {fmtMoney(cascata.total.proj)}
-                </td>
-                <td className="px-3 py-2 text-right font-bold tabular-nums text-ink">
-                  {fmtMoney(cascata.total.lucroNetoEstimado)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-3">
-          <CelulaMetrica
-            rotulo="Custo por tonelada"
-            valor={fmtMoney(custoTonelada)}
-            legenda="despesas ÷ toneladas"
-          />
-          <CelulaMetrica
-            rotulo="Custo por tarefa"
-            valor={fmtMoney(custoTarefa)}
-            legenda="despesas ÷ tarefas"
-          />
-          <CelulaMetrica
-            rotulo="Lucro líquido estimado"
-            valor={fmtMoney(cascata.total.lucroNetoEstimado)}
-            legenda="após custos reais e projeções"
-            destaque
-          />
-        </div>
-      </section>
+      <CascataSecao cascata={cascata} />
 
       {/* Talhões vazios */}
       <section className="mt-10 grid gap-3">
